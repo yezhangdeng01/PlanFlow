@@ -871,7 +871,9 @@ export class PlanBoardView extends ItemView {
 		});
 
 		const summaryCard = dailyGrid.createDiv({ cls: "planboard-card planboard-summary-card" });
-		summaryCard.createDiv({ cls: "planboard-card-title", text: "📝 今日总结" });
+		// v1.7.4: 标题包进 header（与打卡卡同构——两卡 header 等高 38px + center，标题/按钮同一中心线）
+		const summaryHeader = summaryCard.createDiv({ cls: "planboard-card-header" });
+		summaryHeader.createDiv({ cls: "planboard-card-title", text: "📝 今日总结" });
 		// v1.4: 打卡自动生成区（完成/未完成/鼓励语，只读展示，不写文件）
 		this.summaryAutoEl = summaryCard.createDiv({ cls: "planboard-summary-auto" });
 		this.summaryEl = summaryCard.createEl("textarea", {

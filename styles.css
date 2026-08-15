@@ -400,9 +400,8 @@
 	background: rgba(239, 68, 68, 0.12);
 }
 
-.planboard-add-btn {
-	margin-bottom: 8px;
-}
+/* v1.7.4: 旧 margin-bottom:8px 已删——add-btn 现在用于卡头（header 内 flex row 垂直居中，
+   margin 会使按钮 margin-box 撑满 header 导致按钮偏上 4px，与标题中心错位） */
 
 /* ========== 总结 ========== */
 .planboard-summary-input {
@@ -1774,9 +1773,8 @@
 	background: linear-gradient(180deg, rgba(70, 130, 190, 0.4) 0%, rgba(70, 130, 190, 0.15) 65%, rgba(70, 130, 190, 0.05) 100%);
 }
 
-/* 行动区点缀：打卡卡头 + 总结标题前珊瑚橙色条 */
-.planboard-check-card > .planboard-card-header::before,
-.planboard-summary-card > .planboard-card-title::before {
+/* 行动区点缀：总结标题前珊瑚橙色条（v1.7.4 标题已包进 header，选择器改后代） */
+.planboard-summary-card .planboard-card-title::before {
 	content: "";
 	width: 4px;
 	height: 16px;
@@ -1787,10 +1785,52 @@
 	flex-shrink: 0;
 }
 
+/* v1.7.4 修复：打卡卡 header 是 flex space-between——色条原为 header::before flex item 会把标题挤右移 135px。
+   色条已移入标题内（下方规则）。四修：两卡 header 等高 min-height:38px + align-items:center——
+   打卡 header 被 30px 按钮撑高、总结 header 只有 20px 标题，高度不同导致标题/按钮中心错位；
+   等高后标题、按钮、总结卡标题全部同一中心线 */
+.planboard-check-card > .planboard-card-header,
+.planboard-summary-card > .planboard-card-header {
+	min-height: 38px;
+	align-items: center;
+}
+
+.planboard-check-card .planboard-check-title::before {
+	content: "";
+	width: 4px;
+	height: 16px;
+	border-radius: 2px;
+	background: #ef8354;
+	margin-right: 8px;
+	flex-shrink: 0;
+}
+
 /* summary 的标题是 block div——::before 需 inline-block 才有宽高（否则色条不显示） */
 .planboard-summary-card > .planboard-card-title::before {
 	display: inline-block;
 	vertical-align: -2px;
+}
+
+/* v1.7.4：打卡/总结卡底色统一为透明（与月/周/年度卡一致——"浅灰边框骨架"体系；
+   旧 background-secondary 灰底是 v1.4 残留，与全插件透明卡不统一） */
+.planboard-check-card,
+.planboard-summary-card {
+	background: transparent;
+}
+
+/* v1.7.4：打卡列表内容少时均匀分布（拖高卡片后 4 项不再挤顶部留大段空白；
+   margin auto 技巧：空间充足=均匀分布，空间不足=收缩为 0 顶部堆叠+滚动） */
+.planboard-check-card .planboard-checklist {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+.planboard-check-card .planboard-checklist > * {
+	margin-top: auto;
+	margin-bottom: auto;
 }
 
 /* 写复盘按钮：outline 珊瑚橙（行动入口）——特异性需高于 .planboard-btn-outline */
