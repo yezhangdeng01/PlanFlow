@@ -3,6 +3,8 @@
 > 个人计划总览：每日打卡、周/月/年目标进度、看板与甘特——六视图一体的 Obsidian 计划流系统。
 > **数据是纯 Markdown**：计划定义在笔记 frontmatter，打卡即勾选任务，所有视图实时聚合，无需配置任何查询。
 
+📖 **完整图文使用说明（设计理念 / 功能性 / 易用性）：[docs/USAGE.md](docs/USAGE.md)**
+
 ![今日视图](docs/screenshots/today.png)
 
 ## ✨ 功能
