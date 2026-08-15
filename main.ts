@@ -12,7 +12,7 @@ export default class PlanFlowPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		this.registerView(VIEW_TYPE_PLANBOARD, (leaf) => {
+		this.registerView(VIEW_TYPE_PLANFLOW, (leaf) => {
 			this.view = new PlanBoardView(leaf, this);
 			return this.view;
 		});
@@ -24,12 +24,12 @@ export default class PlanFlowPlugin extends Plugin {
 		});
 
 		// 侧边栏图标（点击打开 PlanBoard，主区域）
-		const ribbonIcon = this.addRibbonIcon("layout-dashboard", "PlanBoard 计划总览", () =>
+		const ribbonIcon = this.addRibbonIcon("layout-dashboard", "PlanFlow 计划总览", () =>
 			void this.activateView(),
 		);
 		ribbonIcon.addClass("planboard-ribbon");
 
-		this.addSettingTab(new PlanBoardSettingTab(this.app, this));
+		this.addSettingTab(new PlanFlowSettingTab(this.app, this));
 
 		if (this.settings.openOnStartup) {
 			// 借鉴 Homepage 插件方案：监听 layout-change，等 Obsidian 启动恢复流程
@@ -46,7 +46,7 @@ export default class PlanFlowPlugin extends Plugin {
 	/** layout-change 防抖：恢复稳定后打开 PlanBoard（仅启动期一次）。 */
 	private onStartupLayoutChange = (): void => {
 		if (this.startupOpened) return;
-		const inMain = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANBOARD).some((l) => l.getRoot() === this.app.workspace.rootSplit);
+		const inMain = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANFLOW).some((l) => l.getRoot() === this.app.workspace.rootSplit);
 		if (inMain) {
 			this.startupOpened = true;
 			return;
@@ -59,14 +59,14 @@ export default class PlanFlowPlugin extends Plugin {
 	};
 
 	onunload(): void {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_PLANBOARD);
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_PLANFLOW);
 	}
 
 	/** Open the PlanBoard view in the main area (or reveal it if already open). */
 	async activateView(): Promise<void> {
 		const { workspace } = this.app;
 		// 关闭旧位置（如右栏）的视图，确保在主区域打开
-		workspace.detachLeavesOfType(VIEW_TYPE_PLANBOARD);
+		workspace.detachLeavesOfType(VIEW_TYPE_PLANFLOW);
 		const leaf = workspace.getLeaf("tab");
 		if (!leaf) {
 			new Notice("无法打开 PlanBoard 视图");
