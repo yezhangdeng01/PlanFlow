@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #f2f4f7; margin: 0; padding: 32px; }
+  h2 { margin: 0 0 6px; font-size: 18px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 14px; padding: 28px 20px; text-align: center; box-shadow: 0 1px 5px rgba(0,0,0,.08); max-width: 420px; }
+  .card .big { width: 140px; height: 140px; margin: 0 auto 16px; }
+  .card .n { font-weight: 700; font-size: 14px; }
+  .card .d { color: #888; font-size: 12px; margin-top: 4px; }
+  .sim { margin-top: 16px; background: #eef0f3; border-radius: 8px; padding: 12px; display: flex; justify-content: center; gap: 18px; align-items: center; }
+  .sim .s { display: inline-block; background: #fff; border-radius: 6px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .sim svg { display: block; }
+  .sim .lbl { font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+<h2>PlanFlow 图标 · V3 第三版（矩形齿 + 均匀三环 + 小红点）</h2>
+<div class="sub">齿改矩形（平行边等宽 2.2，不再倒梯形→不再像龟壳）、三环均匀间距 2.0（r7.8/5.8/3.8）、红点缩小 r1.0、十字连环不穿中心</div>
+<div class="card">
+  <div class="big">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- 8 矩形齿（平行边等宽 2.2，齿长 3.7，均分 45°） -->
+      <g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round">
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(45 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(90 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(135 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(180 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(225 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(270 12 12)"/>
+        <path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(315 12 12)"/>
+      </g>
+      <!-- 均匀 3 圆环：r7.8 / r5.8 / r3.8（间距 2.0） -->
+      <circle cx="12" cy="12" r="7.8" stroke="#4a6fa5" stroke-width="0.7"/>
+      <circle cx="12" cy="12" r="5.8" stroke="#4a6fa5" stroke-width="0.7"/>
+      <circle cx="12" cy="12" r="3.8" stroke="#4a6fa5" stroke-width="0.7"/>
+      <!-- 十字：内端连 r3.8、外端连 r7.8 -->
+      <g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round">
+        <path d="M12 4.2 V8.2"/>
+        <path d="M12 15.8 V19.8"/>
+        <path d="M4.2 12 H8.2"/>
+        <path d="M15.8 12 H19.8"/>
+      </g>
+      <!-- 靶心红点（缩小 r1.0） -->
+      <circle cx="12" cy="12" r="1.0" fill="#ef8354"/>
+    </svg>
+  </div>
+  <div class="n">V3 第三版 · 矩形齿 + 均匀三环</div>
+  <div class="d">平行边齿 · 环距 2.0 · 红点 r1.0</div>
+  <div class="sim">
+    <span class="s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round"><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(45 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(90 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(135 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(180 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(225 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(270 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(315 12 12)"/></g><circle cx="12" cy="12" r="7.8" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="5.8" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="3.8" stroke="#4a6fa5" stroke-width="0.7"/><g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round"><path d="M12 4.2 V8.2"/><path d="M12 15.8 V19.8"/><path d="M4.2 12 H8.2"/><path d="M15.8 12 H19.8"/></g><circle cx="12" cy="12" r="1.0" fill="#ef8354"/></svg></span>
+    <span class="lbl">20px 侧边栏</span>
+    <span class="s"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round"><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(45 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(90 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(135 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(180 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(225 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(270 12 12)"/><path d="M10.9 0.5 L13.1 0.5 L13.1 4.2 L10.9 4.2 Z" transform="rotate(315 12 12)"/></g><circle cx="12" cy="12" r="7.8" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="5.8" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="3.8" stroke="#4a6fa5" stroke-width="0.7"/><g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round"><path d="M12 4.2 V8.2"/><path d="M12 15.8 V19.8"/><path d="M4.2 12 H8.2"/><path d="M15.8 12 H19.8"/></g><circle cx="12" cy="12" r="1.0" fill="#ef8354"/></svg></span>
+    <span class="lbl">36px 放大</span>
+  </div>
+</div>
+</body>
+</html>

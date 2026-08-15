@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #f2f4f7; margin: 0; padding: 32px; }
+  h2 { margin: 0 0 6px; font-size: 18px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 14px; padding: 28px 20px; text-align: center; box-shadow: 0 1px 5px rgba(0,0,0,.08); max-width: 420px; }
+  .card .big { width: 140px; height: 140px; margin: 0 auto 16px; }
+  .card .n { font-weight: 700; font-size: 14px; }
+  .card .d { color: #888; font-size: 12px; margin-top: 4px; }
+  .sim { margin-top: 16px; background: #eef0f3; border-radius: 8px; padding: 12px; display: flex; justify-content: center; gap: 18px; align-items: center; }
+  .sim .s { display: inline-block; background: #fff; border-radius: 6px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .sim svg { display: block; }
+  .sim .lbl { font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+<h2>PlanFlow 图标 · V3 第七版（连续轮廓齿轮 · 宽齿窄缝）</h2>
+<div class="sub">外轮廓 = 8 宽齿 + 齿根弧一条连续线（无独立外环）；齿顶宽 3.4 根宽 4.6、缝窄；内 2 环 r6.4/4.4 + 十字 + 红点</div>
+<div class="card">
+  <div class="big">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- 外轮廓：8 齿 + 齿根弧连续勾勒（每个齿含根弧，rotate 45° 拼接） -->
+      <g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round">
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(45 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(90 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(135 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(180 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(225 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(270 12 12)"/>
+        <path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(315 12 12)"/>
+      </g>
+      <!-- 内 2 环：r6.4 / r4.4（间距 2.0） -->
+      <circle cx="12" cy="12" r="6.4" stroke="#4a6fa5" stroke-width="0.7"/>
+      <circle cx="12" cy="12" r="4.4" stroke="#4a6fa5" stroke-width="0.7"/>
+      <!-- 十字：内端连 r4.4、外端连齿根 r8.6 -->
+      <g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round">
+        <path d="M12 3.4 V7.6"/>
+        <path d="M12 16.4 V20.6"/>
+        <path d="M3.4 12 H7.6"/>
+        <path d="M16.4 12 H20.6"/>
+      </g>
+      <!-- 靶心红点 r0.7 -->
+      <circle cx="12" cy="12" r="0.7" fill="#ef8354"/>
+    </svg>
+  </div>
+  <div class="n">V3 第七版 · 连续轮廓 · 宽齿窄缝</div>
+  <div class="d">齿顶 3.4/根 4.6 · 缝 2.1 · 无独立外环</div>
+  <div class="sim">
+    <span class="s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round"><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(45 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(90 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(135 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(180 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(225 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(270 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(315 12 12)"/></g><circle cx="12" cy="12" r="6.4" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="4.4" stroke="#4a6fa5" stroke-width="0.7"/><g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round"><path d="M12 3.4 V7.6"/><path d="M12 16.4 V20.6"/><path d="M3.4 12 H7.6"/><path d="M16.4 12 H20.6"/></g><circle cx="12" cy="12" r="0.7" fill="#ef8354"/></svg></span>
+    <span class="lbl">20px 侧边栏</span>
+    <span class="s"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="#4a6fa5" stroke-width="0.8" stroke-linejoin="round"><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(45 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(90 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(135 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(180 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(225 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(270 12 12)"/><path d="M9.7 3.71 L10.3 0.6 L13.7 0.6 L14.3 3.71 A 8.6 8.6 0 0 1 9.7 3.71 Z" transform="rotate(315 12 12)"/></g><circle cx="12" cy="12" r="6.4" stroke="#4a6fa5" stroke-width="0.7"/><circle cx="12" cy="12" r="4.4" stroke="#4a6fa5" stroke-width="0.7"/><g stroke="#ef8354" stroke-width="0.8" stroke-linecap="round"><path d="M12 3.4 V7.6"/><path d="M12 16.4 V20.6"/><path d="M3.4 12 H7.6"/><path d="M16.4 12 H20.6"/></g><circle cx="12" cy="12" r="0.7" fill="#ef8354"/></svg></span>
+    <span class="lbl">36px 放大</span>
+  </div>
+</div>
+</body>
+</html>

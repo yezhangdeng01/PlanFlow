@@ -25,9 +25,17 @@
 
 ## 🚀 安装
 
-1. 下载 [最新 Release](https://github.com/) 的 `main.js`、`manifest.json`、`styles.css`
+### 方式一：BRAT（推荐，支持自动更新）
+
+1. 安装 [BRAT](obsidian://show-plugin?id=obsidian42-brat) 插件
+2. BRAT 设置 → Add Beta plugin → 输入 `yezhagndeng001/planflow`
+3. 启用 PlanFlow（后续发新版自动更新）
+
+### 方式二：手动安装
+
+1. 下载 [最新 Release](https://github.com/yezhagndeng001/planflow/releases) 的 `main.js`、`manifest.json`、`styles.css`
 2. 在 vault 中创建 `.obsidian/plugins/planflow/` 目录，放入三个文件
-3. Obsidian 设置 → 第三方插件 → 启用 PlanBoard
+3. Obsidian 设置 → 第三方插件 → 启用 PlanFlow
 
 ## 📂 数据格式（vault 内纯 Markdown）
 
