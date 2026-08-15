@@ -10,3 +10,4 @@ test/palette.html
 test/ui-preview/
 # 构建产物（社区插件惯例：main.js 随 release 发布，不进源码仓库）
 main.js
+.claude/settings.json
