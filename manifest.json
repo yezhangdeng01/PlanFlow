@@ -1,0 +1,10 @@
+{
+  "id": "planboard",
+  "name": "PlanBoard",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "个人计划总览：每日打卡、进度统计、目标管理，清爽卡片风格",
+  "author": "JCH",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

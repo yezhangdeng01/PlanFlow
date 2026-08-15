@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+# 本地调试/部署脚本（含本机路径）
+deploy.ps1
+screenshot.js
+test/cdp-*.js
+test/vision_cli.py
+test/palette.html
+test/ui-preview/
+# 构建产物（社区插件惯例：main.js 随 release 发布，不进源码仓库）
+main.js

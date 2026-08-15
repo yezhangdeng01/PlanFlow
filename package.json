@@ -1,0 +1,29 @@
+{
+  "name": "obsidian-planboard",
+  "version": "0.1.0",
+  "description": "PlanBoard: 个人计划总览 - 每日打卡、进度统计、目标管理（清爽卡片风格）",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "typecheck": "tsc -noEmit -skipLibCheck"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "planning",
+    "habits",
+    "tasks"
+  ],
+  "author": "JCH",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "^1.5.7",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.0",
+    "ws": "^8.21.3"
+  }
+}
