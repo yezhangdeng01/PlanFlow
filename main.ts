@@ -72,7 +72,7 @@ export default class PlanFlowPlugin extends Plugin {
 			new Notice("无法打开 PlanBoard 视图");
 			return;
 		}
-		await leaf.setViewState({ type: VIEW_TYPE_PLANBOARD, active: true });
+		await leaf.setViewState({ type: VIEW_TYPE_PLANFLOW, active: true });
 		await workspace.revealLeaf(leaf);
 	}
 
