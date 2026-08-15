@@ -44,12 +44,12 @@ raw/计划/                  ← 可在设置中修改根路径
 ```yaml
 ---
 plans:
-  - name: 写作
+  - name: 阅读
     type: 量化
-    target: 12
-    unit: 篇
-    desc: 公众号长文
-  - name: 跑步
+    target: 24
+    unit: 本
+    desc: 读书笔记
+  - name: 健身
     type: 习惯
     target: 100
     unit: 天
