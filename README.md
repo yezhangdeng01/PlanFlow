@@ -1,6 +1,6 @@
-# PlanBoard
+# PlanFlow
 
-> 个人计划总览：每日打卡、周/月/年目标进度、看板与甘特——六视图一体的 Obsidian 计划系统。
+> 个人计划总览：每日打卡、周/月/年目标进度、看板与甘特——六视图一体的 Obsidian 计划流系统。
 > **数据是纯 Markdown**：计划定义在笔记 frontmatter，打卡即勾选任务，所有视图实时聚合，无需配置任何查询。
 
 ![今日视图](docs/screenshots/today.png)
@@ -24,7 +24,7 @@
 ## 🚀 安装
 
 1. 下载 [最新 Release](https://github.com/) 的 `main.js`、`manifest.json`、`styles.css`
-2. 在 vault 中创建 `.obsidian/plugins/planboard/` 目录，放入三个文件
+2. 在 vault 中创建 `.obsidian/plugins/planflow/` 目录，放入三个文件
 3. Obsidian 设置 → 第三方插件 → 启用 PlanBoard
 
 ## 📂 数据格式（vault 内纯 Markdown）

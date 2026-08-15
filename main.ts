@@ -1,11 +1,11 @@
 import { Notice, Plugin } from "obsidian";
-import { PlanBoardView, VIEW_TYPE_PLANBOARD } from "./src/PlanBoardView";
-import type { PlanBoardSettings } from "./src/settings";
-import { DEFAULT_SETTINGS, PlanBoardSettingTab } from "./src/settings";
+import { PlanFlowView, VIEW_TYPE_PLANFLOW } from "./src/PlanBoardView";
+import type { PlanFlowSettings } from "./src/settings";
+import { DEFAULT_SETTINGS, PlanFlowSettingTab } from "./src/settings";
 
-export default class PlanBoardPlugin extends Plugin {
-	settings: PlanBoardSettings;
-	private view: PlanBoardView | null = null;
+export default class PlanFlowPlugin extends Plugin {
+	settings: PlanFlowSettings;
+	private view: PlanFlowView | null = null;
 	private startupOpenTimer: number | null = null;
 	private startupOpened = false;
 

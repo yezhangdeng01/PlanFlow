@@ -35,7 +35,8 @@ import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMo
 import { attachGanttDrag } from "./gantt-drag";
 import { DEFAULT_PLAN_COLORS } from "./settings";
 
-export const VIEW_TYPE_PLANBOARD = "planboard";
+/** v1.7.4: 插件改名 PlanFlow——view type 同步改（workspace 布局重新打开一次即可） */
+export const VIEW_TYPE_PLANFLOW = "planflow";
 
 type TabKey = PeriodType | "today" | "board" | "gantt";
 
@@ -539,7 +540,7 @@ export class PlanBoardView extends ItemView {
 	}
 
 	getViewType(): string {
-		return VIEW_TYPE_PLANBOARD;
+		return VIEW_TYPE_PLANFLOW;
 	}
 
 	getDisplayText(): string {

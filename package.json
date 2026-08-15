@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-planboard",
+  "name": "obsidian-planflow",
   "version": "0.1.0",
-  "description": "PlanBoard: 个人计划总览 - 每日打卡、进度统计、目标管理（清爽卡片风格）",
+  "description": "PlanFlow: 个人计划总览 - 每日打卡、周月年目标、看板与甘特（六视图一体）",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

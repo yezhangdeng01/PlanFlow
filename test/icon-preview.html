@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #f2f4f7; margin: 0; padding: 32px; }
+  h2 { margin: 0 0 20px; font-size: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .item { background: #fff; border-radius: 12px; padding: 22px 12px; text-align: center; box-shadow: 0 1px 5px rgba(0,0,0,.08); }
+  .item svg { width: 48px; height: 48px; stroke: #4a6fa5; }
+  .item .n { margin-top: 12px; font-weight: 700; font-size: 13px; }
+  .item .d { color: #888; font-size: 12px; margin-top: 4px; }
+  .item.rec { outline: 3px solid #ef8354; outline-offset: 2px; }
+  .note { margin-top: 24px; color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<h2>PlanFlow 图标候选（Lucide 真实渲染）</h2>
+<div class="grid">
+  <div class="item rec"><i data-lucide="calendar-check"></i><div class="n">calendar-check</div><div class="d">计划+打卡 ⭐推荐</div></div>
+  <div class="item"><i data-lucide="target"></i><div class="n">target</div><div class="d">目标靶心</div></div>
+  <div class="item"><i data-lucide="workflow"></i><div class="n">workflow</div><div class="d">流程流转</div></div>
+  <div class="item"><i data-lucide="layers"></i><div class="n">layers</div><div class="d">年→月→周→日</div></div>
+  <div class="item"><i data-lucide="list-checks"></i><div class="n">list-checks</div><div class="d">清单打卡</div></div>
+</div>
+<div class="note">当前使用的：layout-dashboard（四宫格仪表盘）——通用但无计划特征</div>
+<script>lucide.createIcons();</script>
+</body>
+</html>

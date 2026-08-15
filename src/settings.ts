@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type PlanBoardPlugin from "../main";
+import type PlanFlowPlugin from "../main";
 
 /** Default plan accent colors (PRD §5). Keys are plan tag names. */
 export const DEFAULT_PLAN_COLORS: Record<string, string> = {
@@ -21,14 +21,14 @@ export interface PlanTemplate {
 	includeReview: boolean;
 }
 
-export interface PlanBoardSettings {
+export interface PlanFlowSettings {
 	/** Root folder for plan notes, relative to vault root (PRD §2.1). */
 	rootPath: string;
 	/** Daily check-in templates shown when creating a new daily note / adding an item. */
 	dailyTemplates: PlanTemplate[];
 	/** If true, the 复盘 check-in rate denominator uses workdays. */
 	reviewWorkdays: boolean;
-	/** Open the PlanBoard view automatically on startup. */
+	/** Open the PlanFlow view automatically on startup. */
 	openOnStartup: boolean;
 	/** Sidebar icon name (Obsidian / lucide icon id). */
 	icon: string;
@@ -52,7 +52,7 @@ export interface PlanBoardSettings {
 	boardColumnOrder: string[];
 }
 
-export const DEFAULT_SETTINGS: PlanBoardSettings = {
+export const DEFAULT_SETTINGS: PlanFlowSettings = {
 	rootPath: "raw/计划",
 	dailyTemplates: [
 		{ name: "✍️ 写作", duration: "1小时", plan: "写作", includeReview: false },
@@ -74,10 +74,10 @@ export const DEFAULT_SETTINGS: PlanBoardSettings = {
 	boardColumnOrder: [],
 };
 
-export class PlanBoardSettingTab extends PluginSettingTab {
-	plugin: PlanBoardPlugin;
+export class PlanFlowSettingTab extends PluginSettingTab {
+	plugin: PlanFlowPlugin;
 
-	constructor(app: App, plugin: PlanBoardPlugin) {
+	constructor(app: App, plugin: PlanFlowPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -170,7 +170,7 @@ export class PlanBoardSettingTab extends PluginSettingTab {
 
 	private renderTemplateList(containerEl: HTMLElement): void {
 		const templates = this.plugin.settings.dailyTemplates;
-		templates.forEach((tmpl, idx) => {
+		templates.forEach((tmpl: PlanTemplate, idx: number) => {
 			const setting = new Setting(containerEl).setName(`#${idx + 1}`);
 			setting.addText((text) => {
 				text.setPlaceholder("名称").setValue(tmpl.name);
