@@ -889,7 +889,7 @@ export class PlanBoardView extends ItemView {
 			void this.saveSummary();
 		});
 		// v1.4: 复盘入口移到总结区底部（不占 header）
-		const reviewBtn = summaryCard.createEl("button", { cls: "planboard-btn planboard-btn-outline planboard-review-btn planboard-review-bottom", text: "📈 写复盘 →" });
+		const reviewBtn = summaryCard.createEl("button", { cls: "planboard-btn planboard-btn-outline planboard-review-btn planboard-review-bottom", text: "📝 写复盘 →" });
 		reviewBtn.addEventListener("click", () => void this.openOrCreateReview());
 		// v1.4: 总结卡也可拖底部调高（textarea flex 填充），与打卡卡联动同步
 		if (this.plugin.settings.summaryCardHeight > 0) summaryCard.style.height = `${this.plugin.settings.summaryCardHeight}px`;
@@ -1440,7 +1440,7 @@ export class PlanBoardView extends ItemView {
 		} else {
 			await this.ensureFolder(dir);
 			try {
-				file = await this.app.vault.create(path, buildReviewTemplate(this.today));
+				file = await this.app.vault.create(path, buildReviewTemplate(this.today, this.plugin.settings.reviewTemplate));
 				new Notice("复盘笔记已创建");
 			} catch (e) {
 				new Notice(`创建复盘笔记失败：${(e as Error).message ?? String(e)}`);

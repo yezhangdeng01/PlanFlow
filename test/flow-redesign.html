@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #f7f8fa; margin: 0; padding: 24px; display: flex; justify-content: center; }
+  svg { box-shadow: 0 2px 12px rgba(0,0,0,.06); border-radius: 16px; background: #fff; }
+</style>
+</head>
+<body>
+<svg width="1040" height="560" viewBox="0 0 1040 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8ab4d8"/>
+    </marker>
+    <linearGradient id="dashGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dcebf8"/>
+      <stop offset="1" stop-color="#eef7ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#4a6fa5" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- ===== 年度计划（源头） ===== -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="80" width="190" height="72" rx="14" fill="#4a6fa5"/>
+  </g>
+  <text x="155" y="110" fill="#fff" text-anchor="middle" font-size="17" font-weight="700">🎯 年度计划</text>
+  <text x="155" y="132" fill="#cfe0f5" text-anchor="middle" font-size="12">目标定义 · frontmatter</text>
+
+  <!-- 年度计划 → 量化任务（向下） -->
+  <path d="M155 152 V250" stroke="#8ab4d8" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="170" y="205" fill="#5d87b0" font-size="12">拆解</text>
+
+  <!-- ===== 量化任务 ===== -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="256" width="190" height="72" rx="14" fill="#fff" stroke="#c9d6e8" stroke-width="1.2"/>
+  </g>
+  <text x="155" y="286" fill="#3a5678" text-anchor="middle" font-size="17" font-weight="700">📊 量化任务</text>
+  <text x="155" y="308" fill="#93a5bb" text-anchor="middle" font-size="12">目标分解为可执行任务</text>
+
+  <!-- ===== 每日行动打卡（执行） ===== -->
+  <g filter="url(#shadow)">
+    <rect x="395" y="60" width="210" height="78" rx="14" fill="#ef8354"/>
+  </g>
+  <text x="500" y="92" fill="#fff" text-anchor="middle" font-size="17" font-weight="700">✅ 每日行动打卡</text>
+  <text x="500" y="114" fill="#fdeee7" text-anchor="middle" font-size="12">勾选即写回笔记 · 连续天数</text>
+
+  <!-- 年度计划 → 每日行动打卡（右上） -->
+  <path d="M250 100 C 320 84, 335 92, 393 96" stroke="#8ab4d8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <text x="315" y="72" fill="#5d87b0" font-size="12" text-anchor="middle">自动生成</text>
+
+  <!-- ===== 周期任务池 ===== -->
+  <g filter="url(#shadow)">
+    <rect x="395" y="256" width="210" height="78" rx="14" fill="#fff" stroke="#c9d6e8" stroke-width="1.2"/>
+  </g>
+  <text x="500" y="286" fill="#3a5678" text-anchor="middle" font-size="17" font-weight="700">📋 周期任务池</text>
+  <text x="500" y="308" fill="#93a5bb" text-anchor="middle" font-size="12">年 / 月 / 周任务 · 标签归属</text>
+
+  <!-- 量化任务 → 周期任务池（向上） -->
+  <path d="M250 292 C 320 292, 335 292, 393 292" stroke="#8ab4d8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <text x="318" y="280" fill="#5d87b0" font-size="12" text-anchor="middle">自动分解</text>
+
+  <!-- ===== 多视图任务追踪（右侧竖长条） ===== -->
+  <g filter="url(#shadow)">
+    <rect x="770" y="60" width="210" height="330" rx="16" fill="url(#dashGrad)" stroke="#c9d6e8" stroke-width="1.2"/>
+  </g>
+  <text x="875" y="96" fill="#4a6fa5" text-anchor="middle" font-size="17" font-weight="700">📺 多视图任务追踪</text>
+  <!-- 视图徽章列表 -->
+  <g font-size="14" font-weight="600">
+    <rect x="800" y="120" width="150" height="34" rx="9" fill="#4a6fa5"/>
+    <text x="875" y="143" fill="#fff" text-anchor="middle">周 · 月 · 年</text>
+    <rect x="800" y="166" width="150" height="34" rx="9" fill="#fff" stroke="#4a6fa5" stroke-width="1.2"/>
+    <text x="875" y="189" fill="#4a6fa5" text-anchor="middle">📅 甘特</text>
+    <rect x="800" y="212" width="150" height="34" rx="9" fill="#fff" stroke="#ef8354" stroke-width="1.2"/>
+    <text x="875" y="235" fill="#ef8354" text-anchor="middle">🗂 看板</text>
+    <rect x="800" y="258" width="150" height="34" rx="9" fill="#eef4fa"/>
+    <text x="875" y="281" fill="#5d87b0" text-anchor="middle">🏅 徽章激励</text>
+    <rect x="800" y="304" width="150" height="34" rx="9" fill="#eef4fa"/>
+    <text x="875" y="327" fill="#5d87b0" text-anchor="middle">📈 完成率统计</text>
+  </g>
+  <text x="875" y="372" fill="#8a98ab" text-anchor="middle" font-size="12">日期窗口自动归属</text>
+
+  <!-- 每日行动打卡 → 多视图（右上） -->
+  <path d="M605 96 C 690 84, 700 90, 768 110" stroke="#8ab4d8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <text x="700" y="70" fill="#5d87b0" font-size="12" text-anchor="middle">自动统计</text>
+
+  <!-- 周期任务池 → 多视图（右） -->
+  <path d="M605 295 C 690 295, 700 292, 768 260" stroke="#8ab4d8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <text x="700" y="312" fill="#5d87b0" font-size="12" text-anchor="middle">自动聚合</text>
+
+  <!-- 底部激励条 -->
+  <rect x="60" y="420" width="920" height="64" rx="14" fill="#fff7f2" stroke="#f0c9b5" stroke-width="1.2"/>
+  <text x="80" y="448" fill="#ef8354" font-size="14" font-weight="700">🏆 打卡率激励系统</text>
+  <text x="80" y="468" fill="#b08a72" font-size="12">连续打卡 streak · 周/月完成度徽章（铜·银·金）· 成就墙 —— 让坚持看得见</text>
+</svg>
+</body>
+</html>

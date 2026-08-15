@@ -28,6 +28,8 @@ export interface PlanFlowSettings {
 	dailyTemplates: PlanTemplate[];
 	/** If true, the 复盘 check-in rate denominator uses workdays. */
 	reviewWorkdays: boolean;
+	/** Review-note template (写复盘按钮生成); `{date}` is replaced with the current date. */
+	reviewTemplate: string;
 	/** Open the PlanFlow view automatically on startup. */
 	openOnStartup: boolean;
 	/** Sidebar icon name (Obsidian / lucide icon id). */
@@ -61,6 +63,26 @@ export const DEFAULT_SETTINGS: PlanFlowSettings = {
 		{ name: "📈 复盘", duration: "", plan: "复盘", includeReview: true },
 	],
 	reviewWorkdays: true,
+	// v1.8: 通用复盘模板（用户可在设置页自定义，如自己的 A 股复盘格式）
+	reviewTemplate: `---
+type: review
+date: {date}
+tags: [复盘]
+---
+# 📝 复盘（{date}）
+
+## 今日完成
+- 
+
+## 收获与亮点
+- 
+
+## 不足与改进
+- 
+
+## 明日计划
+- 
+`,
 	openOnStartup: true,
 	icon: "calendar",
 	planColors: { ...DEFAULT_PLAN_COLORS },
@@ -132,6 +154,19 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.refreshView();
 				});
+			});
+
+		new Setting(containerEl)
+			.setName("复盘笔记模板")
+			.setDesc("「写复盘」按钮生成的笔记内容模板；{date} 会替换为当天日期")
+			.addTextArea((ta) => {
+				ta.setValue(this.plugin.settings.reviewTemplate);
+				ta.onChange(async (value) => {
+					this.plugin.settings.reviewTemplate = value;
+					await this.plugin.saveSettings();
+				});
+				ta.inputEl.rows = 14;
+				ta.inputEl.addClass("planboard-review-template-input");
 			});
 
 		new Setting(containerEl)

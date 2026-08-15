@@ -355,46 +355,13 @@ export function buildDailyTemplate(date: string, templates: PlanTemplate[]): str
 	].join("\n");
 }
 
-/** Template for a review note (matches the user's existing review format). */
-export function buildReviewTemplate(date: string): string {
-	return `---
-type: review
-date: ${date}
-tags: [复盘]
----
-# 📈 A股复盘与交易计划（${date}）
-
-## 一、大盘环境（过滤开关）
-- 指数表现：上证＿＿ 深成＿＿ 创业板＿＿ | 两市量能＿＿
-- 环境判断：□ 进攻　□ 防守　□ 观望
-- 判断理由：
-- 情绪温度：涨停＿＿ 跌停＿＿ 连板高度＿＿
-
-## 二、市场主线
-- 今日强势板块（行业轮动位置）：
-- 主线/题材：
-- 板块截图：![[${date} 板块截图.png]]
-
-## 三、持仓与今日操作
-| 标的 | 方向 | 成本 | 现价 | 仓位 | 今日操作 | 理由 |
-| --- | --- | --- | --- | --- | --- | --- |
-|  |  |  |  |  |  |  |
-
-## 四、纪律检查
-- 今日：□ 有信号按计划执行　□ 无信号管住手　□ 违反纪律＿＿
-- 冲动交易次数：＿＿
-- 盘中情绪：＿＿
-
-## 五、次日交易计划
-- 持仓处理：
-- 观察池：
-  | 标的 | 触发条件 | 计划仓位 |
-  | --- | --- | --- |
-  |  |  |  |
-- 环境预案：高开＿＿ 低开＿＿ 平开＿＿
-
-## 六、今日感想（可选）
-`;
+/**
+ * Build a review note from the user-configured template.
+ * `{date}` placeholders are replaced with the given date.
+ * (v1.8: template moved to settings.reviewTemplate — was hard-coded A股复盘 before.)
+ */
+export function buildReviewTemplate(date: string, template: string): string {
+	return template.replace(/\{date\}/g, date);
 }
 
 // ---------------------------------------------------------------------------
