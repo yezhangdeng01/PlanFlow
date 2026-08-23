@@ -380,9 +380,10 @@ export function parseTempTasksFromFrontmatter(
 ): TempTask[] {
 	const fmMatch = /^---\n([\s\S]*?)\n---/.exec(content);
 	if (!fmMatch) return [];
-	let data: any;
+	let data: Record<string, unknown> | null | undefined;
 	try {
-		data = parseYaml(fmMatch[1]);
+		const parsed: unknown = parseYaml(fmMatch[1]);
+		data = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 	} catch {
 		return [];
 	}
@@ -479,9 +480,10 @@ export function setTempTaskCheckedInFrontmatter(
 ): string {
 	const fmMatch = /^---\n([\s\S]*?)\n---/.exec(content);
 	if (!fmMatch) return content;
-	let data: any;
+	let data: Record<string, unknown> | null | undefined;
 	try {
-		data = parseYaml(fmMatch[1]);
+		const parsed: unknown = parseYaml(fmMatch[1]);
+		data = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 	} catch {
 		return content;
 	}
@@ -493,11 +495,11 @@ export function setTempTaskCheckedInFrontmatter(
 		const lines = tt.split("\n");
 		if (taskIndex >= 0 && taskIndex < lines.length && /^- \[[ x]\]/.test(lines[taskIndex])) {
 			lines[taskIndex] = lines[taskIndex].replace(/^- \[[ x]\]/, marker);
-			data["temp-tasks"] = lines.join("\n");
+			if (data) data["temp-tasks"] = lines.join("\n");
 			changed = true;
 		}
 	} else if (Array.isArray(tt)) {
-		const el = tt[taskIndex];
+		const el: unknown = tt[taskIndex];
 		if (typeof el === "string" && /^- \[[ x]\]/.test(el)) {
 			tt[taskIndex] = el.replace(/^- \[[ x]\]/, marker);
 			changed = true;

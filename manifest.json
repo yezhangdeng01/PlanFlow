@@ -2,8 +2,8 @@
   "id": "planflow",
   "name": "PlanFlow",
   "version": "1.0.0",
-  "minAppVersion": "1.5.0",
-  "description": "基于Obsidian的计划自动拆解行动系统：年度计划自动拆解，量化任务自动流转，每日行动打卡/周/月/年度目标/看板/甘特六视图目标追踪，自统计徽章激励系统。",
+  "minAppVersion": "1.7.2",
+  "description": "计划自动拆解行动系统：年度计划自动拆解，量化任务自动流转，每日行动打卡/周/月/年度目标/看板/甘特六视图目标追踪，自统计徽章激励系统.",
   "author": "夜掌灯",
   "authorUrl": "https://github.com/yezhangdeng01",
   "isDesktopOnly": false

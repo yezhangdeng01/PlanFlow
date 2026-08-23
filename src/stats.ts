@@ -287,9 +287,10 @@ export function summarizeTasks(tasks: PoolTask[]): TaskSummary {
 export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 	const fmMatch = /^---\n([\s\S]*?)\n---/.exec(content);
 	if (!fmMatch) return [];
-	let data: any;
+	let data: Record<string, unknown> | null | undefined;
 	try {
-		data = parseYaml(fmMatch[1]);
+		const parsed: unknown = parseYaml(fmMatch[1]);
+		data = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 	} catch {
 		return [];
 	}
@@ -371,7 +372,7 @@ export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 function readPlanTarget(obj?: Record<string, unknown>): string {
 	if (!obj) return "";
 	for (const k of ["target", "description", "desc", "目标", "描述", "goal", "值"]) {
-		if (typeof obj[k] === "string") return obj[k] as string;
+		if (typeof obj[k] === "string") return obj[k];
 	}
 	return "";
 }
@@ -379,7 +380,7 @@ function readPlanTarget(obj?: Record<string, unknown>): string {
 function readPlanString(obj: Record<string, unknown> | undefined, keys: string[]): string {
 	if (!obj) return "";
 	for (const k of keys) {
-		if (typeof obj[k] === "string") return obj[k] as string;
+		if (typeof obj[k] === "string") return obj[k];
 	}
 	return "";
 }
@@ -401,7 +402,15 @@ function readPlanGoals(obj?: Record<string, unknown>): PlanGoal[] {
 		const rec = g as Record<string, unknown>;
 		const name = readPlanString(rec, ["name", "名称", "goal", "任务"]);
 		if (!name) continue;
-		const count = typeof rec.count === "number" ? rec.count : typeof rec["数量"] === "number" ? rec["数量"] : parseInt(String(rec.count ?? rec["数量"] ?? "0"), 10);
+		const count =
+			typeof rec.count === "number"
+				? rec.count
+				: typeof rec["数量"] === "number"
+					? rec["数量"]
+					: (() => {
+							const cv: unknown = rec.count ?? rec["数量"];
+							return parseInt(cv == null ? "0" : typeof cv === "string" || typeof cv === "number" ? String(cv) : "0", 10);
+						})();
 		if (!count || Number.isNaN(count) || count <= 0) continue;
 		const unit = readPlanString(rec, ["unit", "单位", "量词"]) || "个";
 		const start = readPlanString(rec, ["start", "开始", "起"]);
@@ -416,7 +425,7 @@ function readPlanType(obj: Record<string, unknown> | undefined, target: string):
 	if (obj) {
 		for (const k of ["type", "kind", "类型", "模式"]) {
 			if (typeof obj[k] === "string") {
-				t = obj[k] as string;
+				t = obj[k];
 				break;
 			}
 		}

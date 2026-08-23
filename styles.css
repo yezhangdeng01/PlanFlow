@@ -303,25 +303,10 @@
 	background: var(--background-modifier-border);
 }
 
-/* 计划标签色（settings 注入的 CSS 可覆盖） */
-.planboard-plan-tag[data-plan="写作"] {
-	color: #f59e0b;
-	background: rgba(245, 158, 11, 0.14);
-}
-
-.planboard-plan-tag[data-plan="健康"] {
-	color: #10b981;
-	background: rgba(16, 185, 129, 0.14);
-}
-
-.planboard-plan-tag[data-plan="学习"] {
-	color: #3b82f6;
-	background: rgba(59, 130, 246, 0.14);
-}
-
-.planboard-plan-tag[data-plan="复盘"] {
-	color: #ef4444;
-	background: rgba(239, 68, 68, 0.14);
+/* 计划标签色（applyPlanColor 通过 CSS 变量注入，变量缺失时回退到内置默认） */
+.planboard-plan-tag {
+	color: var(--plan-tag-color, var(--text-muted));
+	background: var(--plan-tag-bg, var(--background-modifier-border));
 }
 
 .planboard-item-actions {
@@ -1194,6 +1179,9 @@
 	overflow: hidden;
 	z-index: 2;
 	transition: opacity 0.2s;
+	/* applyPlanColor 注入的计划色（变量缺失时回退中性蓝） */
+	background: var(--plan-gantt-bg, rgba(138, 180, 216, 0.55));
+	border-color: var(--plan-gantt-border, #8ab4d8);
 }
 
 .planboard-gantt-bar.is-done {
@@ -2232,3 +2220,9 @@
 .planflow-icon-custom input {
 	width: 180px;
 }
+
+/* FLIP 动画辅助类（替代内联 style 赋值，满足 obsidianmd/no-static-styles-assignment） */
+.planflow-flip-none { transition: none !important; }
+.planflow-flip-fast { transition: transform 0.15s ease !important; }
+.planflow-flip-med { transition: transform 0.18s ease !important; }
+.planflow-flip-slow { transition: transform 0.2s ease !important; }

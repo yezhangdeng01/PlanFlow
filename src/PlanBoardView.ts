@@ -154,11 +154,12 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 			const dx = firsts[i].left - r.left;
 			const dy = firsts[i].top - r.top;
 			if (dx || dy) {
-				c.style.transition = "none";
 				c.style.transform = `translate(${dx}px, ${dy}px)`;
-				requestAnimationFrame(() => {
-					c.style.transition = "transform 0.18s ease";
-					c.style.transform = "";
+				c.addClass("planflow-flip-none");
+				window.requestAnimationFrame(() => {
+					c.removeClass("planflow-flip-none");
+					c.addClass("planflow-flip-med");
+					c.style.removeProperty("transform");
 				});
 			}
 		});
@@ -290,28 +291,29 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		// 先清其他卡所有残留 transform/transition（FLIP 动画残留会污染 rect 计算）
 		othersAll().forEach((c) => {
 			if (c === card) return;
-			c.style.transition = "";
-			c.style.transform = "";
+			c.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
+			c.style.removeProperty("transform");
 		});
 		// 被拖卡恢复流式布局 + FLIP 归位（从鼠标位置滑入格子）
 		const from = card.getBoundingClientRect();
 		card.removeClass("is-plan-dragging");
-		card.style.transform = "";
+		card.style.removeProperty("transform");
 		const to = card.getBoundingClientRect();
 		const dx = from.left - to.left;
 		const dy = from.top - to.top;
 		if (dx || dy) {
-			card.style.transition = "none";
 			card.style.transform = `translate(${dx}px, ${dy}px)`;
-			requestAnimationFrame(() => {
-				card.style.transition = "transform 0.2s ease";
-				card.style.transform = "";
+			card.addClass("planflow-flip-none");
+			window.requestAnimationFrame(() => {
+				card.removeClass("planflow-flip-none");
+				card.addClass("planflow-flip-slow");
+				card.style.removeProperty("transform");
 			});
 		}
 		// 兜底清理（rAF 不可靠时 300ms 后强制归零）
-		setTimeout(() => {
-			card.style.transition = "";
-			card.style.transform = "";
+		window.setTimeout(() => {
+			card.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
+			card.style.removeProperty("transform");
 		}, 320);
 		const names = othersAll().map((c) => c.getAttribute("data-plan-name") || "").filter(Boolean);
 		plugin.settings.planOrder = names;
@@ -334,8 +336,8 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		e.stopImmediatePropagation(); // 阻断 Obsidian 及一切后续监听
 		// v1.6: 拖动前彻底清理——防上次残留 transform 污染 rect 计算
 		othersAll().forEach((c) => {
-			c.style.transition = "";
-			c.style.transform = "";
+			c.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
+			c.style.removeProperty("transform");
 		});
 		// v1.6.1: 按下快照逻辑位置（此时无动画，实时 rect = 布局位置）
 		logicRects.clear();
@@ -920,7 +922,7 @@ export class PlanBoardView extends ItemView {
 
 	private renderGoalRow(prog: PlanProgress): HTMLElement {
 		// v1.4 紧凑条：每计划 = 图标+名 + 数字 + 迷你进度条，一行内一目了然（无展开交互）
-		const item = createEl("div", { cls: "planboard-goal-strip-item" });
+		const item = createDiv({ cls: "planboard-goal-strip-item" });
 		item.setAttribute("title", prog.target || prog.plan);
 		item.createSpan({
 			cls: "planboard-goal-name",
@@ -1102,7 +1104,7 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private renderRhythmHint(h: RhythmHint): HTMLElement {
-		const row = createEl("div", { cls: "planboard-rhythm-hint" });
+		const row = createDiv({ cls: "planboard-rhythm-hint" });
 		const key = `${this.today.slice(0, 7)}:${h.plan}:${h.goalName}`;
 		row.createSpan({ text: `⚠️ ${h.goalName}：本月应有 ${h.need} ${h.unit}，当前 ${h.done} ${h.unit}` });
 		const addBtn = row.createEl("button", { cls: "planboard-btn planboard-btn-primary planboard-rhythm-add", text: "＋ 新建" });
@@ -1189,6 +1191,7 @@ export class PlanBoardView extends ItemView {
 		if (item.plan) {
 			const tag = label.createSpan({ cls: "planboard-plan-tag", text: item.plan });
 			tag.setAttribute("data-plan", item.plan);
+			this.applyPlanColor(tag, item.plan);
 		}
 
 		const actions = li.createDiv({ cls: "planboard-item-actions" });
@@ -1595,11 +1598,11 @@ export class PlanBoardView extends ItemView {
 				const dx = oldR.left - newR.left;
 				const dy = oldR.top - newR.top;
 				if (dx !== 0 || dy !== 0) {
-					el.style.transition = "none";
+					el.addClass("planflow-flip-none");
 					el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
 					void el.offsetWidth;
-					el.style.transition = "";
-					el.style.transform = "";
+					el.removeClass("planflow-flip-none");
+					el.style.removeProperty("transform");
 				}
 				logicRects.set(el, newR);
 			});
@@ -1662,7 +1665,7 @@ export class PlanBoardView extends ItemView {
 				}
 			}
 		};
-		const finish = async (ev?: PointerEvent): Promise<void> => {
+		const finish = (ev?: PointerEvent): void => {
 			if (!dragging) return;
 			dragging = false;
 			window.removeEventListener("pointermove", onMove, true);
@@ -1670,10 +1673,11 @@ export class PlanBoardView extends ItemView {
 			window.removeEventListener("pointercancel", finish, true);
 			if (ev) ev.preventDefault();
 			if (moved) {
-				col.style.transition = "transform 0.15s ease";
-				col.style.transform = "";
-				setTimeout(() => {
-					col.style.transition = "";
+				col.removeClass("planflow-flip-none");
+				col.addClass("planflow-flip-fast");
+				col.style.removeProperty("transform");
+				window.setTimeout(() => {
+					col.removeClass("planflow-flip-fast");
 				}, 160);
 				// 持久化列顺序
 				const order = Array.from(board.children).map((c) => (c as HTMLElement).getAttribute("data-plan") || "其他");
@@ -1723,6 +1727,7 @@ export class PlanBoardView extends ItemView {
 		if (task.plan) {
 			const tag = meta.createSpan({ cls: "planboard-plan-tag", text: task.plan });
 			tag.setAttribute("data-plan", task.plan);
+			this.applyPlanColor(tag, task.plan);
 		}
 		const dates: string[] = [];
 		if (task.start) dates.push(`🛫 ${task.start}`);
@@ -1863,6 +1868,7 @@ export class PlanBoardView extends ItemView {
 			const done = list.filter((t) => t.checked).length;
 			const col = board.createDiv({ cls: "planboard-board-col" });
 			col.setAttribute("data-plan", plan === "其他" ? "" : plan); // v1.7.2: 跨列写回用
+			this.applyPlanColor(col, plan === "其他" ? undefined : plan);
 			const colHeader = col.createDiv({ cls: "planboard-board-col-header" });
 			colHeader.createDiv({ cls: "planboard-board-col-title", text: displayByName.get(plan) ?? plan });
 			colHeader.createDiv({ cls: "planboard-board-col-count", text: `${done}/${list.length}` });
@@ -1996,7 +2002,10 @@ export class PlanBoardView extends ItemView {
 	 */
 	private renderGanttBar(track: HTMLElement, t: PoolTask, s: number, e: number, n: number): void {
 		const bar = track.createDiv({ cls: "planboard-gantt-bar" + (t.checked ? " is-done" : "") });
-		if (t.plan) bar.setAttribute("data-plan", t.plan);
+		if (t.plan) {
+			bar.setAttribute("data-plan", t.plan);
+			this.applyPlanColor(bar, t.plan);
+		}
 		bar.setAttribute("data-line", String(t.line));
 		bar.setAttribute("data-start", t.start ?? "");
 		bar.setAttribute("data-due", t.due ?? "");
@@ -2347,8 +2356,10 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private renderYearPlanCard(prog: PlanProgress): HTMLElement {
-		if (!this.panelEl) return createEl("div");
+		if (!this.panelEl) return createDiv();
 		const card = this.panelEl.createDiv({ cls: "planboard-card planboard-plan-card" });
+		card.setAttribute("data-plan-name", prog.plan);
+		this.applyPlanColor(card, prog.plan);
 
 		// 卡头：名称 + [＋ 新增量化目标]；计划编辑/删除移入右键菜单（v1.7.4，与"编辑用右键"标准一致）
 		const head = card.createDiv({ cls: "planboard-plan-head" });
@@ -2407,7 +2418,7 @@ export class PlanBoardView extends ItemView {
 
 	/** One quantified-goal row inside the year plan card: name + count + mini bar + [✏️][🗑️]. */
 	private renderYearGoalRow(goal: PlanGoalProgress, prog: PlanProgress): HTMLElement {
-		const row = createEl("div", { cls: "planboard-goal-row planboard-goal-row--mini" });
+		const row = createDiv({ cls: "planboard-goal-row planboard-goal-row--mini" });
 		row.createDiv({ cls: "planboard-goal-name", text: goal.name });
 		row.createDiv({ cls: "planboard-goal-count", text: `${goal.done}/${goal.count} ${goal.unit || "个"}` });
 		const bar = row.createDiv({ cls: "planboard-goal-bar" });
@@ -2439,8 +2450,10 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private renderPlanRateCard(rate: PlanRate): HTMLElement {
-		if (!this.panelEl) return createEl("div");
+		if (!this.panelEl) return createDiv();
 		const card = this.panelEl.createDiv({ cls: "planboard-card planboard-plan-card" });
+		card.setAttribute("data-plan-name", rate.plan);
+		this.applyPlanColor(card, rate.plan);
 		const head = card.createDiv({ cls: "planboard-plan-head" });
 		head.createSpan({ cls: "planboard-plan-name", text: rate.plan });
 		head.createSpan({ cls: "planboard-plan-rate", text: `${rate.done}/${rate.total} 天` });
@@ -2452,7 +2465,7 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private renderTempSummaryCard(stats: PeriodStats): HTMLElement {
-		if (!this.panelEl) return createEl("div");
+		if (!this.panelEl) return createDiv();
 		const card = this.panelEl.createDiv({ cls: "planboard-card planboard-plan-card" });
 		const head = card.createDiv({ cls: "planboard-plan-head" });
 		head.createSpan({ cls: "planboard-plan-name", text: "临时任务" });
@@ -2465,7 +2478,7 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private renderTaskSummaryCard(stats: PeriodStats): HTMLElement {
-		if (!this.panelEl) return createEl("div");
+		if (!this.panelEl) return createDiv();
 		const card = this.panelEl.createDiv({ cls: "planboard-card planboard-plan-card" });
 		const head = card.createDiv({ cls: "planboard-plan-head" });
 		head.createSpan({ cls: "planboard-plan-name", text: "任务" });
@@ -2801,15 +2814,21 @@ export class PlanBoardView extends ItemView {
 	}
 
 	// -------------------------------------------------------------------------
-	// Plan color styles (settings-driven, injected as CSS — no inline styles)
+	// Plan color styles (settings-driven, applied via setCssProps — no <style> elements)
 	// -------------------------------------------------------------------------
 
+	/** 计划名 → 颜色变量集（setCssProps 用）。 */
+	private planColorVars: Record<string, Record<string, string>> = {};
+
+	/** 在渲染元素上应用计划色（CSS 变量方式，替代被禁的 <style> 注入）。 */
+	applyPlanColor(el: HTMLElement, plan: string | undefined | null): void {
+		if (!plan) return;
+		const vars = this.planColorVars[plan];
+		if (!vars) return;
+		el.setCssProps(vars);
+	}
+
 	private async injectPlanColorStyles(): Promise<void> {
-		const root = this.contentEl;
-		let styleEl = root.querySelector("style.planboard-dynamic-style") as HTMLStyleElement | null;
-		if (!styleEl) {
-			styleEl = root.createEl("style", { cls: "planboard-dynamic-style" });
-		}
 		// settings 优先，年度计划 frontmatter 的 color 字段兜底（spec v1.2 #6）。
 		const colors: Record<string, string> = { ...(this.plugin.settings.planColors ?? {}) };
 		const rootPath = this.plugin.settings.rootPath.replace(/\/+$/, "");
@@ -2841,22 +2860,20 @@ export class PlanBoardView extends ItemView {
 				}
 			}
 		}
-		const rules = Object.entries(colors)
-			.map(([plan, color]) => {
-				const bg = hexToRgba(color, 0.08); /* v1.7.4: 标签降饱和（0.14→0.08），降"彩虹糖"感 */
-				const barBg = hexToRgba(color, 0.55);
-				return (
-					`.planboard-plan-tag[data-plan="${plan}"] { color: ${color}; background: ${bg}; }\n` +
-					`.planboard-gantt-bar[data-plan="${plan}"] { background: ${barBg}; border-color: ${color}; }\n` +
-					// v1.7.3: 计划卡颜色区分（全框 4px 低饱和边框 + 卡头淡彩 + 名称色点）
-					`.planboard-plan-card[data-plan-name="${plan}"] { --pb-accent: ${color}; --pb-accent-bg: ${bg}; --pb-accent-dim: ${hexToRgba(color, 0.28)}; }\n` +
-					// v1.7.3: 看板列（大类卡片）颜色区分——列边框 + 列头淡彩
-					`.planboard-board-col[data-plan="${plan}"] { --pb-accent: ${color}; --pb-accent-bg: ${bg}; --pb-accent-dim: ${hexToRgba(color, 0.28)}; }\n` +
-					`.planboard-plan-card[data-plan-name="${plan}"] .planboard-plan-name::before { background: ${color}; }`
-				);
-			})
-			.join("\n");
-		styleEl.textContent = rules;
+		this.planColorVars = {};
+		for (const [plan, color] of Object.entries(colors)) {
+			const bg = hexToRgba(color, 0.08); /* v1.7.4: 标签降饱和（0.14→0.08），降"彩虹糖"感 */
+			const barBg = hexToRgba(color, 0.55);
+			this.planColorVars[plan] = {
+				"--pb-accent": color,
+				"--pb-accent-bg": bg,
+				"--pb-accent-dim": hexToRgba(color, 0.28),
+				"--plan-tag-color": color,
+				"--plan-tag-bg": bg,
+				"--plan-gantt-bg": barBg,
+				"--plan-gantt-border": color,
+			};
+		}
 	}
 }
 
@@ -3124,21 +3141,23 @@ class PlanEditModal extends Modal {
 		const cancel = buttons.createEl("button", { cls: "planboard-btn", text: "取消" });
 		cancel.addEventListener("click", () => this.close());
 		const ok = buttons.createEl("button", { cls: "planboard-btn planboard-btn-primary", text: "保存" });
-		ok.addEventListener("click", async () => {
-			const name = this.nameEl.value.trim();
-			if (!name) {
-				new Notice("请输入大类名称");
-				return;
-			}
-			const saved = await this.onSubmit({
-				name,
-				label: this.labelEl.value.trim(),
-				action: this.actionEl.value.trim(),
-				target: this.targetEl.value.trim(),
-				color: this.colorEl.value,
-				daily: this.dailyVal,
-			});
-			if (saved) this.close();
+		ok.addEventListener("click", () => {
+			void (async () => {
+				const name = this.nameEl.value.trim();
+				if (!name) {
+					new Notice("请输入大类名称");
+					return;
+				}
+				const saved = await this.onSubmit({
+					name,
+					label: this.labelEl.value.trim(),
+					action: this.actionEl.value.trim(),
+					target: this.targetEl.value.trim(),
+					color: this.colorEl.value,
+					daily: this.dailyVal,
+				});
+				if (saved) this.close();
+			})();
 		});
 	}
 
@@ -3211,22 +3230,24 @@ class GoalEditModal extends Modal {
 		const cancel = buttons.createEl("button", { cls: "planboard-btn", text: "取消" });
 		cancel.addEventListener("click", () => this.close());
 		const ok = buttons.createEl("button", { cls: "planboard-btn planboard-btn-primary", text: "保存" });
-		ok.addEventListener("click", async () => {
-			const name = this.nameEl.value.trim();
-			if (!name) {
-				new Notice("请输入目标名称");
-				return;
-			}
-			const count = parseInt(this.countEl.value, 10);
-			if (Number.isNaN(count) || count <= 0) {
-				new Notice("请输入有效的数量");
-				return;
-			}
-			const input: GoalInput = { name, count, unit: this.unitEl.value.trim() || "个" };
-			if (this.startEl.value) input.start = this.startEl.value;
-			if (this.endEl.value) input.end = this.endEl.value;
-			const saved = await this.onSubmit(input);
-			if (saved) this.close();
+		ok.addEventListener("click", () => {
+			void (async () => {
+				const name = this.nameEl.value.trim();
+				if (!name) {
+					new Notice("请输入目标名称");
+					return;
+				}
+				const count = parseInt(this.countEl.value, 10);
+				if (Number.isNaN(count) || count <= 0) {
+					new Notice("请输入有效的数量");
+					return;
+				}
+				const input: GoalInput = { name, count, unit: this.unitEl.value.trim() || "个" };
+				if (this.startEl.value) input.start = this.startEl.value;
+				if (this.endEl.value) input.end = this.endEl.value;
+				const saved = await this.onSubmit(input);
+				if (saved) this.close();
+			})();
 		});
 	}
 
@@ -3249,9 +3270,10 @@ function hexToRgba(hex: string, alpha: number): string {
 function readRawPlans(content: string): Map<string, Record<string, unknown>> {
 	const fmMatch = /^---\n([\s\S]*?)\n---/.exec(content);
 	if (!fmMatch) return new Map();
-	let data: any;
+	let data: Record<string, unknown> | null | undefined;
 	try {
-		data = parseYaml(fmMatch[1]);
+		const parsed: unknown = parseYaml(fmMatch[1]);
+		data = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 	} catch {
 		return new Map();
 	}
@@ -3272,7 +3294,7 @@ function readRawPlans(content: string): Map<string, Record<string, unknown>> {
 				}
 			}
 		}
-	} else if (typeof raw === "object") {
+	} else if (raw !== null && typeof raw === "object") {
 		for (const key of Object.keys(raw)) {
 			const val = (raw as Record<string, unknown>)[key];
 			map.set(key, val && typeof val === "object" ? (val as Record<string, unknown>) : {});
@@ -3355,7 +3377,7 @@ function yamlScalar(value: string): string {
 		/:\s/.test(v) || // "key: value" ambiguity
 		/:\s*$/.test(v) || // trailing colon
 		/ #/.test(v) || // comment after space
-		/[\[\]{},]/.test(v) // flow indicators
+		/[[\]{} ,]/.test(v) // flow indicators / space separators
 	) {
 		return JSON.stringify(v);
 	}

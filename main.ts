@@ -5,7 +5,6 @@ import { DEFAULT_SETTINGS, PlanFlowSettingTab } from "./src/settings";
 
 export default class PlanFlowPlugin extends Plugin {
 	settings: PlanFlowSettings;
-	private view: PlanBoardView | null = null;
 	private startupOpenTimer: number | null = null;
 	private startupOpened = false;
 
@@ -13,8 +12,7 @@ export default class PlanFlowPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.registerView(VIEW_TYPE_PLANFLOW, (leaf) => {
-			this.view = new PlanBoardView(leaf, this);
-			return this.view;
+			return new PlanBoardView(leaf, this);
 		});
 
 		this.addCommand({
@@ -59,7 +57,7 @@ export default class PlanFlowPlugin extends Plugin {
 	};
 
 	onunload(): void {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_PLANFLOW);
+		// 保留用户拖放位置：不在 onunload 中 detach leaves
 	}
 
 	/** Open the PlanBoard view in the main area (or reveal it if already open). */
@@ -78,12 +76,14 @@ export default class PlanFlowPlugin extends Plugin {
 
 	/** Ask the open view to re-read files after settings changed. */
 	refreshView(): void {
-		this.view?.requestRefresh();
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANFLOW)) {
+			if (leaf.view instanceof PlanBoardView) leaf.view.requestRefresh();
+		}
 	}
 
 	async loadSettings(): Promise<void> {
-		const data = (await this.loadData()) ?? {};
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		const data = (await this.loadData()) as Partial<PlanFlowSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
 		this.settings.dailyTemplates =
 			Array.isArray(this.settings.dailyTemplates) && this.settings.dailyTemplates.length > 0
 				? this.settings.dailyTemplates

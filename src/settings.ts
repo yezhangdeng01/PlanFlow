@@ -108,7 +108,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "PlanFlow 设置" });
+		;
 
 		new Setting(containerEl)
 			.setName("计划根目录")
@@ -122,7 +122,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				});
 			});
 
-		containerEl.createEl("h3", { text: "每日打卡项模板" });
+		new Setting(containerEl).setName("每日打卡项模板").setHeading();
 		containerEl.createDiv({
 			cls: "planboard-setting-hint",
 			text: "新建今日笔记 / 添加打卡项时使用的默认模板。",
@@ -167,7 +167,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 					if (existing instanceof TFile) {
 						file = existing;
 					} else {
-						file = (await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate)) as TFile;
+						file = (await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate));
 					}
 					if (file) {
 						const leaf = this.app.workspace.getLeaf(false);
@@ -234,7 +234,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			});
 		}
 		const custom = wrap.createDiv({ cls: "planflow-icon-custom" });
-		custom.createEl("span", { text: "自定义：", cls: "planflow-icon-custom-label" });
+		custom.createSpan({ text: "自定义：", cls: "planflow-icon-custom-label" });
 		const input = custom.createEl("input", { attr: { type: "text", placeholder: "输入任意图标名…" } });
 		input.value = ICONS.includes(this.plugin.settings.icon) ? "" : this.plugin.settings.icon;
 		input.addEventListener("change", () => {
