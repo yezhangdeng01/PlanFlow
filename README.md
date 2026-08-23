@@ -41,6 +41,13 @@ PlanFlow 是一个基于 Obsidian 的计划系统插件：
 - 🎨 深空蓝主题色 + 珊瑚橙行动区 + 计划色点缀（明暗主题适配）
 - 📝 每日笔记自动生成（代码内模板），总结可自动派生
 
+## v1.2.0 新功能
+
+- 设置页视觉化图标选择器（18 个 Lucide 格子点选 + 自定义输入兜底）
+- 复盘模板文件化：`raw/计划/复盘模板.md`（Obsidian 内直接编辑，`{date}` 自动替换；用户 A 股模板已自动迁移）
+- 设置页名称残留清零（PlanBoard → PlanFlow 全部）
+- 插件图标用原生 `home`（自定义多色 SVG 在 18px 下不可行，已放弃；追踪素材留 `test/planflow-icon-*.svg`）
+
 ## 🚀 安装
 
 ### 方式一：BRAT（推荐，支持自动更新）
@@ -54,6 +61,15 @@ PlanFlow 是一个基于 Obsidian 的计划系统插件：
 1. 下载 [最新 Release](https://github.com/yezhangdeng01/PlanFlow/releases) 的 `main.js`、`manifest.json`、`styles.css`
 2. 在 vault 中创建 `.obsidian/plugins/planflow/` 目录，放入三个文件
 3. Obsidian 设置 → 第三方插件 → 启用 PlanFlow
+
+## 💰 赞助
+
+如果你喜欢 PlanFlow，可以通过以下方式支持项目的发展：
+
+- [Buy Me a Coffee](https://www.buymeacoffee.com/yezhangdeng01)
+- [爱发电](https://afdian.net/@yezhangdeng01)
+
+ FUNDING.yml 模板已在仓库中提供，可直接使用。
 
 ## 📂 数据格式（vault 内纯 Markdown）
 
