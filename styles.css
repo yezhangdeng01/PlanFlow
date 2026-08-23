@@ -2185,3 +2185,50 @@
 
 /* ========== v1.7.2 看板任务卡拖拽 ========== */
 /* v1.7.3: 任务卡拖拽已取消（碰撞判定体验差），仅保留列头拖拽排序 */
+
+/* 设置页：视觉化图标选择器 */
+.planflow-icon-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 10px 0;
+	max-width: 480px;
+}
+.planflow-icon-option {
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	transition: color 0.15s, border-color 0.15s;
+}
+.planflow-icon-option:hover {
+	color: var(--text-normal);
+	border-color: var(--interactive-accent);
+}
+.planflow-icon-option.is-selected {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	background: var(--interactive-accent-hover);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.planflow-icon-custom {
+	width: 100%;
+	margin-top: 4px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.planflow-icon-custom-label {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+.planflow-icon-custom input {
+	width: 180px;
+}

@@ -23,8 +23,8 @@ export default class PlanFlowPlugin extends Plugin {
 			callback: () => void this.activateView(),
 		});
 
-		// 侧边栏图标（点击打开 PlanBoard，主区域）
-		const ribbonIcon = this.addRibbonIcon("layout-dashboard", "PlanFlow 计划总览", () =>
+		// 侧边栏图标（点击打开 PlanFlow，主区域）
+		const ribbonIcon = this.addRibbonIcon("home", "PlanFlow 计划总览", () =>
 			void this.activateView(),
 		);
 		ribbonIcon.addClass("planboard-ribbon");
@@ -69,7 +69,7 @@ export default class PlanFlowPlugin extends Plugin {
 		workspace.detachLeavesOfType(VIEW_TYPE_PLANFLOW);
 		const leaf = workspace.getLeaf("tab");
 		if (!leaf) {
-			new Notice("无法打开 PlanBoard 视图");
+			new Notice("无法打开 PlanFlow 视图");
 			return;
 		}
 		await leaf.setViewState({ type: VIEW_TYPE_PLANFLOW, active: true });

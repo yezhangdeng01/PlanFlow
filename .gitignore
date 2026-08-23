@@ -15,3 +15,10 @@ PROGRESS.md
 docs/task-v1.2-ui.md
 docs/task-v1.3-ui.md
 docs/devlog-v1.5.md
+# 本地图标素材（个人文件，不进仓库）
+*.png
+!docs/screenshots/*.png
+# 图标生成脚本（已回滚，保留本地）
+test/gen_icon*.py
+test/regen_icon*.py
+test/quantize_icon.py

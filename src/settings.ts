@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, TFile, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
 
 /** Default plan accent colors (PRD §5). Keys are plan tag names. */
@@ -84,7 +84,7 @@ tags: [复盘]
 - 
 `,
 	openOnStartup: true,
-	icon: "calendar",
+	icon: "home",
 	planColors: { ...DEFAULT_PLAN_COLORS },
 	monthCardHeight: 0, // v1.4: 0 = 内容自适应（拖拽后固定）
 	weekCardHeight: 0,
@@ -108,7 +108,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "PlanBoard 设置" });
+		containerEl.createEl("h2", { text: "PlanFlow 设置" });
 
 		new Setting(containerEl)
 			.setName("计划根目录")
@@ -158,19 +158,36 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("复盘笔记模板")
-			.setDesc("「写复盘」按钮生成的笔记内容模板；{date} 会替换为当天日期")
-			.addTextArea((ta) => {
-				ta.setValue(this.plugin.settings.reviewTemplate);
-				ta.onChange(async (value) => {
-					this.plugin.settings.reviewTemplate = value;
-					await this.plugin.saveSettings();
-				});
-				ta.inputEl.rows = 14;
-				ta.inputEl.addClass("planboard-review-template-input");
-			});
+			.setDesc(`模板文件：${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md —— 在 Obsidian 中直接编辑，{date} 会自动替换为当天日期`)
+			.addButton((btn) =>
+				btn.setButtonText("打开模板文件").setCta().onClick(async () => {
+					const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+					let file: TFile | null = null;
+					const existing = this.app.vault.getAbstractFileByPath(filePath);
+					if (existing instanceof TFile) {
+						file = existing;
+					} else {
+						file = (await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate)) as TFile;
+					}
+					if (file) {
+						const leaf = this.app.workspace.getLeaf(false);
+						await leaf.openFile(file);
+					}
+				})
+			)
+			.addButton((btn) =>
+				btn.setButtonText("恢复默认").onClick(async () => {
+					const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+					const file = this.app.vault.getAbstractFileByPath(filePath);
+					if (file instanceof TFile) {
+						await this.app.vault.modify(file, this.plugin.settings.reviewTemplate);
+						new Notice("已恢复默认模板");
+					}
+				})
+			);
 
 		new Setting(containerEl)
-			.setName("启动时打开 PlanBoard")
+			.setName("启动时打开 PlanFlow")
 			.setDesc("Obsidian 启动后自动打开计划总览视图")
 			.addToggle((toggle) => {
 				toggle.setValue(this.plugin.settings.openOnStartup);
@@ -193,14 +210,38 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("图标主题")
-			.setDesc("侧边栏图标（Obsidian / Lucide 内置图标名）")
-			.addText((text) => {
-				text.setPlaceholder("calendar").setValue(this.plugin.settings.icon);
-				text.onChange(async (value) => {
-					this.plugin.settings.icon = value.trim() || "calendar";
-					await this.plugin.saveSettings();
-				});
+			.setDesc("点击选择侧边栏 / 标签页图标，或输入任意 Obsidian / Lucide 图标名");
+		this.renderIconPicker(containerEl);
+	}
+
+	/** v1.2: 视觉化图标选择器（常用 Lucide 图标格子 + 自定义输入兜底）。 */
+	private renderIconPicker(containerEl: HTMLElement): void {
+		const ICONS = [
+			"home", "calendar", "target", "layout-dashboard", "list-checks",
+			"book-open", "trending-up", "check-circle", "flame", "trophy",
+			"rocket", "heart", "star", "clock", "zap", "layers", "workflow", "flag",
+		];
+		const wrap = containerEl.createDiv({ cls: "planflow-icon-picker" });
+		for (const name of ICONS) {
+			const btn = wrap.createEl("button", { cls: "planflow-icon-option", attr: { type: "button" } });
+			setIcon(btn, name);
+			btn.title = name;
+			if (name === this.plugin.settings.icon) btn.addClass("is-selected");
+			btn.addEventListener("click", () => {
+				this.plugin.settings.icon = name;
+				void this.plugin.saveSettings();
+				this.display();
 			});
+		}
+		const custom = wrap.createDiv({ cls: "planflow-icon-custom" });
+		custom.createEl("span", { text: "自定义：", cls: "planflow-icon-custom-label" });
+		const input = custom.createEl("input", { attr: { type: "text", placeholder: "输入任意图标名…" } });
+		input.value = ICONS.includes(this.plugin.settings.icon) ? "" : this.plugin.settings.icon;
+		input.addEventListener("change", () => {
+			this.plugin.settings.icon = input.value.trim() || "home";
+			void this.plugin.saveSettings();
+			this.display();
+		});
 	}
 
 	private renderTemplateList(containerEl: HTMLElement): void {

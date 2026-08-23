@@ -1440,7 +1440,8 @@ export class PlanBoardView extends ItemView {
 		} else {
 			await this.ensureFolder(dir);
 			try {
-				file = await this.app.vault.create(path, buildReviewTemplate(this.today, this.plugin.settings.reviewTemplate));
+				const template = await this.loadReviewTemplate();
+				file = await this.app.vault.create(path, buildReviewTemplate(this.today, template));
 				new Notice("复盘笔记已创建");
 			} catch (e) {
 				new Notice(`创建复盘笔记失败：${(e as Error).message ?? String(e)}`);
@@ -1448,6 +1449,23 @@ export class PlanBoardView extends ItemView {
 			}
 		}
 		await this.openFileInEditMode(file);
+	}
+
+	/**
+	 * v1.2: 复盘模板改为文件化（{rootPath}/复盘模板.md）。
+	 * 文件不存在时自动创建——内容优先用设置里已有的自定义模板（迁移），否则用默认模板。
+	 */
+	private async loadReviewTemplate(): Promise<string> {
+		const root = this.plugin.settings.rootPath.replace(/\/+$/, "");
+		const filePath = `${root}/复盘模板.md`;
+		const existing = this.app.vault.getAbstractFileByPath(filePath);
+		if (existing instanceof TFile) {
+			return await this.app.vault.read(existing);
+		}
+		const content = this.plugin.settings.reviewTemplate;
+		await this.ensureFolder(filePath);
+		await this.app.vault.create(filePath, content);
+		return content;
 	}
 
 	private async openFileInEditMode(file: TFile): Promise<void> {
