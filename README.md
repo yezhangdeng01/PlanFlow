@@ -62,15 +62,6 @@ PlanFlow 是一个基于 Obsidian 的计划系统插件：
 2. 在 vault 中创建 `.obsidian/plugins/planflow/` 目录，放入三个文件
 3. Obsidian 设置 → 第三方插件 → 启用 PlanFlow
 
-## 💰 赞助
-
-如果你喜欢 PlanFlow，可以通过以下方式支持项目的发展：
-
-- [Buy Me a Coffee](https://www.buymeacoffee.com/yezhangdeng01)
-- [爱发电](https://afdian.net/@yezhangdeng01)
-
- FUNDING.yml 模板已在仓库中提供，可直接使用。
-
 ## 📂 数据格式（vault 内纯 Markdown）
 
 ```
