@@ -154,13 +154,13 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 			const dx = firsts[i].left - r.left;
 			const dy = firsts[i].top - r.top;
 			if (dx || dy) {
-				c.style.transform = `translate(${dx}px, ${dy}px)`;
+				// 对齐看板列模式：先禁过渡（瞬间定位）→ 设 transform → 强制重排 → 开过渡归位
 				c.addClass("planflow-flip-none");
-				window.requestAnimationFrame(() => {
-					c.removeClass("planflow-flip-none");
-					c.addClass("planflow-flip-med");
-					c.style.removeProperty("transform");
-				});
+				c.style.transform = `translate(${dx}px, ${dy}px)`;
+				void c.offsetWidth;
+				c.removeClass("planflow-flip-none");
+				c.addClass("planflow-flip-med");
+				c.style.removeProperty("transform");
 			}
 		});
 	};
@@ -305,13 +305,12 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		const dx = from.left - to.left;
 		const dy = from.top - to.top;
 		if (dx || dy) {
-			card.style.transform = `translate(${dx}px, ${dy}px)`;
 			card.addClass("planflow-flip-none");
-			window.requestAnimationFrame(() => {
-				card.removeClass("planflow-flip-none");
-				card.addClass("planflow-flip-slow");
-				card.style.removeProperty("transform");
-			});
+			card.style.transform = `translate(${dx}px, ${dy}px)`;
+			void card.offsetWidth;
+			card.removeClass("planflow-flip-none");
+			card.addClass("planflow-flip-slow");
+			card.style.removeProperty("transform");
 		}
 		// 兜底清理（rAF 不可靠时 300ms 后强制归零）
 		window.setTimeout(() => {
