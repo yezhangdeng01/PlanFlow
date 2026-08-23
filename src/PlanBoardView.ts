@@ -173,27 +173,49 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 	 *        小卡拖向矮列被误判为"拖到所有卡末尾"而无法移入）。 */
 	interface RefResult {
 		target: HTMLElement;
-		mode: "before" | "after" | "end";
+		mode: "swap" | "before" | "after" | "end";
 	}
-	/** v1.7.5: 对齐看板列的重叠比例判定（消除中心点边界抖动）。
-	 *  垂直重叠比例 ≥ 1/3 的最大卡为目标；方向由中心 y 决定 before/after；
+	/** v1.7.5: 列归属 + 重叠比例判定（用户预期语义）。
+	 *  列归属 = 被拖卡中心 x 落在哪列 → 只与该列内卡交互（跨列同行卡垂直 100% 重叠也不参与）；
+	 *  列内 = 沿拖动方向（dy 符号）找垂直重叠 ≥ 1/3 的最大卡 → swap（交换）；
 	 *  中心 y 低于所有卡最大底部 → end。 */
 	const computeRef = (): RefResult | null => {
 		const others = othersAll().filter((c) => c !== card);
 		const dr = card.getBoundingClientRect(); // 被拖卡视觉 rect（含 transform = 当前跟手位置）
-		// 0. 全局末尾：被拖卡中心 y 低于【所有卡】最大底部 +12 → append（真正拖到最底部）
+		const cx = dr.left + dr.width / 2;
+		const cy = dr.top + dr.height / 2;
+		const dy = (card.style.transform.match(/translate3d\([^,]+,\s*(-?[\d.]+)px/) ?? [null, "0"])[1];
+		const movingDown = parseFloat(dy ?? "0") >= 0;
+		// 0. 全局末尾：中心 y 低于【所有卡】最大底部 +12 → append（真正拖到最底部）
 		const maxBottom = others.reduce((m, o) => Math.max(m, rectOf(o).bottom), -Infinity);
-		if (others.length > 0 && dr.top + dr.height / 2 > maxBottom + 12) {
+		if (others.length > 0 && cy > maxBottom + 12) {
 			return { target: others[others.length - 1], mode: "end" };
 		}
-		// 1. 垂直重叠比例 ≥ 1/3 的最大卡（分母 = 双方较小高度 → 卡高差距不影响触发）
+		// 1. 列归属：按 left 聚类成列（同列 left 相同），中心 x 落在哪列 → 目标列
+		const colGroups = new Map<number, HTMLElement[]>();
+		for (const o of others) {
+			const left = Math.round(rectOf(o).left);
+			const list = colGroups.get(left) ?? [];
+			list.push(o);
+			colGroups.set(left, list);
+		}
+		let targetCol: HTMLElement[] | null = null;
+		for (const [left, list] of colGroups) {
+			const colRight = left + rectOf(list[0]).width;
+			if (cx >= left && cx <= colRight) {
+				targetCol = list;
+				break;
+			}
+		}
+		if (!targetCol) return null; // 中心在列间死区（间隙）——不动
+		// 2. 列内沿拖动方向找垂直重叠 ≥ 1/3 的最大卡 → swap（重叠 1/3 即交换）
 		let best: HTMLElement | null = null;
 		let bestRatio = 0;
-		for (const o of others) {
+		for (const o of targetCol) {
 			const r = rectOf(o);
-			// 必须同列（水平有重叠）才比较垂直方向
-			const hOverlap = Math.min(dr.right, r.right) - Math.max(dr.left, r.left);
-			if (hOverlap <= 0) continue;
+			// 只沿拖动方向：向下拖只看下方卡，向上拖只看上方卡
+			if (movingDown && r.top < dr.top - 2) continue;
+			if (!movingDown && r.bottom > dr.bottom + 2) continue;
 			const vOverlap = Math.min(dr.bottom, r.bottom) - Math.max(dr.top, r.top);
 			if (vOverlap <= 0) continue;
 			const ratio = vOverlap / Math.min(dr.height, r.height);
@@ -203,11 +225,7 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 			}
 		}
 		if (best && bestRatio >= 0.34) {
-			const r = rectOf(best);
-			const cy = dr.top + dr.height / 2;
-			const ncy = r.top + r.height / 2;
-			// 方向：被拖卡中心 y 在目标卡中心 y 之上 → before；之下 → after（与抓取点无关）
-			return cy < ncy ? { target: best, mode: "before" } : { target: best, mode: "after" };
+			return { target: best, mode: "swap" };
 		}
 		return null;
 	};
@@ -230,7 +248,23 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 				lastKey = key;
 				// 重排：记录【布局位置】→ DOM 操作 → 补偿 offset（视觉连续）
 				const oldL = layoutOf(card);
-				if (res.mode === "after") {
+				if (res.mode === "swap") {
+					// v1.7.5: 真交换（列感知）——重叠 1/3 即交换：相邻时单步移动，不相邻时两步对调
+					if (card.nextSibling === res.target) {
+						// card 紧邻 target 前 → card 移到 target 后
+						parentOf(card).insertBefore(card, res.target.nextSibling);
+					} else if (res.target.nextSibling === card) {
+						// card 紧邻 target 后 → card 移到 target 前
+						parentOf(card).insertBefore(card, res.target);
+					} else {
+						// 不相邻（含跨列）：target 移到 card 前，card 移到 target 原位
+						const cardCol = parentOf(card);
+						const targetCol = parentOf(res.target);
+						const targetNext = res.target.nextSibling;
+						cardCol.insertBefore(res.target, card);
+						targetCol.insertBefore(card, targetNext);
+					}
+				} else if (res.mode === "after") {
 					// 插目标后（列尾时 nextElementSibling=null → append 到该列末尾）
 					const tc = parentOf(res.target);
 					tc.insertBefore(card, res.target.nextElementSibling);
