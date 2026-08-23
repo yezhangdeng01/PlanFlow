@@ -290,10 +290,13 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		logicRects.clear();
 		// 先清其他卡所有残留 transform/transition（FLIP 动画残留会污染 rect 计算）
 		othersAll().forEach((c) => {
-			if (c === card) return;
-			c.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
-			c.style.removeProperty("transform");
-		});
+				if (c === card) return;
+				c.removeClass("planflow-flip-none");
+				c.removeClass("planflow-flip-fast");
+				c.removeClass("planflow-flip-med");
+				c.removeClass("planflow-flip-slow");
+				c.style.removeProperty("transform");
+			});
 		// 被拖卡恢复流式布局 + FLIP 归位（从鼠标位置滑入格子）
 		const from = card.getBoundingClientRect();
 		card.removeClass("is-plan-dragging");
@@ -312,7 +315,10 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		}
 		// 兜底清理（rAF 不可靠时 300ms 后强制归零）
 		window.setTimeout(() => {
-			card.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
+			card.removeClass("planflow-flip-none");
+			card.removeClass("planflow-flip-fast");
+			card.removeClass("planflow-flip-med");
+			card.removeClass("planflow-flip-slow");
 			card.style.removeProperty("transform");
 		}, 320);
 		const names = othersAll().map((c) => c.getAttribute("data-plan-name") || "").filter(Boolean);
@@ -336,7 +342,10 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		e.stopImmediatePropagation(); // 阻断 Obsidian 及一切后续监听
 		// v1.6: 拖动前彻底清理——防上次残留 transform 污染 rect 计算
 		othersAll().forEach((c) => {
-			c.removeClass("planflow-flip-none planflow-flip-fast planflow-flip-med planflow-flip-slow");
+			c.removeClass("planflow-flip-none");
+			c.removeClass("planflow-flip-fast");
+			c.removeClass("planflow-flip-med");
+			c.removeClass("planflow-flip-slow");
 			c.style.removeProperty("transform");
 		});
 		// v1.6.1: 按下快照逻辑位置（此时无动画，实时 rect = 布局位置）
