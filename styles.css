@@ -522,6 +522,28 @@
 	margin-top: 16px;
 }
 
+/* 量化目标弹窗日期选择——整块可点（原生日历指示器覆盖全输入区，点击任意位置弹选择窗）+ 按钮外观 */
+.planboard-modal input[type="date"].planboard-date-btn {
+	position: relative;
+	cursor: pointer;
+	text-align: center;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+}
+.planboard-modal input[type="date"].planboard-date-btn:hover {
+	border-color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+.planboard-modal input[type="date"].planboard-date-btn::-webkit-calendar-picker-indicator {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
 /* ========== M2 首页目标卡 ========== */
 .planboard-goal-card,
 .planboard-month-task-card,
@@ -959,41 +981,6 @@
 
 .planboard-progress-number--inline {
 	margin-bottom: 6px;
-}
-
-/* ========== 节奏提示 ========== */
-.planboard-rhythm-hints {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	margin: 6px 0 2px;
-}
-
-.planboard-rhythm-hint {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 12px;
-	color: #f59e0b;
-	background: rgba(245, 158, 11, 0.1);
-	border: 1px solid rgba(245, 158, 11, 0.25);
-	border-radius: 8px;
-	padding: 6px 10px;
-}
-
-.theme-dark .planboard-rhythm-hint {
-	color: #fbbf24;
-	background: rgba(245, 158, 11, 0.14);
-}
-
-.planboard-rhythm-hint .planboard-btn {
-	font-size: 12px;
-	padding: 3px 10px;
-	flex-shrink: 0;
-}
-
-.planboard-rhythm-close {
-	margin-left: auto;
 }
 
 /* 周/月视图徽章墙卡片 */
@@ -2219,6 +2206,58 @@
 }
 .planflow-icon-custom input {
 	width: 180px;
+}
+
+/* 新增大类弹窗 emoji 选择浮动层（v2.4.1：点「选择…」在按钮旁弹出，不占 Modal 空间） */
+.planflow-emoji-pop {
+	position: fixed;
+	z-index: calc(var(--z-index-modal, 1000) + 5);
+	width: 340px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+	padding: 8px 10px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.planflow-emoji-group {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.planflow-emoji-group-label {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	flex-shrink: 0;
+	width: 32px;
+	text-align: right;
+}
+.planflow-emoji-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.planflow-emoji-option {
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	transition: border-color 0.15s, transform 0.1s;
+}
+.planflow-emoji-option:hover {
+	border-color: var(--interactive-accent);
+	transform: scale(1.1);
 }
 
 /* FLIP 动画辅助类（替代内联 style 赋值，满足 obsidianmd/no-static-styles-assignment） */

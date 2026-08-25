@@ -1,23 +1,19 @@
-import { App, ItemView, MarkdownView, Menu, Modal, Notice, Setting, TAbstractFile, TFile, TFolder, WorkspaceLeaf, parseYaml } from "obsidian";
+import { App, ButtonComponent, ItemView, MarkdownView, Menu, Modal, Notice, Setting, TAbstractFile, TFile, TFolder, WorkspaceLeaf, parseYaml } from "obsidian";
 import type PlanBoardPlugin from "../main";
-import type { CheckItem, DailyData, TempTask } from "./daily";
+import type { CheckItem, DailyData } from "./daily";
 import {
 	appendCheckItem,
 	buildCheckLine,
 	buildDailyTemplate,
 	buildReviewTemplate,
-	getISOWeek,
-	isActiveToday,
 	moveTaskLine,
 	parseDailyContent,
 	parseDateString,
-	parseTempTasksFromFrontmatter,
 	removeLine,
 	replaceSummary,
 	TASK_LINE_RE,
 	todayStr,
 	toggleTaskLine,
-	toggleTempTask,
 	weekRange,
 	daysInMonth,
 } from "./daily";
@@ -39,12 +35,6 @@ import { DEFAULT_PLAN_COLORS } from "./settings";
 export const VIEW_TYPE_PLANFLOW = "planflow";
 
 type TabKey = PeriodType | "today" | "board" | "gantt";
-
-const SOURCE_LABELS: Record<TempTask["source"], string> = {
-	daily: "今日",
-	week: "本周",
-	month: "本月",
-};
 
 const PERIOD_TITLES: Record<PeriodType, string> = {
 	week: "本周",
@@ -173,17 +163,63 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 	 *        小卡拖向矮列被误判为"拖到所有卡末尾"而无法移入）。 */
 	interface RefResult {
 		target: HTMLElement;
-		mode: "swap" | "before" | "after" | "end";
+		mode: "swap" | "before" | "after" | "end" | "first";
 	}
-	/** v1.7.5: 列归属 + 重叠比例判定（用户预期语义）。
-	 *  列归属 = 被拖卡中心 x 落在哪列 → 只与该列内卡交互（跨列同行卡垂直 100% 重叠也不参与）；
-	 *  列内 = 沿拖动方向（dy 符号）找垂直重叠 ≥ 1/3 的最大卡 → swap（交换）；
-	 *  中心 y 低于所有卡最大底部 → end。 */
+	/** 拖拽判定（v2.1 分离语义，实测校准）：
+	 *  两列（年度视图）→ v2.0 间隙插入模型：列归属（横向重叠）→ 列内按中心 cy 找间隙
+	 *    （列首 before / 卡内按中心± / 列尾 after / 空列 first），无 swap、无方向判定、无方向锁
+	 *    （v2.2: 删除 lastRef2 锁——它把"拖到第一行上方"锁死在 after；年度卡大间距大本就不抖）；
+	 *  单列（周/月视图）→ v1.7.5 swap 语义原样保留（用户实测确认满意，不再改动）。 */
 	const computeRef = (): RefResult | null => {
 		const others = othersAll().filter((c) => c !== card);
 		const dr = card.getBoundingClientRect(); // 被拖卡视觉 rect（含 transform = 当前跟手位置）
 		const cx = dr.left + dr.width / 2;
 		const cy = dr.top + dr.height / 2;
+		// ===== 两列（年度视图）：v2.0 间隙插入模型 =====
+		if (cols.length > 1) {
+			// 1. 列归属：与【列容器】横向重叠宽度最大者（v2.3: 用列容器而非卡聚类——
+			//    空列不在卡聚类里，拖入空列会被判死区；列容器 rect 天然包含空列）。
+			//    全部零重叠（列间隙）时用中心点兜底。
+			let targetColEl: HTMLElement | null = null;
+			let bestOverlap = 0;
+			const colRects = cols.map((c) => c.getBoundingClientRect());
+			for (let i = 0; i < cols.length; i++) {
+				const cr = colRects[i];
+				const ov = Math.min(dr.right, cr.right) - Math.max(dr.left, cr.left);
+				if (ov > bestOverlap) {
+					bestOverlap = ov;
+					targetColEl = cols[i];
+				}
+			}
+			if (!targetColEl || bestOverlap <= 0) {
+				for (let i = 0; i < cols.length; i++) {
+					const cr = colRects[i];
+					if (cx >= cr.left && cx <= cr.right) {
+						targetColEl = cols[i];
+						break;
+					}
+				}
+			}
+			if (!targetColEl) return null;
+			const sameCol = Array.from(targetColEl.children).filter((c) => c !== card) as HTMLElement[];
+			// 2. 空列 → 插列首（第一行）
+			if (sameCol.length === 0) {
+				return { target: targetColEl, mode: "first" };
+			}
+			// 3. 列内按【卡顶 top】找间隙（v2.3: 卡中心会被大卡高度滞后——写作卡 h435 拖到列首上方
+			//    时中心还在下面，插不到第一行；卡顶 = 鼠标抓取位置，判定更直觉）
+			const top = dr.top;
+			for (const o of sameCol) {
+				const r = rectOf(o);
+				if (top < r.top) return { target: o, mode: "before" }; // 列首
+				if (top <= r.bottom) {
+					// 卡内：按相对卡中心，上半插前、下半插后（吸附感）
+					return { target: o, mode: top < (r.top + r.bottom) / 2 ? "before" : "after" };
+				}
+			}
+			return { target: sameCol[sameCol.length - 1], mode: "after" }; // 列尾
+		}
+		// ===== 单列（周/月视图）：v1.7.5 swap 语义（原样保留）=====
 		const dy = (card.style.transform.match(/translate3d\([^,]+,\s*(-?[\d.]+)px/) ?? [null, "0"])[1];
 		const movingDown = parseFloat(dy ?? "0") >= 0;
 		// 0. 全局末尾：中心 y 低于【所有卡】最大底部 +12 → append（真正拖到最底部）
@@ -237,19 +273,35 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 		if (now - lastMoveT < 16) return;
 		lastMoveT = now;
 		// transform 跟手（相对流式位置 + 重排补偿）——不用 fixed（Obsidian transform 祖先劫持 fixed 坐标基准）
-		const dx = ev.clientX - grabX + offsetX;
-		const dy = ev.clientY - grabY + offsetY;
+		// v2.1: 移动阈值（activation constraint）——原始位移 <4px 视为"按下未拖"，不判定不重排
+		//（修复：按下瞬间 dy≈0 时判定会锁死方向/触发无操作重排，周月年度通杀）
+		const rawX = ev.clientX - grabX;
+		const rawY = ev.clientY - grabY;
+		if (Math.abs(rawX) < 4 && Math.abs(rawY) < 4) return;
+		const dx = rawX + offsetX;
+		const dy = rawY + offsetY;
 		card.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-		// 2D 目标位置（中心线推进：进入目标 rect 才触发；同行 swap / 跨行插入 / 末尾 append；null=死区不动）
+		// 2D 目标位置（单列 swap / 两列间隙插入；null=死区不动）
 		const res = computeRef();
 		if (res && res.target !== card) {
 			const key = res.target.getAttribute("data-plan-name") + ":" + res.mode;
 			if (key !== lastKey) {
+				// v2.3 修复: 原位保护——C 已在目标位置则不重排（无操作 insertBefore + FLIP 是抖动源）。
+				// 条件曾写反（before 用 previousElementSibling）：card 在 target【后】时判定 before
+				// 被误判"已在位"跳过 → 拖到第一行上方插不进去。已在位 = card 紧邻 target 前/后。
+				if (
+					(res.mode === "before" && card.nextElementSibling === res.target) ||
+					(res.mode === "after" && card.previousElementSibling === res.target) ||
+					(res.mode === "first" && card.parentElement === res.target && card === res.target.firstChild)
+				) {
+					lastKey = key;
+					return;
+				}
 				lastKey = key;
 				// 重排：记录【布局位置】→ DOM 操作 → 补偿 offset（视觉连续）
 				const oldL = layoutOf(card);
 				if (res.mode === "swap") {
-					// v1.7.5: 真交换（列感知）——重叠 1/3 即交换：相邻时单步移动，不相邻时两步对调
+					// v1.7.5: 真交换（单列用）——重叠 1/3 即交换：相邻时单步移动，不相邻时两步对调
 					if (card.nextSibling === res.target) {
 						// card 紧邻 target 前 → card 移到 target 后
 						parentOf(card).insertBefore(card, res.target.nextSibling);
@@ -257,7 +309,7 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 						// card 紧邻 target 后 → card 移到 target 前
 						parentOf(card).insertBefore(card, res.target);
 					} else {
-						// 不相邻（含跨列）：target 移到 card 前，card 移到 target 原位
+						// 不相邻：target 移到 card 前，card 移到 target 原位
 						const cardCol = parentOf(card);
 						const targetCol = parentOf(res.target);
 						const targetNext = res.target.nextSibling;
@@ -268,8 +320,11 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 					// 插目标后（列尾时 nextElementSibling=null → append 到该列末尾）
 					const tc = parentOf(res.target);
 					tc.insertBefore(card, res.target.nextElementSibling);
+				} else if (res.mode === "first") {
+					// 空列 → 插到列容器开头（第一行）
+					res.target.insertBefore(card, res.target.firstChild);
 				} else if (res.mode === "end") {
-					// 拖到最底部 → 最后一列末尾
+					// 拖到最底部 → 最后一列末尾（单列）
 					cols[cols.length - 1].appendChild(card);
 				} else {
 					// before：插目标前（同列或跨列 insertBefore 均正确）
@@ -278,7 +333,7 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 				const newL = layoutOf(card);
 				offsetX += oldL.left - newL.left;
 				offsetY += oldL.top - newL.top;
-				card.style.transform = `translate3d(${ev.clientX - grabX + offsetX}px, ${ev.clientY - grabY + offsetY}px, 0)`;
+				card.style.transform = `translate3d(${rawX + offsetX}px, ${rawY + offsetY}px, 0)`;
 				flipOthers();
 			}
 		}
@@ -387,12 +442,6 @@ function attachResizeHandle(
 	const handle = card.createDiv({ cls: "planboard-resize-handle", attr: { title: "拖动调整高度" } });
 	let startY = 0;
 	let startH = 0;
-	const readH = (): number => {
-		if (key === "yearPlanHeights" && mapKey) {
-			return plugin.settings.yearPlanHeights[mapKey] ?? 0;
-		}
-		return (plugin.settings as unknown as Record<string, number>)[key] ?? 0;
-	};
 	const writeH = (h: number): void => {
 		if (key === "yearPlanHeights" && mapKey) {
 			plugin.settings.yearPlanHeights[mapKey] = h;
@@ -429,8 +478,25 @@ function attachResizeHandle(
 	});
 }
 
-const HOME_TASK_PREVIEW_LIMIT = 2;
-const RHYTHM_HINT_LIMIT = 2;
+/** 异步确认对话框（替代原生 confirm()，满足 Obsidian 官方审查合规要求）。返回 boolean。 */
+function confirmDialog(app: App, message: string, opts: { confirmText?: string; cancelText?: string; danger?: boolean } = {}): Promise<boolean> {
+	return new Promise<boolean>((resolve) => {
+		const modal = new Modal(app);
+		modal.contentEl.addClass("planboard-confirm-modal");
+		modal.contentEl.createEl("p", { text: message });
+		const row = modal.contentEl.createDiv({ cls: "planboard-confirm-buttons" });
+		const ok = new ButtonComponent(row)
+			.setButtonText(opts.confirmText ?? "确定")
+			.onClick(() => { resolve(true); modal.close(); });
+		if (opts.danger) ok.setWarning();
+		new ButtonComponent(row)
+			.setButtonText(opts.cancelText ?? "取消")
+			.onClick(() => { resolve(false); modal.close(); });
+		const prevOnClose = modal.onClose;
+		modal.onClose = () => { resolve(false); prevOnClose?.call(modal); };
+		modal.open();
+	});
+}
 
 /** 完成率分档（奖励机制）：≥100 金 / ≥80 银 / ≥60 铜 / 其余默认 */
 function tierClass(percent: number): string {
@@ -476,15 +542,6 @@ interface GoalInput {
 /** Palette offered in PlanEditModal (spec v1.2); empty choice = auto-rotate. */
 const PLAN_COLOR_OPTIONS = ["#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
-/** One per-goal rhythm hint row (spec v1.2 #3). */
-interface RhythmHint {
-	goalName: string;
-	unit: string;
-	need: number;
-	done: number;
-	plan: string;
-}
-
 /**
  * Main PlanBoard view: tab bar + per-tab panels (PRD §3, DEV.md M2).
  * Today panel is the home page (年度目标卡 → 本月任务卡 → 本周任务卡 → 今日打卡),
@@ -513,10 +570,6 @@ export class PlanBoardView extends ItemView {
 	/** Latest gantt task list (drag write-back resolves tasks by pool line). */
 	private ganttBarTasks: PoolTask[] = [];
 	private planProgress: PlanProgress[] = [];
-	/** Annual plan period (start/end) read on home data build — used by rhythm hints. */
-	private planPeriod: { start: string; end: string } | null = null;
-	/** Rhythm hints dismissed in this session (not persisted; key = `month:plan:goal`). */
-	private rhythmDismissed = new Set<string>();
 
 	// DOM refs (nullable — guard before touching)
 	private panelEl: HTMLElement | null = null;
@@ -525,8 +578,6 @@ export class PlanBoardView extends ItemView {
 	private homeDateSubEl: HTMLElement | null = null;
 	private tabsEl: HTMLElement | null = null;
 	private checklistEl: HTMLElement | null = null;
-	private tempListEl: HTMLElement | null = null;
-	private tempEmptyEl: HTMLElement | null = null;
 	private summaryEl: HTMLTextAreaElement | null = null;
 	/** 打卡自动生成区（完成/未完成/鼓励语，v1.4）。 */
 	private summaryAutoEl: HTMLElement | null = null;
@@ -539,7 +590,6 @@ export class PlanBoardView extends ItemView {
 	private goalEmptyEl: HTMLElement | null = null;
 	private monthTaskNumberEl: HTMLElement | null = null;
 	private monthTaskFillEl: HTMLElement | null = null;
-	private monthHintEl: HTMLElement | null = null;
 	private monthPreviewEl: HTMLElement | null = null;
 	private monthPreviewEmptyEl: HTMLElement | null = null;
 	private weekTaskNumberEl: HTMLElement | null = null;
@@ -755,7 +805,6 @@ export class PlanBoardView extends ItemView {
 			}));
 		if (autoPlans.length === 0) return;
 		const period = await readPlanPeriod(this.app, root, year);
-		this.planPeriod = period;
 		if (!period) return;
 		this.selfWrite = true;
 		try {
@@ -830,7 +879,6 @@ export class PlanBoardView extends ItemView {
 		newMonthBtn.addEventListener("click", () => void this.openTaskModal(null, { due: monthEnd }));
 		const monthBar = monthCard.createDiv({ cls: "planboard-progress-bar planboard-progress-bar--thin" });
 		this.monthTaskFillEl = monthBar.createDiv({ cls: "planboard-progress-fill" });
-		this.monthHintEl = monthCard.createDiv({ cls: "planboard-rhythm-hints" });
 		this.monthPreviewEl = monthCard.createEl("ul", { cls: "planboard-checklist planboard-home-preview" });
 		if (this.plugin.settings.monthCardHeight > 0) this.monthPreviewEl.style.height = `${this.plugin.settings.monthCardHeight}px`;
 		attachResizeHandle(monthCard, this.monthPreviewEl, this.plugin, "monthCardHeight", {
@@ -979,7 +1027,6 @@ export class PlanBoardView extends ItemView {
 		for (const t of this.monthTasks) {
 			this.monthPreviewEl.appendChild(this.renderTaskItem(t));
 		}
-		if (this.monthHintEl) this.monthHintEl.hidden = true; // v1.4: 任务已在年度目标分解，停用"新建提醒"
 	}
 
 	private updateWeekTaskCard(): void {
@@ -1069,75 +1116,6 @@ export class PlanBoardView extends ItemView {
 			el.addClass("planboard-hidden");
 		}
 		el.dataset.tier = tier?.cls ?? "";
-	}
-	// --- Task rhythm hints (Task D: month task card) -------------------------
-
-	private updateMonthRhythmHints(): void {
-		// v1.4: 已停用（任务已在年度目标分解，无需"应有 N 个"新建提醒）
-		if (!this.monthHintEl) return;
-		this.monthHintEl.empty();
-		const hints = this.computeMonthRhythmHints();
-		this.monthHintEl.hidden = hints.length === 0;
-		for (const h of hints.slice(0, RHYTHM_HINT_LIMIT)) {
-			this.monthHintEl.appendChild(this.renderRhythmHint(h));
-		}
-	}
-
-	/**
-	 * Per-goal rhythm hints (spec v1.2 #3): for each quantified goal,
-	 *   need = ceil(goal.count × month weight within the goal window) - goal.done
-	 * where goal.done = checked pool tasks whose text starts with 「{goal.name}（」.
-	 * Density filter: goals with count/totalMonths < 0.5 (project-type) are skipped.
-	 */
-	private computeMonthRhythmHints(): RhythmHint[] {
-		const hints: RhythmHint[] = [];
-		for (const prog of this.planProgress) {
-			if (!prog.isNumeric) continue;
-			// v1.2：按 goal 独立提示
-			for (const goal of prog.goals) {
-				if (goal.count <= 0) continue;
-				const gStart = goal.start ?? this.planPeriod?.start;
-				const gEnd = goal.end ?? this.planPeriod?.end;
-				if (!gStart || !gEnd) continue;
-				// 密度过滤：目标数/总月数 < 0.5 → 项目型目标（如 1 条/5 个月）不做月度节奏提示
-				const totalMonths = monthsBetween(gStart, gEnd);
-				if (totalMonths > 0 && goal.count / totalMonths < 0.5) continue;
-				const key = `${this.today.slice(0, 7)}:${prog.plan}:${goal.name}`;
-				if (this.rhythmDismissed.has(key)) continue;
-				const weight = monthWeightWithin(gStart, gEnd, this.today);
-				if (weight === null) continue;
-				const expected = Math.ceil(goal.count * weight);
-				const done = goal.done; // 该 goal 前缀任务勾选数
-				const need = expected - done;
-				if (need <= 0) continue;
-				hints.push({ goalName: goal.name, unit: goal.unit || "个", need, done, plan: prog.plan });
-			}
-		}
-		// 缺口最大的优先（limited to RHYTHM_HINT_LIMIT rows）。
-		return hints.sort((a, b) => b.need - a.need);
-	}
-
-	private renderRhythmHint(h: RhythmHint): HTMLElement {
-		const row = createDiv({ cls: "planboard-rhythm-hint" });
-		const key = `${this.today.slice(0, 7)}:${h.plan}:${h.goalName}`;
-		row.createSpan({ text: `⚠️ ${h.goalName}：本月应有 ${h.need} ${h.unit}，当前 ${h.done} ${h.unit}` });
-		const addBtn = row.createEl("button", { cls: "planboard-btn planboard-btn-primary planboard-rhythm-add", text: "＋ 新建" });
-		addBtn.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			const [yy, mm] = this.today.split("-").map(Number);
-			const monthEnd = `${this.today.slice(0, 7)}-${String(daysInMonth(yy, mm)).padStart(2, "0")}`;
-			void this.openTaskModal(null, { plan: h.plan, due: monthEnd });
-		});
-		const closeBtn = row.createEl("button", { cls: "planboard-icon-btn planboard-rhythm-close", attr: { "aria-label": "关闭提示", title: "关闭提示" } });
-		closeBtn.setText("✕");
-		closeBtn.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.rhythmDismissed.add(key);
-			row.remove();
-		});
-		return row;
 	}
 
 	// --- Daily check-in (M1, preserved) -------------------------------------
@@ -1343,62 +1321,6 @@ export class PlanBoardView extends ItemView {
 		}
 		this.dailyData.summary = value;
 		new Notice("总结已保存");
-	}
-
-	// --- Temp tasks -----------------------------------------------------------
-
-	private async updateTempTasks(): Promise<void> {
-		if (!this.dailyData || !this.tempListEl || !this.tempEmptyEl) return;
-		const tasks: TempTask[] = [...this.dailyData.tempItems];
-		const root = this.plugin.settings.rootPath.replace(/\/+$/, "");
-		const year = this.today.slice(0, 4);
-
-		const { week } = getISOWeek(this.today);
-		const weekLabel = `${year}-W${String(week).padStart(2, "0")}`;
-		const weekFile = this.app.vault.getAbstractFileByPath(`${root}/${year}/周/${weekLabel}.md`);
-		if (weekFile instanceof TFile) {
-			const src = parseTempTasksFromFrontmatter(await this.app.vault.cachedRead(weekFile), weekFile, "week");
-			tasks.push(...src.filter((t) => isActiveToday(t, this.today)));
-		}
-
-		const monthLabel = this.today.slice(0, 7);
-		const monthFile = this.app.vault.getAbstractFileByPath(`${root}/${year}/月/${monthLabel}.md`);
-		if (monthFile instanceof TFile) {
-			const src = parseTempTasksFromFrontmatter(await this.app.vault.cachedRead(monthFile), monthFile, "month");
-			tasks.push(...src.filter((t) => isActiveToday(t, this.today)));
-		}
-
-		this.tempListEl.empty();
-		this.tempEmptyEl.hidden = tasks.length > 0;
-		for (const t of tasks) this.tempListEl.appendChild(this.renderTempTask(t));
-	}
-
-	private renderTempTask(task: TempTask): HTMLElement {
-		const li = createEl("li", { cls: "planboard-check-item planboard-temp-item" + (task.checked ? " is-checked" : "") });
-		const label = li.createEl("label", { cls: "planboard-check-label" });
-		const cb = label.createEl("input", { type: "checkbox", cls: "planboard-checkbox" });
-		cb.checked = task.checked;
-		cb.disabled = !task.togglable;
-		cb.addEventListener("change", () => void this.toggleTempTaskItem(task, cb.checked));
-		label.createSpan({ cls: "planboard-check-text", text: task.text || "(无名称)" });
-		if (task.due) label.createSpan({ cls: "planboard-temp-due", text: `📅 ${task.due}` });
-		label.createSpan({ cls: "planboard-temp-source", text: SOURCE_LABELS[task.source] });
-		return li;
-	}
-
-	private async toggleTempTaskItem(task: TempTask, checked: boolean): Promise<void> {
-		this.selfWrite = true;
-		let newContent: string;
-		try {
-			newContent = await toggleTempTask(this.app, task, checked);
-		} finally {
-			this.selfWrite = false;
-		}
-		task.checked = checked;
-		if (task.source === "daily" && this.dailyData) {
-			this.dailyData = parseDailyContent(task.file, newContent, this.today);
-		}
-		await this.updateTempTasks();
 	}
 
 	// --- Missing note / creation ---------------------------------------------
@@ -2704,11 +2626,11 @@ export class PlanBoardView extends ItemView {
 			this.selfWrite = false;
 		}
 		new Notice("量化目标已保存");
-		// v1.5 联动：编辑已有目标后，删除旧分解任务并按新时间/数量重新分解
+		// v1.5 联动 + 修复：编辑目标后重建分解任务；【新建目标同样触发分解】（此前新建只写文件不生成任务）
+		const root = this.plugin.settings.rootPath.replace(/\/+$/, "");
+		const year = this.today.slice(0, 4);
+		const pool = this.app.vault.getAbstractFileByPath(`${root}/${year}/任务.md`);
 		if (existing) {
-			const root = this.plugin.settings.rootPath.replace(/\/+$/, "");
-			const year = this.today.slice(0, 4);
-			const pool = this.app.vault.getAbstractFileByPath(`${root}/${year}/任务.md`);
 			if (pool instanceof TFile) {
 				const prefix = `${existing.name}（`;
 				this.selfWrite = true;
@@ -2729,6 +2651,9 @@ export class PlanBoardView extends ItemView {
 			}
 			await this.ensureAutoTasksForToday(root, year);
 			new Notice("目标已更新，分解任务已按新设置重建");
+		} else {
+			await this.ensureAutoTasksForToday(root, year);
+			new Notice("目标已保存，分解任务已生成");
 		}
 		await this.refresh();
 		return true;
@@ -2736,7 +2661,7 @@ export class PlanBoardView extends ItemView {
 
 	/** Delete a plan category + all of its pool tasks (incl. decomposed). */
 	private async deletePlan(prog: PlanProgress): Promise<void> {
-		if (!confirm(`删除计划「${prog.plan}」将同时删除其全部任务（含分解任务），确定？`)) return;
+		if (!await confirmDialog(this.app, `删除计划「${prog.plan}」将同时删除其全部任务（含分解任务），确定？`, { danger: true })) return;
 		const file = await this.findAnnualPlanFile();
 		if (!file) {
 			new Notice("未找到年度计划文件");
@@ -2783,7 +2708,7 @@ export class PlanBoardView extends ItemView {
 
 	/** Delete a quantified goal + its decomposed pool tasks. */
 	private async deleteGoal(prog: PlanProgress, goal: PlanGoalProgress): Promise<void> {
-		if (!confirm(`删除量化目标「${goal.name}」及其分解任务？`)) return;
+		if (!await confirmDialog(this.app, `删除量化目标「${goal.name}」及其分解任务？`, { danger: true })) return;
 		const file = await this.findAnnualPlanFile();
 		if (!file) {
 			new Notice("未找到年度计划文件");
@@ -3097,6 +3022,9 @@ class PlanEditModal extends Modal {
 	private colorEl!: HTMLSelectElement;
 
 	private dailyVal = true;
+	/** emoji 选择浮层的点击外关闭监听与清理（v2.4.1）。 */
+	private emojiPopDocDown: ((e: PointerEvent) => void) | null = null;
+	private emojiClosePop: (() => void) | null = null;
 
 	constructor(
 		app: App,
@@ -3121,10 +3049,64 @@ class PlanEditModal extends Modal {
 			this.nameEl = text.inputEl;
 			text.setPlaceholder("例如：写作");
 		});
-		new Setting(contentEl).setName("图标").setDesc("显示在计划名称前，如 ✍️ 📖 🏃").addText((text) => {
-			this.labelEl = text.inputEl;
-			text.setPlaceholder("✍️");
-		});
+		// v2.4: 图标字段 emoji 选择器（v2.4.1 改浮动弹层——点「选择…」在按钮旁弹出，不占 Modal 空间）
+		const EMOJI_GROUPS: [string, string[]][] = [
+			["运动", ["🏃", "🚶", "💪", "🏋️", "🧘", "⚽", "🏀", "🚴", "🏊", "🥾", "🎾", "⛰️"]],
+			["学习", ["📖", "📚", "✍️", "🖋️", "🎓", "💡", "🧠", "🔬", "📝", "🗣️", "🎵", "📐"]],
+			["健康", ["🥗", "🍎", "💊", "🩺", "😴", "🛌", "🌿", "💧", "🏥", "🥦", "🍵", "🧖"]],
+			["工作", ["💼", "🖥️", "⌨️", "📈", "🗂️", "📊", "💻", "✉️", "🤝", "📅", "🛠️", "⚙️"]],
+			["其他", ["🎯", "⭐", "🔥", "🎨", "📷", "🌱", "✨", "❤️", "🆕", "🌙", "☀️", "🚀"]],
+		];
+		const closeEmojiPop = (): void => {
+			document.querySelector(".planflow-emoji-pop")?.remove();
+			document.removeEventListener("pointerdown", this.emojiPopDocDown!, true);
+			this.emojiPopDocDown = null;
+		};
+		this.emojiClosePop = closeEmojiPop;
+		const showEmojiPop = (anchor: HTMLElement): void => {
+			closeEmojiPop();
+			const pop = document.body.createDiv({ cls: "planflow-emoji-pop" });
+			for (const [label, emojis] of EMOJI_GROUPS) {
+				const group = pop.createDiv({ cls: "planflow-emoji-group" });
+				group.createSpan({ cls: "planflow-emoji-group-label", text: label });
+				const row = group.createDiv({ cls: "planflow-emoji-row" });
+				for (const emoji of emojis) {
+					const b = row.createEl("button", { cls: "planflow-emoji-option", attr: { type: "button" } });
+					b.setText(emoji);
+					b.addEventListener("click", () => {
+						this.labelEl.value = emoji;
+						closeEmojiPop();
+					});
+				}
+			}
+			// 视口定位：按钮下方，左右不越界；下方空间不足则向上弹
+			const r = anchor.getBoundingClientRect();
+			const W = 340;
+			const H = pop.offsetHeight || 340;
+			let left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8));
+			let top = r.bottom + 6;
+			if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 6);
+			pop.style.left = `${left}px`;
+			pop.style.top = `${top}px`;
+			pop.style.maxHeight = `${Math.min(380, window.innerHeight - 16)}px`;
+			// 点击浮层外关闭
+			this.emojiPopDocDown = (e: PointerEvent) => {
+				if (!pop.contains(e.target as Node)) closeEmojiPop();
+			};
+			document.addEventListener("pointerdown", this.emojiPopDocDown!, true);
+		};
+		new Setting(contentEl)
+			.setName("图标")
+			.setDesc("显示在计划名称前，如 ✍️ 📖 🏃")
+			.addText((text) => {
+				this.labelEl = text.inputEl;
+				text.setPlaceholder("✍️");
+			})
+			.addButton((btn) => {
+				btn.setButtonText("选择…").setTooltip("从常用 emoji 中选择").onClick(() => {
+					showEmojiPop(btn.buttonEl);
+				});
+			});
 		new Setting(contentEl).setName("动作").setDesc("每日打卡动作，如 1小时").addText((text) => {
 			this.actionEl = text.inputEl;
 			text.setPlaceholder("1小时");
@@ -3176,6 +3158,7 @@ class PlanEditModal extends Modal {
 	}
 
 	onClose(): void {
+		this.emojiClosePop?.(); // v2.4.1: 关闭 Modal 时清理浮动 emoji 选择层
 		this.contentEl.empty();
 	}
 }
@@ -3228,10 +3211,12 @@ class GoalEditModal extends Modal {
 		new Setting(contentEl).setName("开始日期").addText((text) => {
 			this.startEl = text.inputEl;
 			this.startEl.type = "date";
+			this.startEl.addClass("planboard-date-btn");
 		});
 		new Setting(contentEl).setName("结束日期").addText((text) => {
 			this.endEl = text.inputEl;
 			this.endEl.type = "date";
+			this.endEl.addClass("planboard-date-btn");
 		});
 
 		this.nameEl.value = this.existing?.name ?? "";
@@ -3239,6 +3224,12 @@ class GoalEditModal extends Modal {
 		this.unitEl.value = this.existing?.unit ?? "个";
 		this.startEl.value = this.existing?.start ?? "";
 		this.endEl.value = this.existing?.end ?? "";
+
+		// 弹窗打开即聚焦名称输入（Obsidian modal 不默认聚焦；迟延兜底动画期间点击失效）
+		this.nameEl.focus();
+		window.setTimeout(() => {
+			if (this.contentEl.isConnected) this.nameEl.focus();
+		}, 120);
 
 		const buttons = contentEl.createDiv({ cls: "planboard-modal-buttons" });
 		const cancel = buttons.createEl("button", { cls: "planboard-btn", text: "取消" });
@@ -3422,23 +3413,3 @@ function toPlanDef(prog: PlanProgress): PlanDef {
 	};
 }
 
-/** Full months spanned by [start, end] (inclusive), e.g. 2026-08~2026-12 → 5. */
-function monthsBetween(start: string, end: string): number {
-	const [sy, sm] = start.slice(0, 7).split("-").map(Number);
-	const [ey, em] = end.slice(0, 7).split("-").map(Number);
-	return (ey - sy) * 12 + (em - sm) + 1;
-}
-
-/** Month progress weight (1..totalMonths)/totalMonths within [start, end]; null when today is outside. */
-function monthWeightWithin(start: string, end: string, today: string): number | null {
-	const startYM = start.slice(0, 7);
-	const endYM = end.slice(0, 7);
-	const curYM = today.slice(0, 7);
-	if (curYM < startYM || curYM > endYM) return null;
-	const [sy, sm] = startYM.split("-").map(Number);
-	const [cy, cm] = curYM.split("-").map(Number);
-	const totalMonths = monthsBetween(start, end);
-	const monthIndex = (cy - sy) * 12 + (cm - sm) + 1;
-	if (totalMonths <= 0) return null;
-	return Math.min(monthIndex, totalMonths) / totalMonths;
-}
