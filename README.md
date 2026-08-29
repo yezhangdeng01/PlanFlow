@@ -1,5 +1,7 @@
 # PlanFlow
 
+> 🌐 **Language**: [English](README.md) · [简体中文](README.zh-CN.md)
+
 An Obsidian plugin that turns your annual plans into executable daily actions: automatic plan decomposition, quantified task flow, six-view goal tracking (Daily / Week / Month / Year / Kanban / Gantt), and a self-driven reward system.
 
 - **Plan decomposition + daily check-in**: break goals down into actionable daily items
