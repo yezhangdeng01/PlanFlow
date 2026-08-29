@@ -243,11 +243,9 @@ export async function readMonthBadges(
 	const mm = monthLabel.slice(5, 7);
 	const out: string[] = [];
 	let inSection = false;
-	let sectionLabel = "";
 	for (const line of content.split("\n")) {
 		if (line.startsWith("## ")) {
 			const m = /^## (\d{4}-W\d{2}|(\d{4}-\d{2}))/.exec(line);
-			sectionLabel = m ? m[1] : "";
 			inSection = false;
 			if (m) {
 				if (m[2]) {

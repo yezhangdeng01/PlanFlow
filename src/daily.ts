@@ -265,29 +265,46 @@ export function replaceSummary(content: string, summary: string): string {
 // Line-level mutations (checkbox / add / remove / move)
 // ---------------------------------------------------------------------------
 
-export function toggleTaskLine(content: string, lineIndex: number, checked: boolean): string {
+export function toggleTaskLine(content: string, lineIndex: number, checked: boolean, expectedRaw?: string): string {
 	const lines = content.split("\n");
-	const line = lines[lineIndex];
+	// v2.5 (B2): 内容定位兜底——行号处内容与预期不符说明文件被外部改动（行号漂移），
+	// 按原始行文本重定位；找不到则放弃写回（fail-safe，防改错行）
+	let idx = lineIndex;
+	if (expectedRaw && lines[idx] !== expectedRaw) {
+		idx = lines.findIndex((l) => l === expectedRaw);
+		if (idx === -1) return content;
+	}
+	const line = lines[idx];
 	if (line === undefined || !/^- \[[ x]\]/.test(line)) return content;
-	lines[lineIndex] = line.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
+	lines[idx] = line.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
 	return lines.join("\n");
 }
 
-export function removeLine(content: string, lineIndex: number): string {
+export function removeLine(content: string, lineIndex: number, expectedRaw?: string): string {
 	const lines = content.split("\n");
-	if (lineIndex < 0 || lineIndex >= lines.length) return content;
-	lines.splice(lineIndex, 1);
+	let idx = lineIndex;
+	if (expectedRaw && lines[idx] !== expectedRaw) {
+		idx = lines.findIndex((l) => l === expectedRaw);
+		if (idx === -1) return content;
+	}
+	if (idx < 0 || idx >= lines.length) return content;
+	lines.splice(idx, 1);
 	return lines.join("\n");
 }
 
-export function moveTaskLine(content: string, lineIndex: number, delta: number): string {
+export function moveTaskLine(content: string, lineIndex: number, delta: number, expectedRaw?: string): string {
 	const lines = content.split("\n");
-	const target = lineIndex + delta;
-	if (lineIndex < 0 || lineIndex >= lines.length) return content;
+	let idx = lineIndex;
+	if (expectedRaw && lines[idx] !== expectedRaw) {
+		idx = lines.findIndex((l) => l === expectedRaw);
+		if (idx === -1) return content;
+	}
+	const target = idx + delta;
+	if (idx < 0 || idx >= lines.length) return content;
 	if (target < 0 || target >= lines.length) return content;
-	if (!/^- \[[ x]\]/.test(lines[lineIndex]) || !/^- \[[ x]\]/.test(lines[target])) return content;
-	const tmp = lines[lineIndex];
-	lines[lineIndex] = lines[target];
+	if (!/^- \[[ x]\]/.test(lines[idx]) || !/^- \[[ x]\]/.test(lines[target])) return content;
+	const tmp = lines[idx];
+	lines[idx] = lines[target];
 	lines[target] = tmp;
 	return lines.join("\n");
 }

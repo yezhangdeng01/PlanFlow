@@ -1,4 +1,4 @@
-import { App, Notice, TFile, TFolder, parseYaml } from "obsidian";
+import { App, Notice, TFile, TFolder } from "obsidian";
 import { TASK_LINE_RE, parseDateString, removeLine, toggleTaskLine, weekRange } from "./daily";
 
 /**
@@ -99,24 +99,75 @@ export async function addTask(app: App, rootPath: string, year: string, input: N
 
 /** Toggle a task's checkbox and write it back. */
 export async function toggleTask(app: App, task: PoolTask, checked: boolean): Promise<void> {
-	await app.vault.process(task.file, (data) => toggleTaskLine(data, task.line, checked));
+	await app.vault.process(task.file, (data) => {
+		const idx = locateTaskLine(data, task);
+		if (idx === -1) {
+			new Notice("任务已变动，勾选未执行（请刷新视图后重试）");
+			return data;
+		}
+		return toggleTaskLine(data, idx, checked);
+	});
 }
 
 /** Replace a task's content / plan / dates, keeping its checked state. */
 export async function editTask(app: App, task: PoolTask, input: NewTaskInput): Promise<void> {
-	const marker = task.checked ? "- [x]" : "- [ ]";
-	const newLine = buildPoolLine(input).replace(/^- \[[ x]\]/, marker);
 	await app.vault.process(task.file, (data) => {
+		const idx = locateTaskLine(data, task);
+		if (idx === -1) {
+			new Notice("任务已变动，修改未保存（请刷新视图后重试）");
+			return data;
+		}
 		const lines = data.split("\n");
-		if (task.line < 0 || task.line >= lines.length) return data;
-		lines[task.line] = newLine;
+		// v2.5 (B1): 字段级编辑——只替换插件认识的字段，保留行内其他手动内容（禁止整行重建）
+		lines[idx] = editTaskLine(lines[idx], input, task.checked);
 		return lines.join("\n");
 	});
 }
 
 /** Delete a task line from the pool. */
 export async function deleteTask(app: App, task: PoolTask): Promise<void> {
-	await app.vault.process(task.file, (data) => removeLine(data, task.line));
+	await app.vault.process(task.file, (data) => {
+		const idx = locateTaskLine(data, task);
+		if (idx === -1) {
+			new Notice("任务已变动，删除未执行（请刷新视图后重试）");
+			return data;
+		}
+		return removeLine(data, idx);
+	});
+}
+
+/**
+ * v2.5 (B2): 内容定位（替代解析时行号快照）——文件被外部修改后行号会漂移，
+ * 盲按行号写回会作用到错误行。先按 raw 精确匹配，再按 text 前缀兜底，都找不到则 -1（fail-safe）。
+ */
+function locateTaskLine(data: string, task: PoolTask): number {
+	const lines = data.split("\n");
+	const byRaw = lines.findIndex((l) => l === task.raw);
+	if (byRaw !== -1) return byRaw;
+	const prefix = `- [${task.checked ? "x" : " "}] ${task.text}`;
+	return lines.findIndex((l) => l.startsWith(prefix));
+}
+
+/**
+ * v2.5 (B1): 字段级编辑任务行——只替换前缀/文本/计划标签/起止日期，
+ * 原行中其他手动内容（备注、额外标签等）原样保留。
+ */
+function editTaskLine(line: string, input: NewTaskInput, checked: boolean): string {
+	let l = line;
+	// 1. 前缀（保留勾选状态）
+	l = l.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
+	// 2. 文本区：行首到第一个字段标记（# / 🛫 / 📅）之间替换为新文本（u flag：emoji 是代理对）
+	l = l.replace(/^[^#🛫📅]+/u, `${input.text.trim()} `);
+	// 3. 计划标签：删旧 → 加新（无则不加）
+	l = l.replace(/#计划\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.plan && input.plan.trim()) l += ` #计划/${input.plan.trim()}`;
+	// 4. 开始日期
+	l = l.replace(/🛫\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.start) l += ` 🛫 ${input.start}`;
+	// 5. 截止日期
+	l = l.replace(/📅\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.due) l += ` 📅 ${input.due}`;
+	return l;
 }
 
 /** Append a line to content, always terminating it with a single newline. */

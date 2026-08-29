@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, TFile, setIcon } from "obsidian";
+import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, TFolder, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
 
 /** Default plan accent colors (PRD §5). Keys are plan tag names. */
@@ -24,8 +24,6 @@ export interface PlanTemplate {
 export interface PlanFlowSettings {
 	/** Root folder for plan notes, relative to vault root (PRD §2.1). */
 	rootPath: string;
-	/** Daily check-in templates shown when creating a new daily note / adding an item. */
-	dailyTemplates: PlanTemplate[];
 	/** If true, the 复盘 check-in rate denominator uses workdays. */
 	reviewWorkdays: boolean;
 	/** Review-note template (写复盘按钮生成); `{date}` is replaced with the current date. */
@@ -56,12 +54,6 @@ export interface PlanFlowSettings {
 
 export const DEFAULT_SETTINGS: PlanFlowSettings = {
 	rootPath: "raw/计划",
-	dailyTemplates: [
-		{ name: "✍️ 写作", duration: "1小时", plan: "写作", includeReview: false },
-		{ name: "🏃 健康", duration: "1小时", plan: "健康", includeReview: false },
-		{ name: "📖 学习", duration: "1小时", plan: "学习", includeReview: false },
-		{ name: "📈 复盘", duration: "", plan: "复盘", includeReview: true },
-	],
 	reviewWorkdays: true,
 	// v1.8: 通用复盘模板（用户可在设置页自定义，如自己的 A 股复盘格式）
 	reviewTemplate: `---
@@ -96,6 +88,49 @@ tags: [复盘]
 	boardColumnOrder: [],
 };
 
+/** 文件夹选择弹窗：列出库内全部文件夹，点选即回调路径（Obsidian 标准交互）。 */
+class FolderPickerModal extends FuzzySuggestModal<TFolder> {
+	private onPick: (path: string) => void;
+	constructor(app: App, onPick: (path: string) => void) {
+		super(app);
+		this.onPick = onPick;
+		this.setPlaceholder("输入或选择库内文件夹…");
+		this.setInstructions([{ command: "↑↓", purpose: "选择" }, { command: "↵", purpose: "确认" }, { command: "esc", purpose: "取消" }]);
+	}
+	getItems(): TFolder[] {
+		return this.app.vault.getAllLoadedFiles().filter((f): f is TFolder => f instanceof TFolder);
+	}
+	getItemText(folder: TFolder): string {
+		return folder.path === "/" ? "/（库根目录）" : folder.path;
+	}
+	onChooseItem(folder: TFolder): void {
+		this.onPick(folder.path === "/" ? "" : folder.path);
+	}
+}
+
+/** 文件夹建议器：输入时下拉选择库内文件夹（社区标准 FolderSuggest 模式）。 */
+class FolderSuggest extends AbstractInputSuggest<TFolder> {
+	private onChange: (path: string) => void;
+	constructor(app: App, inputEl: HTMLInputElement, onChange: (path: string) => void) {
+		super(app, inputEl);
+		this.onChange = onChange;
+	}
+	getSuggestions(inputStr: string): TFolder[] {
+		const lower = inputStr.toLowerCase();
+		return this.app.vault
+			.getAllLoadedFiles()
+			.filter((f): f is TFolder => f instanceof TFolder && f.path.toLowerCase().includes(lower));
+	}
+	renderSuggestion(folder: TFolder, el: HTMLElement): void {
+		el.setText(folder.path);
+	}
+	selectSuggestion(folder: TFolder): void {
+		this.setValue(folder.path);
+		this.onChange(folder.path);
+		this.close();
+	}
+}
+
 export class PlanFlowSettingTab extends PluginSettingTab {
 	plugin: PlanFlowPlugin;
 
@@ -112,37 +147,31 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("计划根目录")
-			.setDesc("笔记存放根路径（相对库根目录）")
+			.setDesc("笔记存放根路径（相对库根目录）；输入时弹库内文件夹下拉，或点「浏览…」打开系统资源管理器")
 			.addText((text) => {
 				text.setPlaceholder("raw/计划").setValue(this.plugin.settings.rootPath);
-				text.onChange(async (value) => {
+				const applyRoot = (value: string): void => {
 					this.plugin.settings.rootPath = value.trim() || "raw/计划";
-					await this.plugin.saveSettings();
+					void this.plugin.saveSettings();
 					this.plugin.refreshView();
-				});
-			});
-
-		new Setting(containerEl).setName("每日打卡项模板").setHeading();
-		containerEl.createDiv({
-			cls: "planboard-setting-hint",
-			text: "新建今日笔记 / 添加打卡项时使用的默认模板。",
-		});
-		this.renderTemplateList(containerEl);
-
-		new Setting(containerEl)
-			.setName("添加打卡项模板")
+				};
+				// 输入即弹文件夹下拉（FolderSuggest），选中直接生效
+				new FolderSuggest(this.app, text.inputEl, applyRoot);
+				text.onChange(applyRoot);
+			})
 			.addButton((btn) =>
-				btn.setButtonText("+ 添加").setCta().onClick(async () => {
-					this.plugin.settings.dailyTemplates.push({
-						name: "新打卡",
-						duration: "1小时",
-						plan: "写作",
-						includeReview: false,
-					});
-					await this.plugin.saveSettings();
-					this.display();
+				btn.setButtonText("浏览…").setTooltip("弹出文件夹选择窗口").onClick(() => {
+					const input = containerEl.querySelector<HTMLInputElement>(".setting-item-control input[type='text']");
+					new FolderPickerModal(this.app, (path) => {
+						if (input) input.value = path;
+						// 触发与手输一致的保存流程
+						input?.dispatchEvent(new Event("input", { bubbles: true }));
+					}).open();
 				})
 			);
+
+		// v2.7: 打卡模板管理已迁移到视图内（今日打卡卡「⚙ 模板」/ 年度计划页「⚙ 打卡模板」），
+		// 模板是数据联动而非设置，不再在设置页维护。
 
 		new Setting(containerEl)
 			.setName("复盘按工作日统计")
@@ -242,55 +271,5 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			void this.plugin.saveSettings();
 			this.display();
 		});
-	}
-
-	private renderTemplateList(containerEl: HTMLElement): void {
-		const templates = this.plugin.settings.dailyTemplates;
-		templates.forEach((tmpl: PlanTemplate, idx: number) => {
-			const setting = new Setting(containerEl).setName(`#${idx + 1}`);
-			setting.addText((text) => {
-				text.setPlaceholder("名称").setValue(tmpl.name);
-				text.onChange(async (value) => {
-					tmpl.name = value;
-					await this.plugin.saveSettings();
-				});
-			});
-			setting.addText((text) => {
-				text.setPlaceholder("时长").setValue(tmpl.duration);
-				text.onChange(async (value) => {
-					tmpl.duration = value;
-					await this.plugin.saveSettings();
-				});
-			});
-			setting.addDropdown((dropdown) => {
-				const options = this.getPlanOptions();
-				for (const plan of options) dropdown.addOption(plan, plan);
-				dropdown.setValue(tmpl.plan);
-				dropdown.onChange(async (value) => {
-					tmpl.plan = value;
-					await this.plugin.saveSettings();
-				});
-			});
-			setting.addToggle((toggle) => {
-				toggle.setValue(tmpl.includeReview);
-				toggle.onChange(async (value) => {
-					tmpl.includeReview = value;
-					await this.plugin.saveSettings();
-				});
-			});
-			setting.addExtraButton((btn) =>
-				btn.setIcon("trash").setTooltip("删除模板").onClick(async () => {
-					this.plugin.settings.dailyTemplates.splice(idx, 1);
-					await this.plugin.saveSettings();
-					this.display();
-				})
-			);
-		});
-	}
-
-	private getPlanOptions(): string[] {
-		const plans = new Set<string>(Object.keys(DEFAULT_PLAN_COLORS));
-		for (const tmpl of this.plugin.settings.dailyTemplates) plans.add(tmpl.plan);
-		return Array.from(plans);
 	}
 }

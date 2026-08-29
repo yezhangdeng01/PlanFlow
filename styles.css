@@ -522,6 +522,49 @@
 	margin-top: 16px;
 }
 
+/* ========== 首次启动欢迎弹窗（v2.7） ========== */
+.planboard-welcome {
+	padding: 8px 4px;
+}
+.planboard-welcome-title {
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	margin-bottom: 4px;
+}
+.planboard-welcome-sub {
+	color: var(--text-muted);
+	margin-bottom: 14px;
+}
+.planboard-welcome-step {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+	padding: 8px 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.planboard-welcome-step:first-of-type {
+	border-top: none;
+}
+.planboard-welcome-step-emoji {
+	font-size: 20px;
+	line-height: 1.3;
+	flex-shrink: 0;
+}
+.planboard-welcome-step-title {
+	font-weight: var(--font-medium);
+	margin-bottom: 2px;
+}
+.planboard-welcome-step-desc {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+.planboard-welcome-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 14px;
+}
+
 /* 量化目标弹窗日期选择——整块可点（原生日历指示器覆盖全输入区，点击任意位置弹选择窗）+ 按钮外观 */
 .planboard-modal input[type="date"].planboard-date-btn {
 	position: relative;

@@ -29,7 +29,7 @@ import type { AutoTaskPlan, NewTaskInput, PoolTask } from "./tasks";
 import { addTask, DAY_MS, deleteTask, editTask, ensureAutoTasks, listTasks, planCounterUnit, toggleTask } from "./tasks";
 import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
 import { attachGanttDrag } from "./gantt-drag";
-import { DEFAULT_PLAN_COLORS } from "./settings";
+import { DEFAULT_PLAN_COLORS, type PlanTemplate } from "./settings";
 
 /** v1.7.4: 插件改名 PlanFlow——view type 同步改（workspace 布局重新打开一次即可） */
 export const VIEW_TYPE_PLANFLOW = "planflow";
@@ -117,7 +117,6 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 	let grabY = 0;
 	let offsetX = 0; // v1.6: 重排补偿（重排后 DOM 位置变化，transform 基准随之修正）
 	let offsetY = 0;
-	let raf = 0;
 	let lastMoveT = 0; // v1.6: 时间节流（替代 rAF——后台页面 rAF 暂停）
 	let lastKey = ""; // v1.6.2: 防重键 = 目标计划名 + 模式（同目标不同模式可推进：before→swap）
 	// v1.6.1: 逻辑位置缓存——碰撞检测用【布局最终位置】（FLIP 动画中间帧 rect 会抖动碰撞判断）
@@ -342,7 +341,6 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 	const finish = (ev?: PointerEvent): void => {
 		if (!dragging) return;
 		dragging = false;
-		raf = 0; // v1.6: 清 rAF 残留（否则下次拖动 onMove 被节流卡死）
 		window.removeEventListener("pointermove", onMove, true);
 		window.removeEventListener("pointerup", finish, true);
 		window.removeEventListener("pointercancel", finish, true);
@@ -414,7 +412,6 @@ function attachPlanSort(card: HTMLElement, container: HTMLElement, plugin: PlanB
 			logicRects.set(c, c.getBoundingClientRect());
 		});
 		dragging = true;
-		raf = 0;
 		offsetX = 0;
 		offsetY = 0;
 		grabX = e.clientX;
@@ -488,12 +485,12 @@ function confirmDialog(app: App, message: string, opts: { confirmText?: string; 
 		const ok = new ButtonComponent(row)
 			.setButtonText(opts.confirmText ?? "确定")
 			.onClick(() => { resolve(true); modal.close(); });
-		if (opts.danger) ok.setWarning();
+		if (opts.danger) ok.buttonEl.addClass("mod-warning"); // 红色危险按钮（setWarning 已 deprecated、setDestructive 需 1.13+，用内置 CSS 类等效且无版本限制）
 		new ButtonComponent(row)
 			.setButtonText(opts.cancelText ?? "取消")
 			.onClick(() => { resolve(false); modal.close(); });
-		const prevOnClose = modal.onClose;
-		modal.onClose = () => { resolve(false); prevOnClose?.call(modal); };
+		// Esc / 点遮罩关闭时兜底返回 false（按钮路径已先 resolve，二次 resolve 无效）
+		modal.onClose = () => resolve(false);
 		modal.open();
 	});
 }
@@ -785,6 +782,24 @@ export class PlanBoardView extends ItemView {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * v2.7: 今日打卡默认项 = 年度计划里 daily 计划的自动推导（无独立模板数据）。
+	 * name = "{label} {计划名}"、duration = action、复盘计划自动带复盘链接。
+	 */
+	private async buildDefaultCheckItems(): Promise<PlanTemplate[]> {
+		const root = this.plugin.settings.rootPath.replace(/\/+$/, "");
+		const defs = await this.readAnnualPlanDefs(root, this.today.slice(0, 4));
+		if (!defs) return [];
+		return defs
+			.filter((d) => d.daily)
+			.map((d) => ({
+				name: `${d.label ?? ""} ${d.name}`.trim(),
+				duration: d.action ?? "",
+				plan: d.name,
+				includeReview: d.name === "复盘" || d.tradingDay,
+			}));
 	}
 
 	/**
@@ -1216,7 +1231,7 @@ export class PlanBoardView extends ItemView {
 		if (!this.dailyData) return;
 		this.selfWrite = true;
 		try {
-			await this.app.vault.process(item.file, (data) => toggleTaskLine(data, item.line, checked));
+			await this.app.vault.process(item.file, (data) => toggleTaskLine(data, item.line, checked, item.raw));
 		} finally {
 			this.selfWrite = false;
 		}
@@ -1231,7 +1246,7 @@ export class PlanBoardView extends ItemView {
 		this.selfWrite = true;
 		let newContent: string;
 		try {
-			newContent = await this.app.vault.process(item.file, (data) => moveTaskLine(data, item.line, delta));
+			newContent = await this.app.vault.process(item.file, (data) => moveTaskLine(data, item.line, delta, item.raw));
 		} finally {
 			this.selfWrite = false;
 		}
@@ -1245,7 +1260,7 @@ export class PlanBoardView extends ItemView {
 		this.selfWrite = true;
 		let newContent: string;
 		try {
-			newContent = await this.app.vault.process(item.file, (data) => removeLine(data, item.line));
+			newContent = await this.app.vault.process(item.file, (data) => removeLine(data, item.line, item.raw));
 		} finally {
 			this.selfWrite = false;
 		}
@@ -1342,7 +1357,8 @@ export class PlanBoardView extends ItemView {
 		const path = `${dir}/${this.today}.md`;
 		try {
 			await this.ensureFolder(dir);
-			await this.app.vault.create(path, buildDailyTemplate(this.today, this.plugin.settings.dailyTemplates));
+			const items = await this.buildDefaultCheckItems();
+			await this.app.vault.create(path, buildDailyTemplate(this.today, items));
 			await this.refresh();
 		} catch {
 			// 静默：重试由第二个定时器兜底
@@ -1360,7 +1376,8 @@ export class PlanBoardView extends ItemView {
 		}
 		try {
 			await this.ensureFolder(dir);
-			await this.app.vault.create(path, buildDailyTemplate(this.today, this.plugin.settings.dailyTemplates));
+			const items = await this.buildDefaultCheckItems();
+			await this.app.vault.create(path, buildDailyTemplate(this.today, items));
 			new Notice("今日笔记已创建");
 			await this.refreshToday();
 		} catch (e) {
@@ -1458,7 +1475,6 @@ export class PlanBoardView extends ItemView {
 			for (const def of defs) plans.add(def.name);
 		}
 		for (const p of Object.keys(DEFAULT_PLAN_COLORS)) plans.add(p);
-		for (const t of this.plugin.settings.dailyTemplates) plans.add(t.plan);
 		return Array.from(plans);
 	}
 
@@ -1511,7 +1527,6 @@ export class PlanBoardView extends ItemView {
 		let dragging = false;
 		let moved = false;
 		let grabX = 0;
-		let grabY = 0;
 		let startX = 0;
 		let startY = 0;
 		let offsetX = 0;
@@ -1637,7 +1652,6 @@ export class PlanBoardView extends ItemView {
 			lastKey = "";
 			offsetX = 0;
 			grabX = e.clientX;
-			grabY = e.clientY;
 			startX = e.clientX;
 			startY = e.clientY;
 			Array.from(board.children).forEach((c) => logicRects.set(c as HTMLElement, (c as HTMLElement).getBoundingClientRect()));
@@ -2180,10 +2194,16 @@ export class PlanBoardView extends ItemView {
 
 		// --- 计划打卡率（v1.6: 2 列 grid 分栏；临时任务/任务统计卡已删除——信息在下方任务列表卡冗余） ---
 		const grid = panel.createDiv({ cls: "planboard-plan-grid" });
-		if (stats.planRates.length === 0) {
+		// v2.6: 过滤孤儿计划（历史打卡残留但当前已无定义的计划不显示，避免孤立卡无法管理）
+		// v2.7: "当前计划" = 年度计划 frontmatter 里的计划（dailyTemplates 已废除，改为数据联动）
+		const rootPath0 = this.plugin.settings.rootPath.replace(/\/+$/, "");
+		const defs = (await this.readAnnualPlanDefs(rootPath0, stats.label.slice(0, 4))) ?? [];
+		const knownPlans = new Set(defs.map((d) => d.name));
+		const liveRates = stats.planRates.filter((r) => knownPlans.has(r.plan));
+		if (liveRates.length === 0) {
 			grid.createDiv({ cls: "planboard-card planboard-empty-card", text: "周期内暂无打卡数据" });
 		}
-		const rates = [...stats.planRates].sort((a, b) => this.orderIndexOf(a.plan) - this.orderIndexOf(b.plan));
+		const rates = [...liveRates].sort((a, b) => this.orderIndexOf(a.plan) - this.orderIndexOf(b.plan));
 		for (const rate of rates) {
 			const card = this.renderPlanRateCard(rate);
 			grid.appendChild(card);
@@ -2274,11 +2294,13 @@ export class PlanBoardView extends ItemView {
 		// v1.6: 打卡统计卡整行展示（内部按计划分栏）
 		const checkCard = panel.createDiv({ cls: "planboard-card planboard-plan-card" });
 		checkCard.createDiv({ cls: "planboard-card-title", text: "打卡统计" });
-		if (stats.planRates.length === 0) {
+		// v2.6: 只显示当前年度计划里存在的计划（过滤历史打卡残留的孤儿计划，如测试数据）
+		const liveRates = stats.planRates.filter((r) => stats.planProgress.some((p) => p.plan === r.plan));
+		if (liveRates.length === 0) {
 			checkCard.createDiv({ cls: "planboard-empty", text: "暂无打卡数据" });
 		} else {
 			const statsGrid = checkCard.createDiv({ cls: "planboard-check-stats-grid" });
-			for (const rate of stats.planRates) {
+			for (const rate of liveRates) {
 				const row = statsGrid.createDiv({ cls: "planboard-goal-row" });
 				const head = row.createDiv({ cls: "planboard-goal-head" });
 				head.createSpan({ cls: "planboard-plan-name", text: rate.plan });
@@ -2515,6 +2537,7 @@ export class PlanBoardView extends ItemView {
 				label: input.label,
 				color: input.color || rotatePlanColor(defs),
 				tradingDay: false,
+				daily: input.daily,
 			});
 			dailyMap[input.name] = input.daily;
 		}
@@ -2684,9 +2707,7 @@ export class PlanBoardView extends ItemView {
 		try {
 			await writePlansToFile(this.app, file, defs, dailyMap);
 			for (const t of toDelete) await deleteTask(this.app, t);
-			// v1.4 联动：清理今日打卡模板 + 今日笔记中该计划的打卡行
-			this.plugin.settings.dailyTemplates = this.plugin.settings.dailyTemplates.filter((t) => t.plan !== prog.plan);
-			await this.plugin.saveSettings();
+			// v1.4 联动：清理今日笔记中该计划的打卡行（v2.7: dailyTemplates 已废除，打卡默认项由年度计划自动推导）
 			const todayFile = this.getTodayFile();
 			if (todayFile) {
 				const todayContent = await this.app.vault.cachedRead(todayFile);
@@ -2917,7 +2938,6 @@ class AddCheckItemModal extends Modal {
 
 	private getPlanOptions(): string[] {
 		const plans = new Set<string>(Object.keys(DEFAULT_PLAN_COLORS));
-		for (const t of this.plugin.settings.dailyTemplates) plans.add(t.plan);
 		return Array.from(plans);
 	}
 }
@@ -3093,7 +3113,7 @@ class PlanEditModal extends Modal {
 			this.emojiPopDocDown = (e: PointerEvent) => {
 				if (!pop.contains(e.target as Node)) closeEmojiPop();
 			};
-			document.addEventListener("pointerdown", this.emojiPopDocDown!, true);
+			document.addEventListener("pointerdown", this.emojiPopDocDown, true);
 		};
 		new Setting(contentEl)
 			.setName("图标")
@@ -3410,6 +3430,7 @@ function toPlanDef(prog: PlanProgress): PlanDef {
 		label: prog.label,
 		color: prog.color,
 		tradingDay: prog.tradingDay,
+		daily: true,
 	};
 }
 

@@ -65,6 +65,8 @@ export interface PlanDef {
 	color: string;
 	/** Trading-day-only check-in (复盘). */
 	tradingDay: boolean;
+	/** Whether this plan appears in the daily check-in (default true; `daily: false` excludes it). */
+	daily: boolean;
 }
 
 /** Progress of one goal under a plan. */
@@ -326,6 +328,8 @@ export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 			label: readPlanString(obj, ["label", "icon", "图标", "emoji"]),
 			color: readPlanString(obj, ["color", "colour", "颜色"]),
 			tradingDay: !!obj?.tradingDay || !!obj?.tradingday || !!obj?.["交易日"],
+			// v2.7: 每日打卡计划标志（daily: false 显式排除；缺省视为每日打卡）
+			daily: obj?.daily !== false,
 		});
 	};
 

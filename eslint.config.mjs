@@ -10,6 +10,9 @@ export default defineConfig([
       parser: tsparser,
       parserOptions: { project: "./tsconfig.json" },
     },
-    rules: {},
+    rules: {
+      // 本插件 UI 文本为中文，sentence case 规则（针对英文）不适用
+      "obsidianmd/ui/sentence-case": "off",
+    },
   },
 ]);
