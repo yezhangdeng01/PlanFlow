@@ -114,8 +114,8 @@
 
 /* v1.7.4: hidden 属性兜底——display:flex 会覆盖 hidden 的默认 display:none，
    导致空态块（暂无任务+新建按钮）在任务非空时仍占位显示（幽灵按钮 bug） */
-.planboard-root [hidden] {
-	display: none !important;
+.planboard-root div[hidden] {
+	display: none;
 }
 
 /* v1.4: 月/周任务列表默认内容自适应高度（拖拽后固定） */
@@ -274,8 +274,8 @@
 
 /* v1.7.4: Obsidian 主题 appearance:none 用背景色画勾选框（accent-color 无效，实测主题紫 #aa95e0）——
    覆盖 checked 背景为品牌深空蓝（对勾符号保留主题的） */
-.planboard-checkbox:checked {
-	background-color: #4a6fa5 !important;
+.planboard-checkbox.planboard-checkbox:checked {
+	background-color: #4a6fa5;
 }
 
 .planboard-check-text {
@@ -287,9 +287,8 @@
 }
 
 .planboard-check-item.is-checked .planboard-check-text {
-	color: var(--text-muted);
+	color: var(--text-faint);
 	text-decoration: line-through;
-	text-decoration-color: var(--text-faint);
 }
 
 .planboard-plan-tag {
@@ -344,14 +343,14 @@
 }
 
 .planboard-btn.planboard-btn-primary {
-	background: var(--pb-accent-dim) !important;
-	border-color: var(--pb-accent-dim) !important;
-	color: #fff !important;
+	background: var(--pb-accent-dim);
+	border-color: var(--pb-accent-dim);
+	color: #fff;
 }
 
 .planboard-btn.planboard-btn-primary:hover {
-	background: var(--pb-accent) !important;
-	border-color: var(--pb-accent) !important;
+	background: var(--pb-accent);
+	border-color: var(--pb-accent);
 }
 
 .planboard-btn-outline {
@@ -739,8 +738,8 @@
 }
 
 /* ========== 工具 ========== */
-.planboard-hidden {
-	display: none !important;
+.planboard-root .planboard-hidden {
+	display: none;
 }
 
 /* ========== v2 首页布局 ========== */
@@ -1296,9 +1295,8 @@
 }
 
 .planboard-check-card .planboard-check-item.is-checked .planboard-check-text {
-	color: var(--text-muted);
+	color: var(--text-faint);
 	text-decoration: line-through;
-	text-decoration-color: rgba(128, 128, 128, 0.45);
 }
 
 .planboard-check-card .planboard-progress-number {
@@ -1585,9 +1583,9 @@
 }
 
 .planboard-subtab.is-active {
-	color: #fff !important;
-	background: var(--pb-accent-dim) !important;
-	border-color: var(--pb-accent-dim) !important;
+	color: #fff;
+	background: var(--pb-accent-dim);
+	border-color: var(--pb-accent-dim);
 }
 
 /* ========== v1.3 甘特拖拽手柄 ========== */
@@ -2312,7 +2310,7 @@
 }
 
 /* FLIP 动画辅助类（替代内联 style 赋值，满足 obsidianmd/no-static-styles-assignment） */
-.planflow-flip-none { transition: none !important; }
-.planflow-flip-fast { transition: transform 0.15s ease !important; }
-.planflow-flip-med { transition: transform 0.18s ease !important; }
-.planflow-flip-slow { transition: transform 0.2s ease !important; }
+.planflow-flip-none { transition: none; }
+.planflow-flip-fast { transition: transform 0.15s ease; }
+.planflow-flip-med { transition: transform 0.18s ease; }
+.planflow-flip-slow { transition: transform 0.2s ease; }
