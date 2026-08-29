@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, TFolder, setIcon } from "obsidian";
+import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab, Setting, SettingDefinitionItem, TFile, TFolder, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
 
 /** Default plan accent colors (PRD §5). Keys are plan tag names. */
@@ -139,118 +139,126 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		;
-
-		new Setting(containerEl)
-			.setName("计划根目录")
-			.setDesc("笔记存放根路径（相对库根目录）；输入时弹库内文件夹下拉，或点「浏览…」打开系统资源管理器")
-			.addText((text) => {
-				text.setPlaceholder("raw/计划").setValue(this.plugin.settings.rootPath);
-				const applyRoot = (value: string): void => {
-					this.plugin.settings.rootPath = value.trim() || "raw/计划";
-					void this.plugin.saveSettings();
-					this.plugin.refreshView();
-				};
-				// 输入即弹文件夹下拉（FolderSuggest），选中直接生效
-				new FolderSuggest(this.app, text.inputEl, applyRoot);
-				text.onChange(applyRoot);
-			})
-			.addButton((btn) =>
-				btn.setButtonText("浏览…").setTooltip("弹出文件夹选择窗口").onClick(() => {
-					const input = containerEl.querySelector<HTMLInputElement>(".setting-item-control input[type='text']");
-					new FolderPickerModal(this.app, (path) => {
-						if (input) input.value = path;
-						// 触发与手输一致的保存流程
-						input?.dispatchEvent(new Event("input", { bubbles: true }));
-					}).open();
-				})
-			);
-
-		// v2.7: 打卡模板管理已迁移到视图内（今日打卡卡「⚙ 模板」/ 年度计划页「⚙ 打卡模板」），
-		// 模板是数据联动而非设置，不再在设置页维护。
-
-		new Setting(containerEl)
-			.setName("复盘按工作日统计")
-			.setDesc("复盘打卡率分母使用工作日（周一至周五），否则与其它计划一致")
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.reviewWorkdays);
-				toggle.onChange(async (value) => {
-					this.plugin.settings.reviewWorkdays = value;
-					await this.plugin.saveSettings();
-					this.plugin.refreshView();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName("复盘笔记模板")
-			.setDesc(`模板文件：${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md —— 在 Obsidian 中直接编辑，{date} 会自动替换为当天日期`)
-			.addButton((btn) =>
-				btn.setButtonText("打开模板文件").setCta().onClick(async () => {
-					const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
-					let file: TFile | null = null;
-					const existing = this.app.vault.getAbstractFileByPath(filePath);
-					if (existing instanceof TFile) {
-						file = existing;
-					} else {
-						file = (await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate));
-					}
-					if (file) {
-						const leaf = this.app.workspace.getLeaf(false);
-						await leaf.openFile(file);
-					}
-				})
-			)
-			.addButton((btn) =>
-				btn.setButtonText("恢复默认").onClick(async () => {
-					const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
-					const file = this.app.vault.getAbstractFileByPath(filePath);
-					if (file instanceof TFile) {
-						await this.app.vault.modify(file, this.plugin.settings.reviewTemplate);
-						new Notice("已恢复默认模板");
-					}
-				})
-			);
-
-		new Setting(containerEl)
-			.setName("启动时打开 PlanFlow")
-			.setDesc("Obsidian 启动后自动打开计划总览视图")
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.openOnStartup);
-				toggle.onChange(async (value) => {
-					this.plugin.settings.openOnStartup = value;
-					await this.plugin.saveSettings();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName("成就音效")
-			.setDesc("达成新档位（金牌/银牌/铜牌）时播放提示音")
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.achievementSound);
-				toggle.onChange(async (value) => {
-					this.plugin.settings.achievementSound = value;
-					await this.plugin.saveSettings();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName("图标主题")
-			.setDesc("点击选择侧边栏 / 标签页图标，或输入任意 Obsidian / Lucide 图标名");
-		this.renderIconPicker(containerEl);
+	// v2.8: 声明式设置（Obsidian 1.13+）——设置可搜索；display() 已移除（1.13 起 getSettingDefinitions 接管渲染）
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: "计划根目录",
+				desc: "笔记存放根路径（相对库根目录）；输入时弹库内文件夹下拉，或点「浏览…」选择",
+				aliases: ["rootPath", "根目录", "路径"],
+				render: (setting) => this.renderRootPath(setting),
+			},
+			{
+				name: "复盘按工作日统计",
+				desc: "复盘打卡率分母使用工作日（周一至周五），否则与其它计划一致",
+				control: { type: "toggle", key: "reviewWorkdays" },
+			},
+			{
+				name: "复盘笔记模板",
+				desc: "在 Obsidian 中直接编辑，{date} 会自动替换为当天日期",
+				aliases: ["reviewTemplate", "模板"],
+				render: (setting) => this.renderReviewTemplate(setting),
+			},
+			{
+				name: "启动时打开 PlanFlow",
+				desc: "Obsidian 启动后自动打开计划总览视图",
+				control: { type: "toggle", key: "openOnStartup" },
+			},
+			{
+				name: "成就音效",
+				desc: "达成新档位（金牌/银牌/铜牌）时播放提示音",
+				control: { type: "toggle", key: "achievementSound" },
+			},
+			{
+				name: "图标主题",
+				desc: "点击选择侧边栏 / 标签页图标，或输入任意 Obsidian / Lucide 图标名",
+				aliases: ["icon", "图标"],
+				render: (setting) => this.renderIconPicker(setting),
+			},
+		];
 	}
 
-	/** v1.2: 视觉化图标选择器（常用 Lucide 图标格子 + 自定义输入兜底）。 */
-	private renderIconPicker(containerEl: HTMLElement): void {
+	/** 声明式绑定读值：从 settings 读取。 */
+	getControlValue(key: string): unknown {
+		return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+	}
+
+	/** 声明式绑定写值：写入 settings 并持久化、刷新视图。 */
+	setControlValue(key: string, value: unknown): void {
+		(this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+		void this.plugin.saveSettings();
+		this.plugin.refreshView();
+	}
+
+	/** 计划根目录：文本框（FolderSuggest 下拉）+ 浏览按钮（文件夹选择弹窗）。 */
+	private renderRootPath(setting: Setting): void {
+		setting.addText((text) => {
+			text.setPlaceholder("raw/计划").setValue(this.plugin.settings.rootPath);
+			const applyRoot = (value: string): void => {
+				this.plugin.settings.rootPath = value.trim() || "raw/计划";
+				void this.plugin.saveSettings();
+				this.plugin.refreshView();
+			};
+			new FolderSuggest(this.app, text.inputEl, applyRoot);
+			text.onChange(applyRoot);
+		});
+		setting.addButton((btn) =>
+			btn.setButtonText("浏览…").setTooltip("弹出文件夹选择窗口").onClick(() => {
+				const input = setting.controlEl.querySelector<HTMLInputElement>("input[type='text']");
+				new FolderPickerModal(this.app, (path) => {
+					if (input) input.value = path;
+					input?.dispatchEvent(new Event("input", { bubbles: true }));
+				}).open();
+			})
+		);
+	}
+
+	/** 复盘模板：打开模板文件 + 恢复默认。 */
+	private renderReviewTemplate(setting: Setting): void {
+		setting.addButton((btn) =>
+			btn.setButtonText("打开模板文件").setCta().onClick(async () => {
+				const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+				let file: TFile | null = null;
+				const existing = this.app.vault.getAbstractFileByPath(filePath);
+				if (existing instanceof TFile) {
+					file = existing;
+				} else {
+					file = await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate);
+				}
+				if (file) {
+					const leaf = this.app.workspace.getLeaf(false);
+					await leaf.openFile(file);
+				}
+			})
+		);
+		setting.addButton((btn) =>
+			btn.setButtonText("恢复默认").onClick(async () => {
+				const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+				const file = this.app.vault.getAbstractFileByPath(filePath);
+				if (file instanceof TFile) {
+					await this.app.vault.modify(file, this.plugin.settings.reviewTemplate);
+					new Notice("已恢复默认模板");
+				}
+			})
+		);
+	}
+
+	/** 图标选择器：常用 Lucide 图标格子 + 自定义输入兜底（声明式 render 版）。 */
+	private renderIconPicker(setting: Setting): void {
 		const ICONS = [
 			"home", "calendar", "target", "layout-dashboard", "list-checks",
 			"book-open", "trending-up", "check-circle", "flame", "trophy",
 			"rocket", "heart", "star", "clock", "zap", "layers", "workflow", "flag",
 		];
-		const wrap = containerEl.createDiv({ cls: "planflow-icon-picker" });
+		setting.settingEl.addClass("planflow-icon-setting");
+		const wrap = setting.settingEl.createDiv({ cls: "planflow-icon-picker" });
+		const syncSelection = (selected: string | null, customInput: HTMLInputElement): void => {
+			wrap.querySelectorAll(".planflow-icon-option.is-selected").forEach((el) => el.removeClass("is-selected"));
+			if (!selected) return;
+			const target = Array.from(wrap.querySelectorAll<HTMLElement>(".planflow-icon-option")).find((b) => b.title === selected);
+			if (target) target.addClass("is-selected");
+			customInput.value = ICONS.includes(selected) ? "" : selected;
+		};
 		for (const name of ICONS) {
 			const btn = wrap.createEl("button", { cls: "planflow-icon-option", attr: { type: "button" } });
 			setIcon(btn, name);
@@ -259,7 +267,8 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			btn.addEventListener("click", () => {
 				this.plugin.settings.icon = name;
 				void this.plugin.saveSettings();
-				this.display();
+				this.plugin.applyRibbonIcon(); // v2.8.1: 侧边栏图标即时跟随
+				syncSelection(name, input);
 			});
 		}
 		const custom = wrap.createDiv({ cls: "planflow-icon-custom" });
@@ -269,7 +278,8 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		input.addEventListener("change", () => {
 			this.plugin.settings.icon = input.value.trim() || "home";
 			void this.plugin.saveSettings();
-			this.display();
+			this.plugin.applyRibbonIcon(); // v2.8.1: 侧边栏图标即时跟随
+			syncSelection(this.plugin.settings.icon, input);
 		});
 	}
 }

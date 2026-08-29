@@ -1,4 +1,4 @@
-import { ButtonComponent, Modal, Notice, Plugin, TFile, TFolder } from "obsidian";
+import { ButtonComponent, Modal, Notice, Plugin, TFile, TFolder, setIcon } from "obsidian";
 import { PlanBoardView, VIEW_TYPE_PLANFLOW } from "./src/PlanBoardView";
 import type { PlanFlowSettings } from "./src/settings";
 import { DEFAULT_PLAN_COLORS, DEFAULT_SETTINGS, PlanFlowSettingTab } from "./src/settings";
@@ -48,6 +48,8 @@ export default class PlanFlowPlugin extends Plugin {
 	settings: PlanFlowSettings;
 	private startupOpenTimer: number | null = null;
 	private startupOpened = false;
+	/** 侧边栏 ribbon 图标元素（v2.8.1：跟随 settings.icon 动态更新）。 */
+	private ribbonIconEl: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -69,11 +71,11 @@ export default class PlanFlowPlugin extends Plugin {
 			callback: () => void this.activateView(),
 		});
 
-		// 侧边栏图标（点击打开 PlanFlow，主区域）
-		const ribbonIcon = this.addRibbonIcon("home", "PlanFlow 计划总览", () =>
+		// 侧边栏图标（点击打开 PlanFlow，主区域）；图标跟随 settings.icon（v2.8.1）
+		this.ribbonIconEl = this.addRibbonIcon(this.settings.icon || "home", "PlanFlow 计划总览", () =>
 			void this.activateView(),
 		);
-		ribbonIcon.addClass("planboard-ribbon");
+		this.ribbonIconEl.addClass("planboard-ribbon");
 
 		this.addSettingTab(new PlanFlowSettingTab(this.app, this));
 
@@ -219,6 +221,11 @@ plans:
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANFLOW)) {
 			if (leaf.view instanceof PlanBoardView) leaf.view.requestRefresh();
 		}
+	}
+
+	/** v2.8.1: 设置页改了图标后，动态更新侧边栏 ribbon 图标（setIcon 原地替换 SVG）。 */
+	applyRibbonIcon(): void {
+		if (this.ribbonIconEl) setIcon(this.ribbonIconEl, this.settings.icon || "home");
 	}
 
 	async loadSettings(): Promise<void> {

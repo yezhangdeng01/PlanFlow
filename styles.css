@@ -2212,6 +2212,14 @@
 	padding: 10px 0;
 	max-width: 480px;
 }
+/* v2.8: 声明式设置中图标选择器位于 setting 行内——换行占满整行 */
+.planflow-icon-setting {
+	flex-wrap: wrap;
+}
+.planflow-icon-setting .planflow-icon-picker {
+	flex-basis: 100%;
+	max-width: none;
+}
 .planflow-icon-option {
 	width: 36px;
 	height: 36px;
