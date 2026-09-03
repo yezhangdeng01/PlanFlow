@@ -59,6 +59,8 @@ export default class PlanFlowPlugin extends Plugin {
 		// getAbstractFileByPath 对已有目录会误返回 null → 误判全新安装 → createFolder 撞已存在目录 → 插件崩溃。
 		this.app.workspace.onLayoutReady(() => {
 			void this.ensurePlanRootSafe();
+			// 布局就绪后再补一次（防核心图标晚于插件插入，覆盖排序）
+			this.moveRibbonIconFirst();
 		});
 
 		this.registerView(VIEW_TYPE_PLANFLOW, (leaf) => {
@@ -76,6 +78,8 @@ export default class PlanFlowPlugin extends Plugin {
 			void this.activateView(),
 		);
 		this.ribbonIconEl.addClass("planboard-ribbon");
+		// v1.0.3: 图标排左侧首位（addRibbonIcon 默认追加在末尾）
+		this.moveRibbonIconFirst();
 
 		this.addSettingTab(new PlanFlowSettingTab(this.app, this));
 
@@ -205,6 +209,14 @@ plans:
 	/** Open the PlanBoard view in the main area (or reveal it if already open). */
 	async activateView(): Promise<void> {
 		const { workspace } = this.app;
+		// v1.0.3: 已在主区域打开 → 直接聚焦，不销毁重建（保留固定状态与视图内状态）
+		const existing = workspace
+			.getLeavesOfType(VIEW_TYPE_PLANFLOW)
+			.find((l) => l.getRoot() === workspace.rootSplit);
+		if (existing) {
+			await workspace.revealLeaf(existing);
+			return;
+		}
 		// 关闭旧位置（如右栏）的视图，确保在主区域打开
 		workspace.detachLeavesOfType(VIEW_TYPE_PLANFLOW);
 		const leaf = workspace.getLeaf("tab");
@@ -213,7 +225,18 @@ plans:
 			return;
 		}
 		await leaf.setViewState({ type: VIEW_TYPE_PLANFLOW, active: true });
+		// v1.0.3: 固定标签页——作为首页常驻，打开其它文件不会顶掉它
+		leaf.setPinned(true);
 		await workspace.revealLeaf(leaf);
+	}
+
+	/** v1.0.3: 侧边栏图标移到左 ribbon 容器首位（Obsidian 无排序 API，操作 DOM 顺序）。 */
+	private moveRibbonIconFirst(): void {
+		const el = this.ribbonIconEl;
+		const parent = el?.parentElement;
+		if (parent && parent.firstElementChild !== el) {
+			parent.prepend(el);
+		}
 	}
 
 	/** Ask the open view to re-read files after settings changed. */

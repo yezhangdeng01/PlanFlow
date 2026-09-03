@@ -222,6 +222,9 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				const existing = this.app.vault.getAbstractFileByPath(filePath);
 				if (existing instanceof TFile) {
 					file = existing;
+				} else if (existing instanceof TFolder) {
+					// 路径被同名文件夹占用（旧版 bug 残留）→ 不 create，避免未捕获异常
+					new Notice(`「${filePath}」被同名文件夹占用，请先删除该文件夹`);
 				} else {
 					file = await this.app.vault.create(filePath, this.plugin.settings.reviewTemplate);
 				}

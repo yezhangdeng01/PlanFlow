@@ -865,9 +865,9 @@ export class PlanBoardView extends ItemView {
 		if (!this.panelEl) return;
 		const panel = this.panelEl;
 
-		const [y, m] = this.today.split("-").map(Number);
-		const monthEnd = `${this.today.slice(0, 7)}-${String(daysInMonth(y, m)).padStart(2, "0")}`;
-		const { start: weekStart, end: weekEnd } = weekRange(this.today);
+		// v1.0.3: 本月/本周卡改为纯展示 + 目标追踪（进度条/任务列表），新建统一在年度视图——
+		// 原 4 个「+ 新建」按钮（header 与空态各一）已移除。
+		// 注意：monthEnd/weekStart/weekEnd 仅被这些按钮使用，随之删除。
 
 		// --- 1. 年度目标卡 (compact one-line strip, per-plan mini bars) ---
 		const goalCard = panel.createDiv({ cls: "planboard-card planboard-goal-card" });
@@ -890,8 +890,6 @@ export class PlanBoardView extends ItemView {
 		const monthNumWrap = monthHeader.createDiv({ cls: "planboard-task-number planboard-task-number--inline" });
 		this.monthTaskNumberEl = monthNumWrap.createSpan();
 		this.monthTaskBadgeEl = monthNumWrap.createSpan({ cls: "planboard-badge planboard-hidden" });
-		const newMonthBtn = monthHeader.createEl("button", { cls: "planboard-btn planboard-btn-outline planboard-add-btn", text: "+ 新建" });
-		newMonthBtn.addEventListener("click", () => void this.openTaskModal(null, { due: monthEnd }));
 		const monthBar = monthCard.createDiv({ cls: "planboard-progress-bar planboard-progress-bar--thin" });
 		this.monthTaskFillEl = monthBar.createDiv({ cls: "planboard-progress-fill" });
 		this.monthPreviewEl = monthCard.createEl("ul", { cls: "planboard-checklist planboard-home-preview" });
@@ -902,8 +900,6 @@ export class PlanBoardView extends ItemView {
 		});
 		this.monthPreviewEmptyEl = monthCard.createDiv({ cls: "planboard-empty planboard-empty-cta" });
 		this.monthPreviewEmptyEl.createSpan({ text: "本月暂无任务" });
-		const monthEmptyBtn = this.monthPreviewEmptyEl.createEl("button", { cls: "planboard-btn planboard-btn-outline", text: "+ 新建" });
-		monthEmptyBtn.addEventListener("click", () => void this.openTaskModal(null, { due: monthEnd }));
 
 		const weekCard = taskGrid.createDiv({ cls: "planboard-card planboard-week-task-card" });
 		const weekHeader = weekCard.createDiv({ cls: "planboard-card-header" });
@@ -911,8 +907,6 @@ export class PlanBoardView extends ItemView {
 		const weekNumWrap = weekHeader.createDiv({ cls: "planboard-task-number planboard-task-number--inline" });
 		this.weekTaskNumberEl = weekNumWrap.createSpan();
 		this.weekTaskBadgeEl = weekNumWrap.createSpan({ cls: "planboard-badge planboard-hidden" });
-		const newWeekBtn = weekHeader.createEl("button", { cls: "planboard-btn planboard-btn-outline planboard-add-btn", text: "+ 新建" });
-		newWeekBtn.addEventListener("click", () => void this.openTaskModal(null, { start: weekStart, due: weekEnd }));
 		const weekBar = weekCard.createDiv({ cls: "planboard-progress-bar planboard-progress-bar--thin" });
 		this.weekTaskFillEl = weekBar.createDiv({ cls: "planboard-progress-fill" });
 		this.weekPreviewEl = weekCard.createEl("ul", { cls: "planboard-checklist planboard-home-preview" });
@@ -923,8 +917,6 @@ export class PlanBoardView extends ItemView {
 		});
 		this.weekPreviewEmptyEl = weekCard.createDiv({ cls: "planboard-empty planboard-empty-cta" });
 		this.weekPreviewEmptyEl.createSpan({ text: "本周暂无任务" });
-		const weekEmptyBtn = this.weekPreviewEmptyEl.createEl("button", { cls: "planboard-btn planboard-btn-outline", text: "+ 新建" });
-		weekEmptyBtn.addEventListener("click", () => void this.openTaskModal(null, { start: weekStart, due: weekEnd }));
 
 		// --- 3. 今日打卡 + 今日总结 (grid, equal columns) ---
 		const dailyGrid = panel.createDiv({ cls: "planboard-grid-2 planboard-daily-only" });
@@ -1418,9 +1410,24 @@ export class PlanBoardView extends ItemView {
 		if (existing instanceof TFile) {
 			return await this.app.vault.read(existing);
 		}
+		// v1.0.3 修复：旧版把「文件路径」误传给建目录函数 ensureFolder，
+		// 会在库中创建名为「复盘模板.md」的文件夹，导致 vault.create 永远撞路径报错（iPad 全新安装必现）。
+		if (existing instanceof TFolder) {
+			if (existing.children.length === 0) {
+				// 空文件夹 = 旧 bug 残留，移入 Obsidian 回收站自愈（trashFile 尊重用户删除偏好）
+				await this.app.fileManager.trashFile(existing);
+			} else {
+				new Notice(`「${filePath}」被同名文件夹占用，本次使用内置模板`);
+			}
+		}
 		const content = this.plugin.settings.reviewTemplate;
-		await this.ensureFolder(filePath);
-		await this.app.vault.create(filePath, content);
+		try {
+			await this.ensureFolder(root);
+			await this.app.vault.create(filePath, content);
+		} catch (e) {
+			// 模板文件写不进去不阻塞复盘：退回内置模板内容（复盘笔记照常生成）
+			console.warn("PlanFlow: 复盘模板文件创建失败，使用内置模板", e);
+		}
 		return content;
 	}
 
