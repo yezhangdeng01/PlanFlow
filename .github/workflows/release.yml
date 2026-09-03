@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 拉全量历史：release notes 需要遍历历史 tag 与上一版之间的 commit
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -46,6 +48,23 @@ jobs:
             manifest.json
             styles.css
 
+      # 从上一版 tag 到本版的 commit 标题生成更新说明（--generate-notes 只出对比链接，不够用）
+      - name: Build release notes
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate --merged HEAD | grep -vx "${GITHUB_REF_NAME}" | head -1 || true)
+          {
+            echo "## 更新内容"
+            echo
+            if [ -n "$PREV_TAG" ]; then
+              git log --format='- %s' "${PREV_TAG}..${GITHUB_REF_NAME}"
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${GITHUB_REF_NAME}"
+            else
+              git log --format='- %s' "${GITHUB_REF_NAME}"
+            fi
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,4 +73,4 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "PlanFlow ${GITHUB_REF_NAME}" \
             --verify-tag \
-            --generate-notes
+            --notes-file RELEASE_NOTES.md
