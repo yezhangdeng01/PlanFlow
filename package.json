@@ -1,6 +1,6 @@
 {
   "name": "obsidian-planflow",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "基于Obsidian的计划自动拆解行动系统：年度计划自动拆解，量化任务自动流转，每日行动打卡/周/月/年度目标/看板/甘特六视图目标追踪，自统计激励系统",
   "main": "main.js",
   "scripts": {

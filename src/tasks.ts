@@ -149,25 +149,27 @@ function locateTaskLine(data: string, task: PoolTask): number {
 }
 
 /**
- * v2.5 (B1): 字段级编辑任务行——只替换前缀/文本/计划标签/起止日期，
- * 原行中其他手动内容（备注、额外标签等）原样保留。
+ * v1.0.4 修复：v2.5 的文本区正则 /^[^#🛫📅]+/ 锚定在行首，会把「- [ ]」前缀一起吞掉——
+ * 写回后行不再匹配 TASK_LINE_RE，任务在所有视图里"消失"（甘特拖拽 = 编辑，等于误删）。
+ * 现在先显式摘出前缀，字段级编辑只作用于正文，最后拼回前缀。
  */
 function editTaskLine(line: string, input: NewTaskInput, checked: boolean): string {
-	let l = line;
-	// 1. 前缀（保留勾选状态）
-	l = l.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
-	// 2. 文本区：行首到第一个字段标记（# / 🛫 / 📅）之间替换为新文本（u flag：emoji 是代理对）
-	l = l.replace(/^[^#🛫📅]+/u, `${input.text.trim()} `);
-	// 3. 计划标签：删旧 → 加新（无则不加）
-	l = l.replace(/#计划\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
-	if (input.plan && input.plan.trim()) l += ` #计划/${input.plan.trim()}`;
-	// 4. 开始日期
-	l = l.replace(/🛫\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
-	if (input.start) l += ` 🛫 ${input.start}`;
-	// 5. 截止日期
-	l = l.replace(/📅\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
-	if (input.due) l += ` 📅 ${input.due}`;
-	return l;
+	const m = /^- \[([ x])\][ \t]?(.*)$/.exec(line);
+	if (!m) return line; // 非标准任务行：不碰，防止破坏手动内容
+	const prefix = checked ? "- [x]" : "- [ ]";
+	let body = m[2];
+	// 1. 文本区：正文行首到第一个字段标记（# / 🛫 / 📅）之间替换为新文本
+	body = body.replace(/^[^#🛫📅]*/u, `${input.text.trim()} `);
+	// 2. 计划标签：删旧 → 加新（无则不加）
+	body = body.replace(/#计划\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.plan && input.plan.trim()) body += ` #计划/${input.plan.trim()}`;
+	// 3. 开始日期
+	body = body.replace(/🛫\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.start) body += ` 🛫 ${input.start}`;
+	// 4. 截止日期
+	body = body.replace(/📅\s*\S+/g, "").replace(/\s{2,}/g, " ").trim();
+	if (input.due) body += ` 📅 ${input.due}`;
+	return `${prefix} ${body}`;
 }
 
 /** Append a line to content, always terminating it with a single newline. */
@@ -295,14 +297,16 @@ export function autoQuota(targetCount: number, weekIndex: number, totalWeeks: nu
 /**
  * Compute the N values of the auto tasks to create this week.
  * Continues from the highest existing auto-task number (avoids re-using a
- * number when a middle task was deleted) and skips names that already exist.
+ * number when a middle task was deleted) and skips names that already exist
+ * or that the user deliberately deleted (`skipNames`, v1.0.4 墓碑机制).
  */
 export function autoTaskNumbers(
 	existingAuto: PoolTask[],
 	need: number,
 	targetCount: number,
 	label: string,
-	unit: string
+	unit: string,
+	skipNames?: ReadonlySet<string>
 ): number[] {
 	let maxN = 0;
 	for (const t of existingAuto) {
@@ -313,12 +317,25 @@ export function autoTaskNumbers(
 	let n = maxN + 1;
 	while (nums.length < need && n <= targetCount) {
 		const name = `${label}（第 ${n} ${unit}）`;
-		if (!existingAuto.some((t) => t.text.trim() === name)) nums.push(n);
+		if (!existingAuto.some((t) => t.text.trim() === name) && !skipNames?.has(name)) nums.push(n);
 		n++;
 	}
 	return nums;
 }
 
+/**
+ * Generate this week's auto tasks for quantity-type plans (DEV.md v1.2).
+ *
+ * Idempotent: a task whose name already matches an existing auto task for the
+ * plan is never duplicated (checked or not). Manual tasks — names not matching
+ * the auto pattern — are ignored and don't affect the count.
+ *
+ * Task naming: `{label}（第 N 篇）`, N continuing from the highest existing
+ * auto-task number. New tasks are dated to this week's window (🛫 Mon 📅 Sun).
+ *
+ * v1.0.4: `skipNames` = 用户手动删除过的自动任务名（墓碑）。计数与补号都跳过它们，
+ * 否则删除配额内最后一个任务会在下次 top-up 时被"复活"（need = count - existing）。
+ */
 export async function ensureAutoTasks(
 	app: App,
 	rootPath: string,
@@ -326,8 +343,10 @@ export async function ensureAutoTasks(
 	today: string,
 	plans: AutoTaskPlan[],
 	planStart: string,
-	planEnd: string
+	planEnd: string,
+	skipNames?: ReadonlySet<string>
 ): Promise<void> {
+	const skip = skipNames ?? new Set<string>();
 	if (plans.length === 0) return;
 	const ctx = autoWeekContext(planStart, planEnd, today);
 	if (!ctx) return;
@@ -344,11 +363,15 @@ export async function ensureAutoTasks(
 			if (today > gEnd) continue;
 			const totalDays = Math.max(1, Math.round((parseDateString(gEnd).getTime() - parseDateString(gStart).getTime()) / DAY_MS) + 1);
 			const prefix = `${goal.name}（`;
-			const existing = tasks.filter((t) => t.plan === plan.name && t.text.trim().startsWith(prefix));
-			const need = goal.count - existing.length;
+			const existing = tasks.filter(
+				(t) => t.plan === plan.name && t.text.trim().startsWith(prefix) && !skip.has(t.text.trim())
+			);
+			// v1.0.4: 被墓碑标记的名额视为"用户决定不要"，不再补足
+			const tombstoned = [...skip].filter((n) => n.startsWith(prefix)).length;
+			const need = goal.count - existing.length - tombstoned;
 			if (need <= 0) continue;
 
-			const nums = autoTaskNumbers(existing, need, goal.count, goal.name, goal.unit);
+			const nums = autoTaskNumbers(existing, need, goal.count, goal.name, goal.unit, skip);
 			for (const n of nums) {
 				const name = `${goal.name}（第 ${n} ${goal.unit}）`;
 				// v1.5 跨度任务：任务 n 从分配日到下一个任务分配日前一天（最后一个到窗口末）
@@ -363,30 +386,9 @@ export async function ensureAutoTasks(
 				await addTask(app, rootPath, year, { text: name, plan: plan.name, start: startDate, due: dueDate });
 			}
 		}
-		// Legacy fallback: plans without goals decompose at plan level (full split).
-		if (plan.goals.length === 0 && plan.targetCount > 0) {
-			if (today > planEnd) continue;
-			const totalDays = Math.max(1, Math.round((parseDateString(planEnd).getTime() - parseDateString(planStart).getTime()) / DAY_MS) + 1);
-			const unit = planCounterUnit(plan.target);
-			const auto = tasks.filter((t) => t.plan === plan.name && isAutoTask(t));
-			const need = plan.targetCount - auto.length;
-			if (need <= 0) continue;
-
-			const nums = autoTaskNumbers(auto, need, plan.targetCount, plan.name, unit);
-			for (const n of nums) {
-				const name = `${plan.name}（第 ${n} ${unit}）`;
-				// v1.5 跨度任务（同 goals 分解逻辑）
-				const startDate = addDaysStr(planStart, Math.floor(((n - 1) * totalDays) / plan.targetCount));
-				let dueDate: string;
-				if (n < plan.targetCount) {
-					dueDate = addDaysStr(planStart, Math.floor((n * totalDays) / plan.targetCount) - 1);
-				} else {
-					dueDate = planEnd;
-				}
-				if (dueDate < startDate) dueDate = startDate;
-				await addTask(app, rootPath, year, { text: name, plan: plan.name, start: startDate, due: dueDate });
-			}
-		}
+		// v1.0.4: 移除计划级遗留分解（v1.2 老格式：plan 无 goals 但 target 文本带数字时按 targetCount 全量生成）。
+		// 它会在用户删掉量化目标后继续"凭 target 文本"生成 {plan}（第 N 篇） 任务——
+		// 用户视角即"目标已删、任务还在自动补"。分解只认显式 goals 定义；targetCount 仍用于进度展示。
 	}
 }
 

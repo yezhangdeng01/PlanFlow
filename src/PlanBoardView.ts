@@ -26,7 +26,7 @@ import {
 	readPlanPeriod,
 } from "./stats";
 import type { AutoTaskPlan, NewTaskInput, PoolTask } from "./tasks";
-import { addTask, DAY_MS, deleteTask, editTask, ensureAutoTasks, listTasks, planCounterUnit, toggleTask } from "./tasks";
+import { addTask, DAY_MS, deleteTask, editTask, ensureAutoTasks, isAutoTask, listTasks, planCounterUnit, toggleTask } from "./tasks";
 import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
 import { attachGanttDrag } from "./gantt-drag";
 import { DEFAULT_PLAN_COLORS, type PlanTemplate } from "./settings";
@@ -556,8 +556,12 @@ export class PlanBoardView extends ItemView {
 	/** Which panel's skeleton is currently rendered in the DOM. */
 	private currentPanel: TabKey | null = null;
 	private summaryFocused = false;
-	/** Gantt sub-mode (v1.3): week / month / year. */
-	private ganttMode: "week" | "month" | "year" = "month";
+	/**
+	 * Gantt sub-mode（v1.3）：week / month / year。
+	 * v1.0.4：按用户要求移除周/月视图，甘特只保留年视图——字段与默认值保留仅为
+	 * 兼容 data-axis 属性语义，恒为 "year"。
+	 */
+	private ganttMode: "week" | "month" | "year" = "year";
 	/** Board sub-mode (v1.3): group by plan category or by status. */
 	private boardMode: "category" | "status" = "category";
 
@@ -823,7 +827,9 @@ export class PlanBoardView extends ItemView {
 		if (!period) return;
 		this.selfWrite = true;
 		try {
-			await ensureAutoTasks(this.app, root, year, this.today, autoPlans, period.start, period.end);
+			// v1.0.4: 传入墓碑（用户手动删除过的自动任务名），删除不再被补额"复活"
+			const skip = new Set(this.plugin.settings.deletedAutoTasks ?? []);
+			await ensureAutoTasks(this.app, root, year, this.today, autoPlans, period.start, period.end, skip);
 		} finally {
 			this.selfWrite = false;
 		}
@@ -1516,11 +1522,26 @@ export class PlanBoardView extends ItemView {
 		this.selfWrite = true;
 		try {
 			await deleteTask(this.app, task);
+			// v1.0.4: 自动分解任务打墓碑——防止 ensureAutoTasks 补额时复活（非自动任务无需）
+			if (isAutoTask(task)) {
+				const name = task.text.trim();
+				if (!this.plugin.settings.deletedAutoTasks.includes(name)) {
+					this.plugin.settings.deletedAutoTasks.push(name);
+					await this.plugin.saveSettings();
+				}
+			}
 		} finally {
 			this.selfWrite = false;
 		}
 		new Notice("任务已删除");
 		await this.refresh();
+	}
+
+	/** v1.0.4: 清掉匹配前缀的自动任务墓碑（目标重建/删除后，原墓碑不再有意义）。 */
+	private clearAutoTombstones(prefix: string): void {
+		const before = this.plugin.settings.deletedAutoTasks?.length ?? 0;
+		this.plugin.settings.deletedAutoTasks = (this.plugin.settings.deletedAutoTasks ?? []).filter((n) => !n.startsWith(prefix));
+		if (this.plugin.settings.deletedAutoTasks.length !== before) void this.plugin.saveSettings();
 	}
 
 	/**
@@ -1887,40 +1908,12 @@ export class PlanBoardView extends ItemView {
 
 		const header = panel.createDiv({ cls: "planboard-period-header" });
 		header.createDiv({ cls: "planboard-period-title", text: "📊 甘特图" });
-		header.createDiv({ cls: "planboard-period-label", text: `${this.ganttRangeLabel()} · 任务时间条` });
+		header.createDiv({ cls: "planboard-period-label", text: `${year} · 任务时间条` });
 
-		const subtabs = panel.createDiv({ cls: "planboard-subtabs" });
-		const modes: Array<{ key: "week" | "month" | "year"; label: string }> = [
-			{ key: "week", label: "本周" },
-			{ key: "month", label: "本月" },
-			{ key: "year", label: "本年" },
-		];
-		for (const m of modes) {
-			const btn = subtabs.createEl("button", {
-				cls: "planboard-subtab" + (this.ganttMode === m.key ? " is-active" : ""),
-				text: m.label,
-			});
-			btn.addEventListener("click", () => {
-				this.ganttMode = m.key;
-				void this.refresh();
-			});
-		}
-
-		if (this.ganttMode === "week") this.renderGanttWeek(panel, tasks);
-		else if (this.ganttMode === "month") this.renderGanttMonth(panel, tasks);
-		else this.renderGanttYear(panel, tasks);
+		// v1.0.4: 周/月子视图移除（用户确认甘特只看年维度），直接渲染年视图
+		this.renderGanttYear(panel, tasks);
 		// Drag write-back needs the full task list (bars carry pool line numbers).
 		this.ganttBarTasks = tasks;
-	}
-
-	/** Range label for the current gantt sub-mode (e.g. "2026-08-10 ~ 2026-08-16"). */
-	private ganttRangeLabel(): string {
-		if (this.ganttMode === "week") {
-			const { start, end } = weekRange(this.today);
-			return `${start} ~ ${end}`;
-		}
-		if (this.ganttMode === "month") return this.today.slice(0, 7);
-		return this.today.slice(0, 4);
 	}
 
 	/** A task's effective window (🛫 ~ 📅); at least one date is guaranteed. */
@@ -1928,14 +1921,9 @@ export class PlanBoardView extends ItemView {
 		return { start: t.start ?? t.due!, end: t.due ?? t.start! };
 	}
 
-	/** Day-of-week index (Monday=1 … Sunday=7) for an ISO date. */
-	private dayOfWeek(date: string): number {
-		return parseDateString(date).getDay() || 7;
-	}
-
 	/**
 	 * Intersect a task's window with [start, end] and map it onto a 1..N axis
-	 * via `unit` (day-of-month for week/month, month number for year). This is
+	 * via `unit` (day index within the year). This is
 	 * the cross-window clamp Hermes' drag code depends on.
 	 */
 	private ganttBarRange(
@@ -1966,7 +1954,7 @@ export class PlanBoardView extends ItemView {
 		bar.setAttribute("data-line", String(t.line));
 		bar.setAttribute("data-start", t.start ?? "");
 		bar.setAttribute("data-due", t.due ?? "");
-		bar.setAttribute("data-axis", this.ganttMode);
+		bar.setAttribute("data-axis", "year"); // v1.0.4: 甘特只保留年视图
 		bar.style.left = `${((s - 1) / n) * 100}%`;
 		bar.style.width = `${Math.max(((e - s + 1) / n) * 100, 1.2)}%`;
 		bar.createDiv({ cls: "planboard-gantt-handle is-left" });
@@ -1981,85 +1969,6 @@ export class PlanBoardView extends ItemView {
 		const uHeader = uCard.createDiv({ cls: "planboard-card-header" });
 		uHeader.createDiv({ cls: "planboard-card-title", text: "🗂️ 未排期任务" });
 		for (const t of tasks) uCard.appendChild(this.renderTaskItem(t));
-	}
-
-	/** Week axis: 周一~周日 (7 cells), today highlighted. */
-	private renderGanttWeek(panel: HTMLElement, tasks: PoolTask[]): void {
-		const { start: weekStart, end: weekEnd } = weekRange(this.today);
-		const inWindow = filterTasksInRange(tasks, weekStart, weekEnd);
-		const unscheduled = tasks.filter((t) => !t.start && !t.due);
-
-		const chart = panel.createDiv({ cls: "planboard-gantt" });
-
-		const weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-		const todayIndex = this.dayOfWeek(this.today);
-		const axisRow = chart.createDiv({ cls: "planboard-gantt-axis" });
-		for (let d = 1; d <= 7; d++) {
-			const cell = axisRow.createDiv({
-				cls: "planboard-gantt-axis-cell" + (d === todayIndex ? " is-today" : ""),
-				text: weekdays[d - 1],
-			});
-			cell.style.width = `${100 / 7}%`;
-		}
-
-		if (inWindow.length === 0) {
-			chart.createDiv({ cls: "planboard-empty", text: "本周没有带日期的任务" });
-		}
-		for (const t of inWindow) {
-			const row = chart.createDiv({ cls: "planboard-gantt-row" });
-			const label = row.createDiv({ cls: "planboard-gantt-label", text: t.text.slice(0, 14), attr: { title: t.text } });
-			if (t.plan) label.setAttribute("data-plan", t.plan);
-			const track = row.createDiv({ cls: "planboard-gantt-track" });
-
-			const todayMark = track.createDiv({ cls: "planboard-gantt-today" });
-			todayMark.style.left = `${((todayIndex - 1) / 7) * 100}%`;
-
-			const { s, e } = this.ganttBarRange(t, weekStart, weekEnd, (d) => this.dayOfWeek(d));
-			this.renderGanttBar(track, t, s, e, 7);
-		}
-
-		this.renderUnscheduled(panel, unscheduled);
-	}
-
-	/** Month axis: day-of-month cells (labels every 5th), today highlighted. */
-	private renderGanttMonth(panel: HTMLElement, tasks: PoolTask[]): void {
-		const [y, mo] = this.today.split("-").map(Number);
-		const dim = daysInMonth(y, mo);
-		const monthStart = `${this.today.slice(0, 7)}-01`;
-		const monthEnd = `${this.today.slice(0, 7)}-${String(dim).padStart(2, "0")}`;
-		const todayDay = Number(this.today.slice(8, 10));
-		const inWindow = filterTasksInRange(tasks, monthStart, monthEnd);
-		const unscheduled = tasks.filter((t) => !t.start && !t.due);
-
-		const chart = panel.createDiv({ cls: "planboard-gantt" });
-
-		const axisRow = chart.createDiv({ cls: "planboard-gantt-axis" });
-		for (let d = 1; d <= dim; d++) {
-			const cell = axisRow.createDiv({
-				cls: "planboard-gantt-axis-cell" + (d === todayDay ? " is-today" : ""),
-				// 隔天标一个数字（1/3/5/…），月末必标——拖拽对位更细
-				text: d % 2 === 1 || d === dim ? String(d) : "",
-			});
-			cell.style.width = `${100 / dim}%`;
-		}
-
-		if (inWindow.length === 0) {
-			chart.createDiv({ cls: "planboard-empty", text: "本月没有带日期的任务" });
-		}
-		for (const t of inWindow) {
-			const row = chart.createDiv({ cls: "planboard-gantt-row" });
-			const label = row.createDiv({ cls: "planboard-gantt-label", text: t.text.slice(0, 14), attr: { title: t.text } });
-			if (t.plan) label.setAttribute("data-plan", t.plan);
-			const track = row.createDiv({ cls: "planboard-gantt-track" });
-
-			const todayMark = track.createDiv({ cls: "planboard-gantt-today" });
-			todayMark.style.left = `${((todayDay - 1) / dim) * 100}%`;
-
-			const { s, e } = this.ganttBarRange(t, monthStart, monthEnd, (d) => Number(d.slice(8, 10)));
-			this.renderGanttBar(track, t, s, e, dim);
-		}
-
-		this.renderUnscheduled(panel, unscheduled);
 	}
 
 	/** Year axis: 1月~12月 (12 cells), bars positioned by day index (v1.5), current month highlighted. */
@@ -2385,7 +2294,7 @@ export class PlanBoardView extends ItemView {
 	private renderYearGoalRow(goal: PlanGoalProgress, prog: PlanProgress): HTMLElement {
 		const row = createDiv({ cls: "planboard-goal-row planboard-goal-row--mini" });
 		row.createDiv({ cls: "planboard-goal-name", text: goal.name });
-		row.createDiv({ cls: "planboard-goal-count", text: `${goal.done}/${goal.count} ${goal.unit || "个"}` });
+		row.createDiv({ cls: "planboard-goal-count", text: `${goal.done}/${goal.total} ${goal.unit || "个"}` });
 		const bar = row.createDiv({ cls: "planboard-goal-bar" });
 		const fill = bar.createDiv({ cls: "planboard-progress-fill" });
 		fill.style.width = `${goal.percent}%`;
@@ -2679,9 +2588,14 @@ export class PlanBoardView extends ItemView {
 					this.selfWrite = false;
 				}
 			}
+			// v1.0.4: 目标重建 = 全量重生成，先清掉该目标的删除墓碑（旧名一并清，防残留）
+			this.clearAutoTombstones(`${existing.name}（`);
+			this.clearAutoTombstones(`${input.name}（`);
 			await this.ensureAutoTasksForToday(root, year);
 			new Notice("目标已更新，分解任务已按新设置重建");
 		} else {
+			// v1.0.4: 新建同名目标时清掉旧墓碑，避免分解被误跳过
+			this.clearAutoTombstones(`${input.name}（`);
 			await this.ensureAutoTasksForToday(root, year);
 			new Notice("目标已保存，分解任务已生成");
 		}
@@ -2714,6 +2628,10 @@ export class PlanBoardView extends ItemView {
 		try {
 			await writePlansToFile(this.app, file, defs, dailyMap);
 			for (const t of toDelete) await deleteTask(this.app, t);
+			// v1.0.4: 计划连同任务删除 → 清掉这些任务的删除墓碑
+			const deletedTexts = new Set(toDelete.map((t) => t.text.trim()));
+			this.plugin.settings.deletedAutoTasks = (this.plugin.settings.deletedAutoTasks ?? []).filter((n) => !deletedTexts.has(n));
+			void this.plugin.saveSettings();
 			// v1.4 联动：清理今日笔记中该计划的打卡行（v2.7: dailyTemplates 已废除，打卡默认项由年度计划自动推导）
 			const todayFile = this.getTodayFile();
 			if (todayFile) {
@@ -2765,6 +2683,8 @@ export class PlanBoardView extends ItemView {
 		try {
 			await writePlansToFile(this.app, file, defs, this.readRawDailyMap(content));
 			for (const t of toDelete) await deleteTask(this.app, t);
+			// v1.0.4: 目标已删除 → 其分解任务墓碑随之作废
+			this.clearAutoTombstones(`${goal.name}（`);
 		} finally {
 			this.selfWrite = false;
 		}

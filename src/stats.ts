@@ -73,6 +73,8 @@ export interface PlanDef {
 export interface PlanGoalProgress extends PlanGoal {
 	/** Completed tasks whose name starts with `${goal.name}（`. */
 	done: number;
+	/** v1.0.4: 任务池中该目标的实际任务总数（单一数据源；count 仅为生成规格）。 */
+	total: number;
 	/** 0-100. */
 	percent: number;
 }
@@ -467,10 +469,13 @@ export async function computeAnnualPlanProgress(
 		const planTasks = tasks.filter((t) => t.plan === def.name);
 		const rate = rateByName.get(def.name);
 		// v1.2: per-goal progress = completed tasks whose name starts with 「{goal.name}（」
+		// v1.0.4: 分母改为任务池实际任务数（单一数据源），g.count 仅是生成规格
 		const goalProgress: PlanGoalProgress[] = def.goals.map((g) => {
 			const prefix = `${g.name}（`;
-			const done = planTasks.filter((t) => t.checked && t.text.trim().startsWith(prefix)).length;
-			return { ...g, done, percent: g.count > 0 ? Math.round((done / g.count) * 100) : 0 };
+			const goalTasks = planTasks.filter((t) => t.text.trim().startsWith(prefix));
+			const done = goalTasks.filter((t) => t.checked).length;
+			const percent = goalTasks.length > 0 ? Math.round((done / goalTasks.length) * 100) : 0;
+			return { ...g, done, total: goalTasks.length, percent };
 		});
 		const base = {
 			plan: def.name,
@@ -484,11 +489,14 @@ export async function computeAnnualPlanProgress(
 		};
 		if (def.type === "numeric") {
 			const doneCount = planTasks.filter((t) => t.checked).length;
-			const percent = def.targetCount > 0 ? Math.round((doneCount / def.targetCount) * 100) : 0;
+			// v1.0.4: 进度分母 = 任务池中该计划的实际任务总数——单一数据源（任务池），
+			// 不再使用 frontmatter target 文本/goals 推导的数字，避免"定义已删、进度仍按旧数显示"
+			const totalCount = planTasks.length;
+			const percent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 			return {
 				...base,
 				isNumeric: true,
-				targetCount: def.targetCount,
+				targetCount: totalCount,
 				doneCount,
 				checkDone: 0,
 				checkTotal: 0,

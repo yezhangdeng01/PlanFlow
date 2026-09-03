@@ -50,6 +50,8 @@ export interface PlanFlowSettings {
 	yearPlanHeights: Record<string, number>;
 	/** 看板列顺序（v1.7.3：拖拽列头调整，计划名数组；空 = 按年度定义顺序）。 */
 	boardColumnOrder: string[];
+	/** 用户手动删除的自动分解任务名（v1.0.4）——防止 ensureAutoTasks 补额时"复活"被删任务。编辑/删除对应量化目标时清空相关条目。 */
+	deletedAutoTasks: string[];
 }
 
 export const DEFAULT_SETTINGS: PlanFlowSettings = {
@@ -86,6 +88,7 @@ tags: [复盘]
 	planOrder: [],
 	yearPlanHeights: {},
 	boardColumnOrder: [],
+	deletedAutoTasks: [],
 };
 
 /** 文件夹选择弹窗：列出库内全部文件夹，点选即回调路径（Obsidian 标准交互）。 */
