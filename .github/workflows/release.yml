@@ -9,6 +9,11 @@ on:
   push:
     tags: ["*"]
 
+# 同一 tag 只跑一次：GitHub 偶发对一次 push 投递两个事件，双跑会在建 release 时互相撞车
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write # 创建 Release、上传资产
   id-token: write # Sigstore 签名（attestation 必需）
