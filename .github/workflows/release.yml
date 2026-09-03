@@ -1,0 +1,52 @@
+name: Release
+
+# 打任意 tag（如 1.0.4）即触发：CI 从源码构建 → 生成构建出处签名（attestation）→ 创建 Release 并上传资产。
+# 解决官方审查的两条提示：
+#   Warning        "Build output does not match the released main.js" —— CI 构建与审查方重建环境一致
+#   Recommendation "Missing GitHub artifact attestations" —— attest-build-provenance 自动签名
+
+on:
+  push:
+    tags: ["*"]
+
+permissions:
+  contents: write # 创建 Release、上传资产
+  id-token: write # Sigstore 签名（attestation 必需）
+  attestations: write # 上传 attestation
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tsc + esbuild production)
+        run: npm run build
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" main.js manifest.json styles.css \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "PlanFlow ${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --generate-notes
