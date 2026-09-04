@@ -48,13 +48,21 @@ Other features:
 
 ## 🚀 Installation
 
-### Option 1: BRAT (recommended, auto-updates)
+### Option 1: Community plugins (recommended)
+
+1. Obsidian settings → Community plugins → turn off Restricted mode if needed
+2. Click **Browse** and search for **PlanFlow**
+3. Install and enable (updates are handled by Obsidian)
+
+Or open it directly: [obsidian://show-plugin?id=planflow](obsidian://show-plugin?id=planflow)
+
+### Option 2: BRAT (beta / pre-release tracking)
 
 1. Install the [BRAT](obsidian://show-plugin?id=obsidian42-brat) plugin
 2. BRAT settings → Add Beta plugin → enter `yezhangdeng01/PlanFlow`
 3. Enable PlanFlow (new releases update automatically)
 
-### Option 2: Manual install
+### Option 3: Manual install
 
 1. Download `main.js`, `manifest.json`, `styles.css` from the [latest Release](https://github.com/yezhangdeng01/PlanFlow/releases)
 2. Create `.obsidian/plugins/planflow/` in your vault and place the three files inside
