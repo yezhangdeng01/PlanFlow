@@ -1263,8 +1263,12 @@ export class PlanBoardView extends ItemView {
 	/** v2.9: 首页 dashboard 图表刷新——4 KPI + 圆环组 + 周柱 + 热力图 + 月度趋势（手写 SVG，零依赖）。 */
 	private async updateHomeCharts(): Promise<void> {
 		// 一次性读 365 天每日完成度（缓存同年内复用），供热力图/周柱/趋势共享
+		// v1.1.1 修正：守卫漏了「map 已被置 null」的情况——补卡路径把 completionMap
+		// 置 null 想强制重算，但年份没变守卫不通过，`?? new Map()` 拿到空表，
+		// 本月每日柱状全部退化成不可见的幽灵槽（用户实测「统计条全消失」）。
+		// 与回顾页年度图表（3199 行）的正确守卫对齐。
 		const year = this.today.slice(0, 4);
-		if (this.completionMapYear !== year) {
+		if (this.completionMapYear !== year || !this.completionMap) {
 			this.completionMap = await this.computeDailyCompletionMap(year);
 			this.completionMapYear = year;
 		}
