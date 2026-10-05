@@ -271,9 +271,10 @@ export async function readMonthBadges(
 }
 
 /**
- * Consecutive check-in streak: walk backwards from yesterday; a day counts when
- * its daily note exists and every check-in item is checked. Stops on the first
- * missing/incomplete day. Today itself never counts (reward v3).
+ * Consecutive check-in streak. v1.1.1 放宽口径：当天**至少完成 1 项**打卡就算一天
+ * （原「全部勾选才算」在真实使用中恒为 0——用户反馈「一直显示 0 天」）。
+ * 今天本身完成过 ≥1 项也先计 1 天（否则刚勾完仍显示 0，像没生效）；
+ * 从昨天起再往前逐日累计，遇到「笔记缺失 / 没有任何打卡项 / 一项都没完成」即断。
  * Reuses daily.ts parsing (DEV.md §6).
  */
 export async function computeStreak(
@@ -283,18 +284,27 @@ export async function computeStreak(
 	today: string
 ): Promise<number> {
 	const rootPath = paths.rootPath(root);
+	const streakOf = (ds: string): Promise<number> =>
+		(async () => {
+			const file = app.vault.getAbstractFileByPath(paths.dailyNotePath(rootPath, ds));
+			if (!(file instanceof TFile)) return -1; // -1 = 断链
+			const content = await app.vault.cachedRead(file);
+			const data = parseDailyContent(file, content, ds);
+			if (data.checkItems.length === 0) return -1;
+			return data.checkItems.filter((c) => c.checked).length; // 当天完成数
+		})();
+
 	let streak = 0;
-	let cur = addDays(parseDateString(today), -1); // start from yesterday
+	// 今天先算：完成过 ≥1 项 → 计 1 天（进行中的一天也给反馈）
+	const todayDone = await streakOf(today);
+	if (todayDone > 0) streak++;
+	// 从昨天往前累计
+	let cur = addDays(parseDateString(today), -1);
 	// Each date resolves its own year folder, so the streak crosses year boundaries.
 	for (let i = 0; i < 3700; i++) {
-		const ds = formatDate(cur);
-		const path = paths.dailyNotePath(rootPath, ds);
-		const file = app.vault.getAbstractFileByPath(path);
-		if (!(file instanceof TFile)) break;
-		const content = await app.vault.cachedRead(file);
-		const data = parseDailyContent(file, content, ds);
-		if (data.checkItems.length === 0) break;
-		if (!data.checkItems.every((c) => c.checked)) break;
+		const done = await streakOf(formatDate(cur));
+		if (done < 0) break; // 笔记缺失 / 无打卡项
+		if (done === 0) break; // 当天一项都没完成
 		streak++;
 		cur = addDays(cur, -1);
 	}

@@ -1232,7 +1232,7 @@ export class PlanBoardView extends ItemView {
 		/* v6.7（#6）：其它卡片标题都带图标，这两张漏了 */
 		weekChartHeader.createDiv({ cls: "planboard-card-title", text: "📅 本月每日打卡" });
 		/* v7.11（用户 135859 截图）：连击徽章从「今日总结」标题行搬到这里。
-		   放这张卡是因为连击讲的就是「每天有没有把打卡勾完」—— 与这张柱状图同一件事；
+		   放这张卡是因为连击讲的就是「每天有没有打卡」—— 与这张柱状图同一件事；
 		   挂在这条 header 右端（header 是 space-between，标题左、徽章右）。
 		   原来它在总结卡标题行是 absolute 居中定位的，那条 CSS 已随本次搬家删除。 */
 		this.streakEl = weekChartHeader.createSpan({ cls: "planboard-streak planboard-hidden" });
@@ -1473,7 +1473,7 @@ export class PlanBoardView extends ItemView {
 		attachPlanSort(card, container, this.plugin, plan, cols);
 	}
 
-	/** 🔥 连续打卡天数：从昨天往前数，每天全部打卡勾选才计一天。X=0 不显示。 */
+	/** 🔥 连续打卡天数：当天完成 ≥1 项即计 1 天（v1.1.1 放宽，原全勾口径恒为 0），再往前累计。 */
 	private async updateStreak(): Promise<void> {
 		if (!this.streakEl) return;
 		const root = pfRoot(this.plugin.settings.rootPath);
@@ -1905,6 +1905,9 @@ export class PlanBoardView extends ItemView {
 		this.updateChecklist();
 		this.updateSummary();
 		this.refreshHomeChartsAfterChange();
+		// v1.1.1：勾卡/取消直接影响连击（≥1 项算一天）——此前只有补卡流程刷新连击，
+		// 今日勾完卡 🔥 数字不动（真机闭环实测抓到）。
+		void this.updateStreak();
 	}
 
 	/**
@@ -2110,6 +2113,7 @@ export class PlanBoardView extends ItemView {
 		this.updateProgress();
 		this.updateSummary();
 		this.refreshHomeChartsAfterChange(); // v3.0 联动
+		void this.updateStreak(); // 删掉勾选项可能让今天完成数归零，连击要跟着掉
 		this.offerRestoreCheckItem(item);
 	}
 
