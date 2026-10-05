@@ -4061,7 +4061,11 @@
 .theme-dark .planboard-root .planboard-header .planboard-tab.is-active {
 	background: var(--pf-tab-open-bg);
 	border-color: transparent;
-	box-shadow: none;
+	/* v1.1.0 修正：这里原来是 box-shadow:none——把浅色 v7.1 加的「2px 同色硬阴影
+	   盖发丝线」一起抹掉了，深色下 banner 底缘那根 hairline（rgba(255,255,255,0.1)）
+	   从活动标签正下方横穿（用户实测「切换时下面还是有一条横线」）。
+	   恢复盖线段；浅色那条向上的悬浮阴影在深底上不可见，不补。 */
+	box-shadow: 0 2px 0 0 var(--pf-tab-open-bg);
 	/* v7.14 顺手修：文字色一直没跟 v7.0 的暗画布一起换——#17405f 落在 #1e2326 上
 	   几乎读不出来（v7.14 真机截图确认）。改亮色，与深色 hover 文字同档。 */
 	color: #eaf4fd;
