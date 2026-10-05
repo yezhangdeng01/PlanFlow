@@ -4,19 +4,19 @@
  * 本文件由脚本从 PlanBoardView.ts 机械搬移而来（原 3871-4345 区间），**代码未作任何改写**，
  * 只是给顶层符号加了 export。搬出来的理由：
  *   ① 这 470 行是纯函数 + 常量，不碰 DOM 查询/事件/插件状态，与视图逻辑本就解耦；
- *   ② 图表必须写 element.style.fill/stroke（配色是运行时按数据插值算的：热力图绿档随主题切、
- *      柱高与扇区色按完成度插值、计划色还要再柔化），社区规范禁止 eslint-disable 注释，
- *      豁免只能走 eslint 配置——按文件是最精确的粒度，不用按行号或全局关；
- *   ③ 纯函数可脱离 Obsidian 运行时单测。
+ *   ② 纯函数可脱离 Obsidian 运行时单测。
  *
- * 颜色工具（deepenForText / softenChartColor / hexToRgba）仍住在 PlanBoardView，
- * 因为主类多处直接调用；这里反向 import，不重复实现。
+ * v1.1.2 起动态样式走 Obsidian 的 `setCssStyles`（社区扫描器 error 级规则
+ * no-static-styles-assignment 禁止 element.style 直赋值；setCssStyles 同时兼容
+ * 弹出窗场景），SVG 元素用全局 `createSvg` 创建（prefer-create-el 同因）。
+ *
+ * 颜色工具（deepenForText / softenChartColor / hexToRgba）住在 colors.ts。
  */
 import { deepenForText, softenChartColor } from "./colors";
 import { formatDate } from "./daily";
 /** v2.9 手写 SVG 图表工具（零依赖，Obsidian 变量随主题自适应）。 */
 export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] {
-	const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+	const el = createSvg(tag);
 	for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
 	return el;
 }
@@ -43,8 +43,8 @@ export function buildDonutChartSvg(
 	const svg = svgEl("svg", { viewBox: `0 0 ${size} ${size}`, width: "100%", "aria-hidden": "true" });
 	// 轨道：也当空态底环（全年 0 次时不是"什么都没有"，是一个空环 + 中心的 0）
 	const track = svgEl("circle", { cx: mid, cy: mid, r, fill: "none", "stroke-width": sw });
-	track.style.stroke = "var(--background-modifier-border)";
-	track.style.opacity = "0.32";
+	track.setCssStyles({ stroke: "var(--background-modifier-border)" });
+	track.setCssStyles({ opacity: "0.32" });
 	svg.append(track);
 	if (total > 0) {
 		const gapPx = slices.length > 1 ? Math.min(3, c * 0.01) : 0;
@@ -60,8 +60,8 @@ export function buildDonutChartSvg(
 				"stroke-dashoffset": String(-offset),
 				transform: `rotate(-90 ${mid} ${mid})`,
 			});
-			seg.style.stroke = color;
-			if (opacity < 1) seg.style.opacity = String(opacity);
+			seg.setCssStyles({ stroke: color });
+			if (opacity < 1) seg.setCssStyles({ opacity: String(opacity) });
 			svg.append(seg);
 		};
 		let acc = 0;
@@ -91,7 +91,7 @@ export function buildDonutChartSvg(
 		"font-weight": "700",
 	});
 	big.textContent = centerValue;
-	big.style.fill = "var(--text-normal)";
+	big.setCssStyles({ fill: "var(--text-normal)" });
 	svg.append(big);
 	const sub = svgEl("text", {
 		x: mid,
@@ -103,7 +103,7 @@ export function buildDonutChartSvg(
 		"letter-spacing": "1",
 	});
 	sub.textContent = centerLabel;
-	sub.style.fill = "var(--text-faint)";
+	sub.setCssStyles({ fill: "var(--text-faint)" });
 	svg.append(sub);
 	return svg;
 }
@@ -171,19 +171,19 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 		if (v === 0) {
 			const gx = bx(i);
 			const ghost = svgEl("rect", { x: gx, y: base - 4, width: bw, height: 4, rx: 2 });
-			ghost.style.fill = "var(--background-modifier-border)";
-			ghost.style.opacity = "0.6"; // v6.0: 0.9 → 0.6，空槽不再像一排小黑块
+			ghost.setCssStyles({ fill: "var(--background-modifier-border)" });
+			ghost.setCssStyles({ opacity: "0.6" }); // v6.0: 0.9 → 0.6，空槽不再像一排小黑块
 			svg.append(ghost);
 		}
 		// 每柱一条动态渐变——顶部颜色随完成度在冷→暖色带上爬升
 		const t = full > 0 ? Math.max(0, Math.min(1, v / full)) : 0;
 		const grad = svgEl("linearGradient", { id: `pf-bar-${i}`, x1: "0", y1: "0", x2: "0", y2: "1" });
 		const stopTop = svgEl("stop", { offset: "0%" });
-		stopTop.style.stopColor = weekBarRampColor(t);
+		stopTop.setCssStyles({ stopColor: weekBarRampColor(t) });
 		const stopMid = svgEl("stop", { offset: "52%" });
-		stopMid.style.stopColor = weekBarRampColor(t * 0.5);
+		stopMid.setCssStyles({ stopColor: weekBarRampColor(t * 0.5) });
 		const stopBottom = svgEl("stop", { offset: "100%" });
-		stopBottom.style.stopColor = weekBarRampColor(0);
+		stopBottom.setCssStyles({ stopColor: weekBarRampColor(0) });
 		grad.append(stopTop, stopMid, stopBottom);
 		defs.append(grad);
 	});
@@ -194,7 +194,7 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 		const x = bx(i);
 		const rect = svgEl("rect", { x, y: base - h, width: bw, height: Math.max(h, v > 0 ? 2 : 0), rx: 2 });
 		rect.setAttribute("fill", `url(#pf-bar-${i})`);
-		if (i !== todayIdx) rect.style.opacity = "0.85"; // v6.0: 0.7 → 0.85，整排不再发灰
+		if (i !== todayIdx) rect.setCssStyles({ opacity: "0.85" }); // v6.0: 0.7 → 0.85，整排不再发灰
 		const tip = svgEl("title", {});
 		tip.textContent = `${i + 1} 日 · ${v} 完成`;
 		rect.append(tip);
@@ -214,8 +214,8 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 			"font-weight": i === todayIdx ? "700" : "400",
 		});
 		label.textContent = String(v);
-		label.style.fill = "var(--text-normal)";
-		if (i !== todayIdx) label.style.opacity = "0.8";
+		label.setCssStyles({ fill: "var(--text-normal)" });
+		if (i !== todayIdx) label.setCssStyles({ opacity: "0.8" });
 		svg.append(label);
 	});
 	// v3.9: 底部日期 1..N（已过日期正常色、今天加粗、未来日期弱化）
@@ -229,8 +229,8 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 			"font-weight": d === todayIdx ? "700" : "400",
 		});
 		dt.textContent = String(d + 1);
-		dt.style.fill = d === todayIdx ? "var(--text-normal)" : "var(--text-faint)";
-		if (d > todayIdx) dt.style.opacity = "0.6";
+		dt.setCssStyles({ fill: d === todayIdx ? "var(--text-normal)" : "var(--text-faint)" });
+		if (d > todayIdx) dt.setCssStyles({ opacity: "0.6" });
 		svg.append(dt);
 	}
 	return svg;
@@ -261,9 +261,9 @@ export function buildHeatmapSvg(map: Map<string, number>, today: string): SVGSVG
 		: ["#fbe4d0", "#fbe4d0", "#f6bd8a", "#ef9548", "#d97706"];
 	// v3.9: preserveAspectRatio none——高度拖拽只拉伸格子高度，宽度始终铺满卡（不会再缩到中间）
 	const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", "aria-hidden": "true" });
-	svg.style.width = "100%";
-	svg.style.height = "100%";
-	svg.style.display = "block";
+	svg.setCssStyles({ width: "100%" });
+	svg.setCssStyles({ height: "100%" });
+	svg.setCssStyles({ display: "block" });
 	for (let c = 0; c < cols; c++) {
 		for (let r = 0; r < rows; r++) {
 			const dIdx = c * 7 + r - (jan1Dow - 1);
@@ -282,7 +282,7 @@ export function buildHeatmapSvg(map: Map<string, number>, today: string): SVGSVG
 				rx: 1.5,
 			});
 			// v3.0: 空档主题自适应（深色主题下亮灰 #ebedf0 太刺眼，改用边框色变量）
-			rect.style.fill = tier === 0 ? "var(--background-modifier-border)" : palette[tier];
+			rect.setCssStyles({ fill: tier === 0 ? "var(--background-modifier-border)" : palette[tier] });
 			if (dStr === today) {
 				rect.setAttribute("stroke", "#3572a8");
 				rect.setAttribute("stroke-width", "1.5");
@@ -305,7 +305,7 @@ export function buildHeatmapSvg(map: Map<string, number>, today: string): SVGSVG
 			y: H - 6,
 			"font-size": SVG_FS.micro,
 		});
-		txt.style.fill = "var(--text-muted)"; // SVG attr 不认 CSS 变量，必须走 style
+		txt.setCssStyles({ fill: "var(--text-muted)" }); // SVG attr 不认 CSS 变量，必须走 style
 		txt.textContent = monthNames[m];
 		svg.append(txt);
 	}
@@ -337,23 +337,23 @@ export function buildPlanBarsH(rows: { plan: string; count: number; color?: stri
 		// 计划名（带计划色，与 banner 同款加深保证可读）
 		const name = svgEl("text", { x: 0, y: y + 14, "font-size": SVG_FS.label, "font-weight": "600" });
 		name.textContent = r.plan;
-		name.style.fill = r.color ? deepenForText(r.color) : "var(--text-normal)";
+		name.setCssStyles({ fill: r.color ? deepenForText(r.color) : "var(--text-normal)" });
 		svg.append(name);
 		// 轨道 + 计划色条
 		const track = svgEl("rect", { x: nameW, y: y + 5, width: barMax, height: 12, rx: 6 });
-		track.style.fill = "var(--background-modifier-border)";
-		track.style.opacity = "0.28"; // v6.0: 0.45 → 0.28
+		track.setCssStyles({ fill: "var(--background-modifier-border)" });
+		track.setCssStyles({ opacity: "0.28" }); // v6.0: 0.45 → 0.28
 		svg.append(track);
 		const w = Math.max((r.count / max) * barMax, r.count > 0 ? 8 : 0);
 		if (w > 0) {
 			const bar = svgEl("rect", { x: nameW, y: y + 5, width: w, height: 12, rx: 6 });
-			bar.style.fill = r.color ? softenChartColor(r.color) : "#3572a8";
+			bar.setCssStyles({ fill: r.color ? softenChartColor(r.color) : "#3572a8" });
 			svg.append(bar);
 		}
 		// 右侧次数
 		const val = svgEl("text", { x: nameW + barMax + 10, y: y + 15, "font-size": SVG_FS.label, "font-weight": "500" });
 		val.textContent = `${r.count} 次`;
-		val.style.fill = r.count > 0 ? "var(--text-muted)" : "var(--text-faint)";
+		val.setCssStyles({ fill: r.count > 0 ? "var(--text-muted)" : "var(--text-faint)" });
 		svg.append(val);
 	});
 	return svg;
@@ -387,9 +387,9 @@ export function buildYearMonthsSvg(months: { label: string; done: number }[]): S
 		const t = Math.max(0, Math.min(1, m.done / max));
 		const grad = svgEl("linearGradient", { id: `pf-ym-${i}`, x1: "0", y1: "0", x2: "0", y2: "1" });
 		const s1 = svgEl("stop", { offset: "0%" });
-		s1.style.stopColor = weekBarRampColor(t);
+		s1.setCssStyles({ stopColor: weekBarRampColor(t) });
 		const s2 = svgEl("stop", { offset: "100%" });
-		s2.style.stopColor = weekBarRampColor(0);
+		s2.setCssStyles({ stopColor: weekBarRampColor(0) });
 		grad.append(s1, s2);
 		defs.append(grad);
 	});
@@ -407,19 +407,19 @@ export function buildYearMonthsSvg(months: { label: string; done: number }[]): S
 			svg.append(rect);
 		} else {
 			const ghost = svgEl("rect", { x, y: base - 4, width: cw, height: 4, rx: 1 });
-			ghost.style.fill = "var(--background-modifier-border)";
+			ghost.setCssStyles({ fill: "var(--background-modifier-border)" });
 			svg.append(ghost);
 		}
 		// 最高月柱顶标数值
 		if (i === maxIdx && m.done > 0) {
 			const val = svgEl("text", { x: x + cw / 2, y: Math.max(13, base - h - 3), "text-anchor": "middle", "font-size": SVG_FS.value, "font-weight": "700" });
 			val.textContent = String(m.done);
-			val.style.fill = "var(--text-normal)";
+			val.setCssStyles({ fill: "var(--text-normal)" });
 			svg.append(val);
 		}
 		const lbl = svgEl("text", { x: x + cw / 2, y: base + 11, "text-anchor": "middle", "font-size": SVG_FS.micro });
 		lbl.textContent = m.label;
-		lbl.style.fill = i === maxIdx ? "var(--text-normal)" : "var(--text-muted)";
+		lbl.setCssStyles({ fill: i === maxIdx ? "var(--text-normal)" : "var(--text-muted)" });
 		svg.append(lbl);
 	});
 	return svg;
@@ -452,15 +452,15 @@ export function buildCumulativeSvg(months: { label: string; done: number }[], ye
 	const defs = svgEl("defs", {});
 	const grad = svgEl("linearGradient", { id: "pf-cum-grad", x1: "0", y1: "0", x2: "0", y2: "1" });
 	const s1 = svgEl("stop", { offset: "0%" });
-	s1.style.stopColor = weekBarRampColor(1);
+	s1.setCssStyles({ stopColor: weekBarRampColor(1) });
 	const s2 = svgEl("stop", { offset: "100%" });
-	s2.style.stopColor = weekBarRampColor(0);
+	s2.setCssStyles({ stopColor: weekBarRampColor(0) });
 	grad.append(s1, s2);
 	defs.append(grad);
 	svg.append(defs);
 	const areaD = `M ${pts[0][0]} ${base} ` + pts.map((p) => `L ${p[0]} ${p[1]}`).join(" ") + ` L ${pts[n - 1][0]} ${base} Z`;
 	const area = svgEl("path", { d: areaD, fill: "url(#pf-cum-grad)", stroke: "none" });
-	area.style.fillOpacity = "0.14";
+	area.setCssStyles({ fillOpacity: "0.14" });
 	svg.append(area);
 	const lineD = `M ${pts[0][0]} ${pts[0][1]} ` + pts.slice(1).map((p) => `L ${p[0]} ${p[1]}`).join(" ");
 	const line = svgEl("path", { d: lineD, fill: "none", stroke: "url(#pf-cum-grad)", "stroke-width": "2", "stroke-linejoin": "round" });
@@ -469,13 +469,13 @@ export function buildCumulativeSvg(months: { label: string; done: number }[], ye
 	months.forEach((_, i) => {
 		const t = svgEl("text", { x: pad + i * cw, y: H - 5, "text-anchor": "middle", "font-size": SVG_FS.micro });
 		t.textContent = String(i + 1);
-		t.style.fill = "var(--text-muted)";
+		t.setCssStyles({ fill: "var(--text-muted)" });
 		svg.append(t);
 	});
 	// 末端总数徽标
 	const end = svgEl("text", { x: pts[n - 1][0] - 4, y: Math.max(13, pts[n - 1][1] - 5), "text-anchor": "end", "font-size": SVG_FS.value, "font-weight": "700" });
 	end.textContent = `${total} 次`;
-	end.style.fill = "var(--text-normal)";
+	end.setCssStyles({ fill: "var(--text-normal)" });
 	svg.append(end);
 	void yearMap;
 	return svg;

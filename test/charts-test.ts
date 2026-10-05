@@ -19,6 +19,10 @@ import {
 } from "../src/charts";
 import { deepenForText, softenChartColor, hexToRgba } from "../src/colors";
 
+// charts.ts 用 Obsidian 运行时的全局 createSvg 建 SVG 元素——测试环境补全局桩，
+// 映射到本文件的 mkEl（函数声明会提升，此处引用安全）。
+(globalThis as unknown as Record<string, unknown>).createSvg = (tag: string): StubEl => mkEl(tag);
+
 let failed = 0;
 function check(name: string, cond: boolean, detail?: unknown): void {
 	console.log((cond ? "PASS" : "FAIL") + " | " + name + (detail !== undefined ? " | " + JSON.stringify(detail) : ""));
@@ -33,6 +37,8 @@ interface StubEl {
 	style: Record<string, string>;
 	textContent: string;
 	setAttribute(k: string, v: string): void;
+	/** v1.1.2 起 charts.ts 用 Obsidian 的 setCssStyles 写动态样式，桩实现合并进 style */
+	setCssStyles(styles: Partial<CSSStyleDeclaration>): void;
 	append(...c: StubEl[]): void;
 	appendChild(c: StubEl): void;
 	// 便于断言
@@ -48,6 +54,7 @@ function mkEl(tag: string): StubEl {
 		style: {},
 		textContent: "",
 		setAttribute(k, v) { this.attrs[k] = v; },
+		setCssStyles(styles) { Object.assign(this.style, styles); },
 		append(...c: StubEl[]) { this.children.push(...c); },
 		appendChild(c) { this.children.push(c); },
 		_find(t) {
