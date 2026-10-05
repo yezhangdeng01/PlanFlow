@@ -27,7 +27,7 @@ Most planning tools keep "yearly goals, monthly plans, daily check-ins" as three
 
 "Today's check-in + Today's summary" sits at the visual center, with the annual progress bar pinned at the top — the first thing you see when opening Obsidian is "what to do today, and how much is done".
 
-![](docs/screenshots/home.png)
+![](docs/screenshots/today-action.png)
 
 ## ✨ Features
 
@@ -49,7 +49,7 @@ Other features:
 
 **Today** — check-ins, daily summary, monthly charts and week/month task lists at a glance.
 
-![](docs/screenshots/home.png)
+![](docs/screenshots/today-action.png)
 
 **Plans** — per-plan check-in actions, quantified goals and task lists.
 

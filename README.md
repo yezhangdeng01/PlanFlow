@@ -27,7 +27,7 @@
 
 「今日打卡 + 今日总结」是界面的视觉中心，年度目标进度条常驻顶部——打开 Obsidian 第一眼看到的是「今天要做什么、做了多少」。
 
-![](docs/screenshots/home.png) 
+![](docs/screenshots/today-action.png) 
 
 ## ✨ 功能
 | 页面 | 职责 | 核心操作 |
@@ -47,7 +47,7 @@
 
 **今日行动**——打卡、今日总结、本月图表与周/月任务清单，一屏总览。
 
-![](docs/screenshots/home.png)
+![](docs/screenshots/today-action.png)
 
 **计划管理**——每个计划的打卡行动、量化目标与任务列表。
 

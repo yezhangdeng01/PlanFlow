@@ -25,7 +25,7 @@
 
 「今日打卡 + 今日总结」是界面的视觉中心，年度目标进度条常驻顶部——打开 Obsidian 第一眼看到的是「今天要做什么、做了多少」。
 
-![](screenshots/home.png)
+![](screenshots/today-action.png)
 
 ### 3. 数据属于你
 
@@ -46,7 +46,7 @@
 
 ### 今日行动
 
-![](screenshots/home.png)
+![](screenshots/today-action.png)
 
 - **年度目标条**：各计划进度一目了然，进度条随打卡自动前进
 - **今日打卡**：行末「打卡」按钮一点即完成；日期下拉选「昨天」可以补卡
