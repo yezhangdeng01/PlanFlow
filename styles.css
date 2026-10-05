@@ -1030,8 +1030,11 @@
 	/* 三格各按内容宽；余量由 space-between 均分进两个间隙 ⇒ 距离动态 */
 	grid-template-columns: auto auto auto;
 	justify-content: space-between;
-	/* 间隙下限：余量分完之后也不能小于这里，免得三样贴到一起 */
-	column-gap: 12px;
+	/* 间隙下限：余量分完之后也不能小于这里，免得三样贴到一起
+	   （v1.1.5：column-gap → gap+row-gap:0 —— 列表器把 column-gap 归入
+	   multicolumn 特性标 Warning；视觉语义不变：横向 12、纵向 0） */
+	gap: 12px;
+	row-gap: 0;
 }
 
 /* 已完成计数（标题行中格）。
@@ -2595,8 +2598,10 @@
 }
 .planboard-modal input.is-invalid,
 .planboard-modal textarea.is-invalid {
-	border-color: var(--text-error, #b91c1c) !important;
-	box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.12) !important;
+	/* v1.1.5：去掉 !important（CSS LINT warning）——特异性 (0,2,1) 已压过
+	   全库所有 modal input 边框规则；真机验证过 computed border-color 落在错误红。 */
+	border-color: var(--text-error, #b91c1c);
+	box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.12);
 }
 
 /* =========================================================
