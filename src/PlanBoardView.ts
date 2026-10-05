@@ -2211,13 +2211,15 @@ export class PlanBoardView extends ItemView {
 		}
 
 		const pct = total === 0 ? 0 : Math.round((done.length / total) * 100);
+		// v1.1.1：全部精简到 9 字以内——鼓励语要与标题/已完成排成一行（用户 010907：
+		// 「既然精简了文案，就排成一行才更好」），降级阈值也按新字宽重算（styles.css 375px）。
 		let cheer: string;
-		if (total === 0) cheer = "今天还没有打卡项，去添加一个吧";
-		else if (pct === 100) cheer = "全勤达成！今天的你闪闪发光";
-		else if (pct >= 80) cheer = `已完成 ${pct}%，快完成啦，再坚持一下！`;
-		else if (pct >= 50) cheer = `已完成 ${pct}%，势头不错，继续冲！`;
-		else if (pct > 0) cheer = `已完成 ${pct}%，加油突破，动起来！`;
-		else cheer = "从第一项开始吧"; // v1.1.1 精简（原「今天还没开始打卡哦，从第一项开始吧」鼓励语独占一行后过长）
+		if (total === 0) cheer = "去添加一个打卡项吧";
+		else if (pct === 100) cheer = "全勤达成！闪闪发光";
+		else if (pct >= 80) cheer = "快完成啦，坚持住！";
+		else if (pct >= 50) cheer = "势头不错，继续冲！";
+		else if (pct > 0) cheer = "加油突破，动起来！";
+		else cheer = "从第一项开始吧";
 		// v7.11: 落到总结卡标题行右端（💪 已在 CSS 里用 ::before 画上）
 		if (this.summaryCheerEl) this.summaryCheerEl.setText(cheer);
 	}
