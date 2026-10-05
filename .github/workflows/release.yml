@@ -37,6 +37,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 社区扫描器（community.obsidian.md）对发布产物跑同一套规则，
+      # error 级违规会让 Review 判 Failed——发版前本地先拦一遍
+      - name: Lint (scanner-equivalent ruleset)
+        run: npm run lint
+
       - name: Build (tsc + esbuild production)
         run: npm run build
 
