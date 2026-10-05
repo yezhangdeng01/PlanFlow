@@ -421,9 +421,12 @@ export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 			targetCount = goals.reduce((acc, g) => acc + g.count, 0);
 		} else {
 			type = readPlanType(obj, target);
+			// v1.1.2：lookbehind（(?<!...)）换成等价的前缀写法——regex lookbehind 是
+			// 社区扫描器 error 级规则（旧 Electron/Safari 不支持，iPad 会直接崩）。
+			// 13 组样本比对确认两写法首 match 完全等价（含 %50 / a%112 / 112 等边界）。
 			const m =
 				/(\d+)\s*(?:篇|条|个|部|期|集|次|份|张|幅|本|门)/.exec(target) ??
-				/(?<![0-9/%])(\d+)(?![0-9/%])/.exec(target);
+				/(?:^|[^0-9/%])(\d+)(?![0-9/%])/.exec(target);
 			targetCount = type === "numeric" && m ? parseInt(m[1], 10) : 0;
 		}
 		defs.push({
