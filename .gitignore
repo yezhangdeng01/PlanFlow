@@ -8,6 +8,9 @@ test/cdp-*.js
 test/vision_cli.py
 test/palette.html
 test/ui-preview/
+# 测试构建产物（run-test.mjs 用 esbuild 从 *-test.ts 现场生成）
+test/*.cjs
+test/*-test.mjs
 # 构建产物（社区插件惯例：main.js 随 release 发布，不进源码仓库）
 main.js
 .claude/settings.json
@@ -22,3 +25,18 @@ docs/devlog-v1.5.md
 test/gen_icon*.py
 test/regen_icon*.py
 test/quantize_icon.py
+# ===== dev 工作区并入的本地目录/文件（2026-10-01 单目录化，不进仓库）=====
+_tools/
+_preview/
+_archive/
+_vault-backup/
+_metrics-*.tsv
+_to_utf8bom.py
+_last-backup.txt
+restore-vault.ps1
+# 内部审计/评审文档（个人文件，不进仓库）
+docs/UI-AUDIT-2026-09-09.md
+docs/UI-AUDIT-2026-09-30.md
+docs/UI-REDESIGN-PROPOSAL-2026-09-09.md
+docs/UI-REVIEW-2026-09-30.md
+docs/UI-SKIN-PROPOSAL-2026-09-30.md

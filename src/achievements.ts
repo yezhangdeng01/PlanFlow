@@ -1,5 +1,6 @@
 import { App, TFile, TFolder } from "obsidian";
 import { addDays, daysInMonth, formatDate, parseDailyContent, parseDateString } from "./daily";
+import * as paths from "./paths";
 
 /**
  * Rewards (v3): weekly/monthly badge settlement + consecutive check-in streak.
@@ -46,7 +47,7 @@ export function tierFor(done: number, total: number): BadgeTier | null {
 
 /** Path of the achievement file for a year. */
 function achievementPath(rootPath: string, year: string): string {
-	return `${rootPath.replace(/\/+$/, "")}/${year}/成就.md`;
+	return paths.achievementPath(rootPath, year);
 }
 
 /**
@@ -281,13 +282,13 @@ export async function computeStreak(
 	year: string,
 	today: string
 ): Promise<number> {
-	const rootPath = root.replace(/\/+$/, "");
+	const rootPath = paths.rootPath(root);
 	let streak = 0;
 	let cur = addDays(parseDateString(today), -1); // start from yesterday
 	// Each date resolves its own year folder, so the streak crosses year boundaries.
 	for (let i = 0; i < 3700; i++) {
 		const ds = formatDate(cur);
-		const path = `${rootPath}/${ds.slice(0, 4)}/每日/${ds}.md`;
+		const path = paths.dailyNotePath(rootPath, ds);
 		const file = app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFile)) break;
 		const content = await app.vault.cachedRead(file);

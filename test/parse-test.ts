@@ -6,6 +6,7 @@
  */
 import { parsePlansFromFrontmatter, filterTasksInRange, summarizeTasks } from "../src/stats";
 import { parseTaskPool, buildPoolLine, autoWeekContext, autoQuota, autoTaskNumbers, planCounterUnit, isAutoTask } from "../src/tasks";
+import { toggleTaskLine, moveTaskLine, removeLine, appendCheckItem, upsertCheckLog, removeCheckLog, findCheckLineByPlan } from "../src/daily";
 import { TFile } from "obsidian";
 
 let failed = 0;
@@ -186,5 +187,113 @@ check("autoTaskNumbers capped at targetCount", JSON.stringify(numsCap) === "[]",
 const numsEmpty = autoTaskNumbers([], 2, 12, "写作", "篇");
 check("autoTaskNumbers from scratch", JSON.stringify(numsEmpty) === "[1,2]", numsEmpty);
 
+// --- 6. Line-level mutations: bounds safety (regression for the idx/target order bug) ---
+// 背景：这些函数按行号改内容，但行号会被外部改动冲歪，于是靠 expectedRaw 兜底重定位。
+// 重定位失败时 idx=-1——早先 moveTaskLine 先算 `idx+delta` 再判越界，delta=1 得到 target=0，
+// 骗过 `target>=0` 检查后拿 lines[0] 去交换，静默改错数据。removeLine 则会 splice(-1,1) 删掉最后一行。
+const DOC = ["## ✅ 今日打卡", "", "- [ ] 任务甲", "- [ ] 任务乙", "- [ ] 任务丙"].join("\n");
+
+// 正例：行号正确时行为不变（下移 = idx 与 idx+1 交换；上移 = idx 与 idx-1 交换）
+const DOWN = moveTaskLine(DOC, 2, 1).split("\n");
+check("moveTaskLine 下移：甲下沉一位", DOWN[2] === "- [ ] 任务乙" && DOWN[3] === "- [ ] 任务甲", DOWN.slice(2, 4));
+const UP = moveTaskLine(DOC, 3, -1).split("\n");
+check("moveTaskLine 上移：乙升到甲的位置", UP[2] === "- [ ] 任务乙" && UP[3] === "- [ ] 任务甲", UP.slice(2, 4));
+
+// 回归：expectedRaw 找不到 → 必须原样返回，一个字节都不能动
+const GHOST = "- [ ] 早已删除的任务";
+check("moveTaskLine 重定位失败原样返回", moveTaskLine(DOC, 2, 1, GHOST) === DOC);
+check("removeLine 重定位失败原样返回", removeLine(DOC, 2, GHOST) === DOC);
+check("toggleTaskLine 重定位失败原样返回", toggleTaskLine(DOC, 2, true, GHOST) === DOC);
+
+// 回归：idx 越界的直接入参（不只 -1，还包括 >=length 与负数）
+check("moveTaskLine idx=-1 不越界写", moveTaskLine(DOC, -1, 1) === DOC);
+check("moveTaskLine idx=-1 delta=-1 不越界写", moveTaskLine(DOC, -1, -1) === DOC);
+check("moveTaskLine idx 越界(>=len) 不动", moveTaskLine(DOC, 999, 1) === DOC);
+check("removeLine idx=-1 不删最后一行", removeLine(DOC, -1) === DOC);
+check("removeLine idx 越界不动", removeLine(DOC, 999) === DOC);
+check("toggleTaskLine idx 越界不动", toggleTaskLine(DOC, 999, true) === DOC);
+
+// 旧 bug 的精确复现：首行就是任务行，且传入一个不存在的 expectedRaw。
+// 旧写法：idx=-1 → target = -1+1 = 0 → 骗过 `target>=0` → 拿 lines[0] 交换 → 静默改错数据。
+// 新写法：resolveLineIndex 返回 -1 → 直接原样返回。
+const HEAD_TASK = ["- [ ] 首行任务", "- [ ] 次行任务"].join("\n");
+check("moveTaskLine 不拿 lines[0] 顶替（旧 bug 精确复现）",
+	moveTaskLine(HEAD_TASK, 0, 1, "- [ ] 不存在的行") === HEAD_TASK, moveTaskLine(HEAD_TASK, 0, 1, "- [ ] 不存在的行"));
+
+// 边界：只能与真实任务行交换，不能与非任务行（标题/空行）交换
+check("moveTaskLine 不与空行交换", moveTaskLine(DOC, 2, -1) === DOC);
+check("moveTaskLine 不与标题行交换", moveTaskLine(HEAD_TASK, 0, -1) === HEAD_TASK);
+check("moveTaskLine 越出末尾不动", moveTaskLine(DOC, 4, 1) === DOC);
+check("moveTaskLine 越出开头不动", moveTaskLine(DOC, 0, -1) === DOC);
+
+// 正例：removeLine / toggleTaskLine 正常路径
+check("removeLine 删指定行", removeLine(DOC, 2) === ["## ✅ 今日打卡", "", "- [ ] 任务乙", "- [ ] 任务丙"].join("\n"));
+check("toggleTaskLine 勾选", toggleTaskLine(DOC, 2, true).split("\n")[2] === "- [x] 任务甲");
+check("toggleTaskLine 取消勾选", toggleTaskLine(DOC, 2, false).split("\n")[2] === "- [ ] 任务甲");
+check("toggleTaskLine 非任务行不动", toggleTaskLine(DOC, 0, true) === DOC);
+
+// --- 7. Check-log round-trip (打卡记录的写入 / 改时长 / 撤销) -----------------
+// 记录行真实格式：`- {日期} · {项名} · {用时}`（`·` 分隔，见 logAnchor）。
+// 记录区从 `## ⏱ 打卡记录` 标题开始，到下一个 `##` 标题（或文末）为止。
+const LOG_LINE = "- 2026-10-04 · 写作 · 30 分钟";
+const LOG_DOC = ["## ✅ 今日打卡", "", "- [ ] 写作 30分钟", "", "## ⏱ 打卡记录", "", LOG_LINE].join("\n");
+
+const NO_LOG = ["## ✅ 今日打卡", "", "- [ ] 写作 30分钟"].join("\n");
+const FRESH = upsertCheckLog(NO_LOG, "2026-10-04", "写作", "30 分钟");
+check("upsertCheckLog 无记录区则新建区", FRESH.includes("## ⏱ 打卡记录") && FRESH.includes(LOG_LINE), FRESH);
+
+const LOGGED = upsertCheckLog(LOG_DOC, "2026-10-04", "写作", "30 分钟");
+check("upsertCheckLog 同 key 同 detail 幂等（不刷屏）", LOGGED === LOG_DOC);
+const RETIMED = upsertCheckLog(LOG_DOC, "2026-10-04", "写作", "60 分钟");
+check("upsertCheckLog 改时长是整行替换而非追加",
+	RETIMED.includes("- 2026-10-04 · 写作 · 60 分钟") && !RETIMED.includes("30 分钟"), RETIMED.split("\n").pop());
+const REPEATED = upsertCheckLog(LOG_DOC, "2026-10-04", "写作", "30 分钟");
+check("upsertCheckLog 重复打卡不产生第二条记录",
+	REPEATED.split("\n").filter((l) => l.includes("2026-10-04 · 写作")).length === 1);
+
+const UNLOGGED = removeCheckLog(LOG_DOC, "2026-10-04", "写作");
+check("removeCheckLog 撤销后记录行消失", !UNLOGGED.includes(LOG_LINE), UNLOGGED);
+check("removeCheckLog 撤销不伤打卡勾选状态", UNLOGGED.includes("- [ ] 写作 30分钟"));
+check("removeCheckLog 对不存在的 key 是 no-op", removeCheckLog(LOG_DOC, "2026-10-05", "写作") === LOG_DOC);
+check("removeCheckLog 对不存在的项名是 no-op", removeCheckLog(LOG_DOC, "2026-10-04", "阅读") === LOG_DOC);
+
+// --- 8. appendCheckItem 插到打卡区末尾 --------------------------------------
+const APPENDED = appendCheckItem(DOC, "- [ ] 任务丁");
+// 插在**最后一条任务之后**：原最后一行「任务丙」在 idx 4 → insertIdx=5 → 丁落在 idx 5
+check("appendCheckItem 追加到最后一条任务后", APPENDED.split("\n")[5] === "- [ ] 任务丁"
+	&& APPENDED.split("\n")[4] === "- [ ] 任务丙", APPENDED);
+const APPENDED2 = appendCheckItem(APPENDED, "- [ ] 任务戊");
+check("appendCheckItem 连续追加保持顺序（后加的在后面）",
+	APPENDED2.split("\n").indexOf("- [ ] 任务丁") < APPENDED2.split("\n").indexOf("- [ ] 任务戊"), APPENDED2);
+check("appendCheckItem 不动打卡区以外的行", APPENDED.startsWith("## ✅ 今日打卡\n"), APPENDED);
+check("appendCheckItem 原有任务不被改写", APPENDED.includes("- [ ] 任务甲") && APPENDED.includes("- [ ] 任务丙"));
+// 无打卡区标题时**主动补建标题**（容错，不是 bug）——老模板/手写笔记也接得住
+const NO_HEADING = appendCheckItem("随便一行", "- [ ] x");
+check("appendCheckItem 无标题则补建标题", NO_HEADING.includes("## ✅ 今日打卡") && NO_HEADING.includes("- [ ] x"), NO_HEADING);
+check("appendCheckItem 补建时保留原内容", NO_HEADING.startsWith("随便一行"), NO_HEADING);
+
+// --- 9. findCheckLineByPlan 跨文件定位（补卡的唯一可靠锚点） -----------------
+// 补卡写的是「另一篇」文件，行号完全不同，所以只能按计划名定位。
+// 下面这组是 v7.22 真实踩坑的固化：老笔记行带 "1小时" 后缀、复盘行带 [[链接]]，
+// 按显示名匹配会全部对不上，必须按 #计划/ 标签逐字比。
+const LEGACY = [
+	"## ✅ 今日打卡",
+	"",
+	"- [ ] ✍️ 写作 1小时 #计划/写作", // ← 老行：带时长后缀
+	"- [ ] 📈 复盘 复盘+次日计划 → [[2026-10-01 复盘]] #计划/复盘", // ← 老行：带复盘链接
+	"- [ ] 手写项", // ← 无计划标签，走显示名回退
+	"",
+].join("\n");
+check("findCheckLineByPlan 命中带时长后缀的老行", findCheckLineByPlan(LEGACY, "写作", "✍️ 写作") === 2, findCheckLineByPlan(LEGACY, "写作", "✍️ 写作"));
+check("findCheckLineByPlan 命中带复盘链接的老行", findCheckLineByPlan(LEGACY, "复盘", "📈 复盘") === 3, findCheckLineByPlan(LEGACY, "复盘", "📈 复盘"));
+check("findCheckLineByPlan 无标签行走显示名回退", findCheckLineByPlan(LEGACY, null, "手写项") === 4, findCheckLineByPlan(LEGACY, null, "手写项"));
+check("findCheckLineByPlan 找不到返回 -1", findCheckLineByPlan(LEGACY, "不存在的计划", "不存在") === -1);
+// ⚠️ 计划名优先：即使显示名能匹配到别的行，也以 #计划/ 标签为准
+// （前提是同一计划在同一天只有一个打卡项——这正是插件的数据模型，见函数注释）
+check("findCheckLineByPlan 计划名优先于显示名", findCheckLineByPlan(LEGACY, "写作", "手写项") === 2, findCheckLineByPlan(LEGACY, "写作", "手写项"));
+check("findCheckLineByPlan 不跨越打卡区（打卡区外同文本不算）",
+	findCheckLineByPlan(["## 📝 今日总结", "", "- [ ] 写作 #计划/写作", "", "## ✅ 今日打卡", "", "- [ ] 阅读 #计划/阅读"].join("\n"), "写作", "写作") === -1);
+
 console.log(failed === 0 ? "\nALL PASSED" : `\n${failed} FAILED`);
-process.exit(failed === 0 ? 0 : 1);
+// 用抛错而非 process.exit 汇报失败：process.exit 会掐断 runner，后面的套件就跑不到了。
+if (failed > 0) throw new Error(`${failed} 个断言失败`);

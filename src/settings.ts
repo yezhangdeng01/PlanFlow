@@ -1,5 +1,6 @@
 import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab, Setting, SettingDefinitionItem, TFile, TFolder, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
+import { reviewTemplatePath } from "./paths";
 
 /** Default plan accent colors (PRD §5). Keys are plan tag names. */
 export const DEFAULT_PLAN_COLORS: Record<string, string> = {
@@ -9,16 +10,22 @@ export const DEFAULT_PLAN_COLORS: Record<string, string> = {
 	复盘: "#ef4444",
 };
 
-/** One row of the daily check-in template (PRD §6). */
+/**
+ * One row of the daily check-in template (PRD §6).
+ * v7.6：`duration`（原「1小时」动作后缀）已退役——打卡记的是当天行动内容 + 用时，
+ * 由行内输入框当场填，不再由计划定义预写进标题。
+ */
 export interface PlanTemplate {
 	/** Display name, e.g. "✍️ 写作" (emoji included). */
 	name: string;
-	/** Duration text, e.g. "1小时". May be empty. */
-	duration: string;
 	/** Plan tag name (no `#计划/` prefix), e.g. "写作". */
 	plan: string;
 	/** Whether to append a review link `→ [[{date} 复盘]]`. */
 	includeReview: boolean;
+	/** v7.21: 打卡项窗口 🛫（缺省 = 当天，原行为）——量化到每日打卡的自定义项带窗口。 */
+	start?: string;
+	/** v7.21: 打卡项窗口 📅（缺省 = 当天）。 */
+	due?: string;
 }
 
 export interface PlanFlowSettings {
@@ -42,6 +49,12 @@ export interface PlanFlowSettings {
 	checkCardHeight: number;
 	/** Home summary card height (px, 0 = auto). */
 	summaryCardHeight: number;
+	/** Home month-bars chart card height (px, 0 = auto, v3.8 draggable). */
+	weekChartHeight: number;
+	/** Home trend chart card height (px, 0 = auto, v3.8 draggable). */
+	trendChartHeight: number;
+	/** Home heatmap card height (px, 0 = auto, v3.8 draggable). */
+	heatCardHeight: number;
 	/** Achievement pop sound on tier-up (v1.4). */
 	achievementSound: boolean;
 	/** 计划卡拖拽排序（v1.6）：计划名顺序，空数组 = 按年度文件定义顺序。 */
@@ -52,6 +65,14 @@ export interface PlanFlowSettings {
 	boardColumnOrder: string[];
 	/** 用户手动删除的自动分解任务名（v1.0.4）——防止 ensureAutoTasks 补额时"复活"被删任务。编辑/删除对应量化目标时清空相关条目。 */
 	deletedAutoTasks: string[];
+	/**
+	 * 打卡「用时」的默认档（分钟，v7.9）。
+	 *
+	 * 语义是**记忆**而不是偏好：用户每次打卡填的那个值会回写到这里，
+	 * 下次打开/刷新时输入框就停在这个值上——「选了 30 分，以后打卡默认就是 30，
+	 * 除非再手动改」。首次安装没有这个字段时走 DEFAULT_SETTINGS 的 30。
+	 */
+	checkMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: PlanFlowSettings = {
@@ -84,11 +105,15 @@ tags: [复盘]
 	weekCardHeight: 0,
 	checkCardHeight: 0,
 	summaryCardHeight: 0,
+	weekChartHeight: 0, // v3.8: 0 = 自适应（拖拽后固定）
+	trendChartHeight: 0,
+	heatCardHeight: 0,
 	achievementSound: true,
 	planOrder: [],
 	yearPlanHeights: {},
 	boardColumnOrder: [],
 	deletedAutoTasks: [],
+	checkMinutes: 30,
 };
 
 /** 文件夹选择弹窗：列出库内全部文件夹，点选即回调路径（Obsidian 标准交互）。 */
@@ -220,7 +245,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 	private renderReviewTemplate(setting: Setting): void {
 		setting.addButton((btn) =>
 			btn.setButtonText("打开模板文件").setCta().onClick(async () => {
-				const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+				const filePath = reviewTemplatePath(this.plugin.settings.rootPath);
 				let file: TFile | null = null;
 				const existing = this.app.vault.getAbstractFileByPath(filePath);
 				if (existing instanceof TFile) {
@@ -239,7 +264,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		);
 		setting.addButton((btn) =>
 			btn.setButtonText("恢复默认").onClick(async () => {
-				const filePath = `${this.plugin.settings.rootPath.replace(/\/+$/, "")}/复盘模板.md`;
+				const filePath = reviewTemplatePath(this.plugin.settings.rootPath);
 				const file = this.app.vault.getAbstractFileByPath(filePath);
 				if (file instanceof TFile) {
 					await this.app.vault.modify(file, this.plugin.settings.reviewTemplate);

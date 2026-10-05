@@ -1,5 +1,6 @@
 import { App, Notice, TFile, TFolder } from "obsidian";
 import { TASK_LINE_RE, parseDateString, removeLine, toggleTaskLine, weekRange } from "./daily";
+import { taskPoolPath, rootPath as pfRoot } from "./paths";
 
 /**
  * Task pool (`{root}/{year}/任务.md`) — PRD §0, DEV.md M2.
@@ -40,8 +41,8 @@ export interface NewTaskInput {
 
 /** Path of the task pool file for a given year. */
 export function poolPath(rootPath: string, year: string): string {
-	const root = rootPath.replace(/\/+$/, "");
-	return `${root}/${year}/任务.md`;
+	const root = pfRoot(rootPath);
+	return taskPoolPath(root, year);
 }
 
 /** Parse a task pool file's content into tasks. */
@@ -399,4 +400,32 @@ function addDaysStr(date: string, n: number): string {
 	const m = String(d.getMonth() + 1).padStart(2, "0");
 	const dd = String(d.getDate()).padStart(2, "0");
 	return `${y}-${m}-${dd}`;
+}
+
+
+// ---------------------------------------------------------------------------
+// v1.0.5 以下三个纯函数从 PlanBoardView.ts 搬入（只被看板渲染用，语义属于任务域）
+// ---------------------------------------------------------------------------
+
+export function summarize(tasks: PoolTask[]): { total: number; done: number; percent: number } {
+	const total = tasks.length;
+	const done = tasks.filter((t) => t.checked).length;
+	return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+}
+
+/** Derive a task's status column (spec v1.3). Undated, unchecked tasks → "todo". */
+export function taskStatus(t: PoolTask, today: string): "todo" | "doing" | "done" {
+	if (t.checked) return "done";
+	if (t.start && today >= t.start && (!t.due || today <= t.due)) return "doing";
+	return "todo";
+}
+
+/** Sort pool tasks by due date ascending; completed tasks sink to the bottom. */
+export function sortTasksByDue(tasks: PoolTask[]): PoolTask[] {
+	return [...tasks].sort((a, b) => {
+		if (a.checked !== b.checked) return a.checked ? 1 : -1;
+		const ad = a.due ?? "9999-12-31";
+		const bd = b.due ?? "9999-12-31";
+		return ad < bd ? -1 : ad > bd ? 1 : 0;
+	});
 }

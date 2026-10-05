@@ -8,6 +8,7 @@ import {
 	parseTempTasksFromFrontmatter,
 	weekRange,
 } from "./daily";
+import { annualPlanPath, dailyDir, monthDir, monthNotePath, weekDir, weekNotePath, rootPath as pfRoot } from "./paths";
 import type { PoolTask } from "./tasks";
 import { listTasks } from "./tasks";
 
@@ -34,6 +35,24 @@ export interface PlanRate {
 	percent: number;
 }
 
+/**
+ * v7.21: 量化到每日打卡的打卡项配置——编辑量化目标弹窗里与「添加打卡项」同款的
+ * 可编辑内容（名称/计划/起止/复盘链接）。缺省（YAML 未写 dailyItem）时各字段
+ * 回落目标自身值：name = 目标名、plan = 目标所属计划、start/end = 目标窗口、review = false。
+ */
+export interface GoalDailyItem {
+	/** 打卡项标题（≠ 目标名时才有必要自定义，如「写作 30 分钟」）。 */
+	name: string;
+	/** `#计划/` 标签指向的计划名（默认 = 目标所属计划）。 */
+	plan: string;
+	/** 打卡项窗口起点（默认跟随目标 start；再缺省 = 当天）。 */
+	start?: string;
+	/** 打卡项窗口终点（默认跟随目标 end）。 */
+	due?: string;
+	/** 是否带复盘链接 `→ [[{date} 复盘]]`。 */
+	review?: boolean;
+}
+
 /** A quantified goal under a plan (v1.2: plans are categories, goals carry counts). */
 export interface PlanGoal {
 	/** Goal name shown on tasks: 「{name}（第 N {unit}）」. */
@@ -45,6 +64,10 @@ export interface PlanGoal {
 	/** Optional custom window (defaults to the plan period). */
 	start?: string;
 	end?: string;
+	/** v7.20: 量化到每日打卡——窗口内每天自动加一条该目标的打卡项。 */
+	daily?: boolean;
+	/** v7.21: 每日打卡项的自定义内容（daily 为 true 时有意义；未写 = 全部回落目标自身值）。 */
+	dailyItem?: GoalDailyItem;
 }
 
 /** A plan definition read from the annual note's frontmatter `plans` (read-only). */
@@ -101,7 +124,7 @@ export interface PlanProgress {
 	tasks: PoolTask[];
 	/** Per-goal progress (v1.2). Empty for pure check-in plans. */
 	goals: PlanGoalProgress[];
-	/** Daily check-in action label, e.g. "1小时". */
+	/** Daily check-in action label, e.g. "1小时". v7.6 已退役，仅用于识别老笔记标题里的历史后缀。 */
 	action: string;
 	/** Icon prefix, e.g. "✍️". */
 	label: string;
@@ -109,6 +132,8 @@ export interface PlanProgress {
 	color: string;
 	/** Trading-day-only check-in (复盘). */
 	tradingDay: boolean;
+	/** v7.6: 是否每日打卡计划（决定今日打卡标题是否按「图标 + 计划名」硬裁历史后缀）。 */
+	daily: boolean;
 }
 
 export interface PeriodStats {
@@ -140,8 +165,8 @@ export interface PlanPeriod {
  * Prefers `{root}/{year}/年度计划.md`, falls back to `{root}/年度计划.md`.
  */
 export async function readPlanPeriod(app: App, rootPath: string, year: string): Promise<PlanPeriod | null> {
-	const root = rootPath.replace(/\/+$/, "");
-	for (const path of [`${root}/${year}/年度计划.md`, `${root}/年度计划.md`]) {
+	const root = pfRoot(rootPath);
+	for (const path of [annualPlanPath(root, year), annualPlanPath(root)]) {
 		const f = app.vault.getAbstractFileByPath(path);
 		if (!(f instanceof TFile)) continue;
 		const fm = parseYaml((await app.vault.cachedRead(f)).match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "") as {
@@ -156,13 +181,91 @@ export async function readPlanPeriod(app: App, rootPath: string, year: string): 
 	return null;
 }
 
+// ---------------------------------------------------------------------------
+// v1.0.5：按 (app, root, today, type, reviewWorkdays) 加键的统计缓存
+//
+// 为什么需要（实测数据，不是猜测）：
+//   回顾页一次刷新连算 3 个周期（`renderReview` 里 year + week + month），
+//   而**年统计要把窗口内每一篇每日笔记读一遍 + parseDailyContent**（真库 2026 有 42 篇，
+//   窗口满年时是 365 篇）。首页 banner、回顾页、settle 判定还会各自再算一遍年统计 ——
+//   同一次 refresh 里可能重复 3~4 次同样的全量遍历。
+//   vault modify 又会触发 refresh（500ms debounce），改一个 checkbox 就重算一遍全年。
+//
+// 为什么按 key 缓存而不是「只缓存年统计」：
+//   week / month 的窗口小（7 / 30 天），重复计算的收益低但成本同样存在；
+//   统一 keyed cache 逻辑只有一份，且键里带了全部输入（root/today/type/rw），
+//   不存在「拿到别的口径的旧结果」这种风险。
+//
+// 失效策略：**整体清空**（`invalidateStatsCache`），不做逐 key 精细失效。
+//   理由：一次 vault 事件往往同时影响多篇日记/多个文件，逐条算「谁脏了」的成本
+//   几乎等于重算；而清空的代价只是「下一次 refresh 重算一次」，正确性上零风险。
+//   视图在任何 vault modify 到达时都会调 invalidate —— 宁可可重算，不可算错。
+// ---------------------------------------------------------------------------
+
+interface StatsCacheEntry {
+	stats: PeriodStats;
+	/** 入库时的 vault mtime 指纹，仅用于诊断与调试输出 */
+	stamp: string;
+}
+
+/** 按 app 对象分桶的缓存（多库场景下互不串味）。 */
+let statsCaches = new WeakMap<App, Map<string, StatsCacheEntry>>();
+
+/** 取缓存键：所有影响结果的输入都进键里。 */
+function statsCacheKey(rootPath: string, today: string, type: PeriodType, reviewWorkdays: boolean): string {
+	// 分隔符用 \u0000 —— 路径/日期里不可能出现它，避免 "a|b" + "c" 与 "a" + "b|c" 撞键
+	return `${rootPath}\u0000${today}\u0000${type}\u0000${reviewWorkdays ? 1 : 0}`;
+}
+
+/**
+ * 作废某 app 的全部统计缓存。
+ *
+ * 必须在任何「文件可能变了」之后调用：vault modify / create / delete / rename，
+ * 以及设置变更（rootPath、reviewWorkdays 变了键自然不同，但清空更省心）。
+ */
+export function invalidateStatsCache(app: App): void {
+	statsCaches.get(app)?.clear();
+}
+
+/** 清掉所有 app 的统计缓存（切库 / 卸载 / 测试隔离用）。 */
+export function invalidateAllStatsCaches(): void {
+	statsCaches = new WeakMap();
+}
+
+/** 读缓存命中则返回，未命中返回 undefined。 */
+function readStatsCache(app: App, key: string): PeriodStats | undefined {
+	return statsCaches.get(app)?.get(key)?.stats;
+}
+
+function writeStatsCache(app: App, key: string, stats: PeriodStats, stamp: string): void {
+	let bucket = statsCaches.get(app);
+	if (!bucket) {
+		bucket = new Map();
+		statsCaches.set(app, bucket);
+	}
+	// 只留最近 12 条：一次会话里 root/year/rw 的组合不会太多，
+	// 上限是防「切库 + 改设置」这类长会话把内存慢慢撑起来。
+	if (bucket.size >= 12) {
+		const oldest = bucket.keys().next();
+		if (!oldest.done) bucket.delete(oldest.value);
+	}
+	bucket.set(key, { stats, stamp });
+}
+
 export async function computePeriodStats(
 	app: App,
 	rootPath: string,
 	today: string,
 	type: PeriodType,
-	reviewWorkdays: boolean
+	reviewWorkdays: boolean,
+	/** 绕过缓存强制重算（自写写盘后、或调用方明确知道库变了时用）。 */
+	force = false
 ): Promise<PeriodStats> {
+	const cacheKey = statsCacheKey(rootPath, today, type, reviewWorkdays);
+	if (!force) {
+		const hit = readStatsCache(app, cacheKey);
+		if (hit) return hit;
+	}
 	const period = resolvePeriod(today, type);
 	let { start, end, label, yearDir } = period;
 
@@ -176,7 +279,7 @@ export async function computePeriodStats(
 	}
 
 	// --- Plan check-in rates -------------------------------------------------
-	const prefix = `${rootPath}/${yearDir}/每日/`;
+	const prefix = `${dailyDir(rootPath, yearDir)}/`;
 	const dailyFiles = app.vault
 		.getFiles()
 		.filter((f) => f.path.startsWith(prefix) && /^\d{4}-\d{2}-\d{2}\.md$/.test(f.name));
@@ -237,7 +340,7 @@ export async function computePeriodStats(
 		planProgress = await computeAnnualPlanProgress(app, rootPath, today, poolTasks, planRates);
 	}
 
-	return {
+	const result: PeriodStats = {
 		type,
 		label,
 		rangeLabel: `${start.slice(5)} ~ ${end.slice(5)}`,
@@ -251,6 +354,9 @@ export async function computePeriodStats(
 		tasks: windowTasks,
 		planProgress,
 	};
+	// 写入缓存：即使 force 重算过也更新（force 只表示「别信旧值」，不表示「新值别存」）
+	writeStatsCache(app, cacheKey, result, `${type}:${start}~${end}`);
+	return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +412,7 @@ export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 		const trimmed = name.trim();
 		if (!trimmed) return;
 		const target = readPlanTarget(obj);
-		const goals = readPlanGoals(obj);
+		const goals = readPlanGoals(obj, trimmed);
 		// v1.2: 有 goals 即数量型（targetCount = Σ goals.count）；无 goals 时按旧逻辑正则兜底
 		let type: PlanDef["type"] = "check";
 		let targetCount = 0;
@@ -392,7 +498,7 @@ function readPlanString(obj: Record<string, unknown> | undefined, keys: string[]
 }
 
 /** Parse the `goals` array under a plan (v1.2). Tolerant of string/number/object entries. */
-function readPlanGoals(obj?: Record<string, unknown>): PlanGoal[] {
+function readPlanGoals(obj?: Record<string, unknown>, planName = ""): PlanGoal[] {
 	if (!obj || !Array.isArray(obj.goals)) return [];
 	const out: PlanGoal[] = [];
 	for (const g of obj.goals) {
@@ -421,7 +527,35 @@ function readPlanGoals(obj?: Record<string, unknown>): PlanGoal[] {
 		const unit = readPlanString(rec, ["unit", "单位", "量词"]) || "个";
 		const start = readPlanString(rec, ["start", "开始", "起"]);
 		const end = readPlanString(rec, ["end", "结束", "止"]);
-		out.push({ name: name.trim(), count, unit, start: start || undefined, end: end || undefined });
+		const daily = rec.daily === true || rec.daily === "true";
+		// v7.21: dailyItem 对象——每日打卡项的自定义内容（名称/计划/窗口/复盘链接）。
+		// plan 缺省回落所属计划名；start/due 缺省回落目标窗口（使用端再回落当天）。
+		let dailyItem: GoalDailyItem | undefined;
+		const diRaw = rec.dailyItem;
+		if (diRaw && typeof diRaw === "object") {
+			const d = diRaw as Record<string, unknown>;
+			const dname = readPlanString(d, ["name", "名称"]);
+			if (dname) {
+				dailyItem = {
+					name: dname.trim(),
+					plan: readPlanString(d, ["plan", "计划"]) || planName,
+				};
+				const dstart = readPlanString(d, ["start", "开始"]);
+				const ddue = readPlanString(d, ["due", "end", "结束"]);
+				if (dstart) dailyItem.start = dstart;
+				if (ddue) dailyItem.due = ddue;
+				if (d.review === true) dailyItem.review = true;
+			}
+		}
+		out.push({
+			name: name.trim(),
+			count,
+			unit,
+			start: start || undefined,
+			end: end || undefined,
+			daily: daily || undefined,
+			dailyItem,
+		});
 	}
 	return out;
 }
@@ -457,9 +591,9 @@ export async function computeAnnualPlanProgress(
 	tasks: PoolTask[],
 	planRates: PlanRate[]
 ): Promise<PlanProgress[]> {
-	const root = rootPath.replace(/\/+$/, "");
+	const root = pfRoot(rootPath);
 	const year = today.slice(0, 4);
-	const f = app.vault.getAbstractFileByPath(`${root}/${year}/年度计划.md`);
+	const f = app.vault.getAbstractFileByPath(annualPlanPath(root, year));
 	if (!(f instanceof TFile)) return [];
 	const content = await app.vault.cachedRead(f);
 	const defs = parsePlansFromFrontmatter(content);
@@ -484,6 +618,7 @@ export async function computeAnnualPlanProgress(
 			label: def.label,
 			color: def.color,
 			tradingDay: def.tradingDay,
+			daily: def.daily,
 			goals: goalProgress,
 			tasks: planTasks,
 		};
@@ -498,9 +633,11 @@ export async function computeAnnualPlanProgress(
 				isNumeric: true,
 				targetCount: totalCount,
 				doneCount,
-				checkDone: 0,
-				checkTotal: 0,
-				checkPercent: 0,
+				// v7.4: 数字型计划同样带回打卡数据（每日日记勾选产生 planRates）——
+				// 计划卡顶条改用打卡进度后，硬编码 0 会把条清空。
+				checkDone: rate?.done ?? 0,
+				checkTotal: rate?.total ?? 0,
+				checkPercent: rate?.percent ?? 0,
 				percent,
 			};
 		}
@@ -553,11 +690,11 @@ function collectTempTaskFiles(
 	type: PeriodType
 ): TFile[] {
 	if (type === "week") {
-		const f = app.vault.getAbstractFileByPath(`${rootPath}/${yearDir}/周/${label}.md`);
+		const f = app.vault.getAbstractFileByPath(weekNotePath(rootPath, yearDir, label));
 		return f instanceof TFile ? [f] : [];
 	}
 	if (type === "month") {
-		const f = app.vault.getAbstractFileByPath(`${rootPath}/${yearDir}/月/${label}.md`);
+		const f = app.vault.getAbstractFileByPath(monthNotePath(rootPath, yearDir, label));
 		return f instanceof TFile ? [f] : [];
 	}
 	// Year: all week + month notes of the year.
@@ -566,6 +703,6 @@ function collectTempTaskFiles(
 		.filter(
 			(f) =>
 				f.name.endsWith(".md") &&
-				(f.path.startsWith(`${rootPath}/${yearDir}/周/`) || f.path.startsWith(`${rootPath}/${yearDir}/月/`))
+				(f.path.startsWith(`${weekDir(rootPath, yearDir)}/`) || f.path.startsWith(`${monthDir(rootPath, yearDir)}/`))
 		);
 }

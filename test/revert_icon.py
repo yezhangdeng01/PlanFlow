@@ -21,7 +21,7 @@ if os.path.exists("src/icon.ts"):
     print("icon.ts removed")
 
 # local data.json
-path = "E:/文档/workbuddy/Obsidian库/.obsidian/plugins/planflow/data.json"
+path = "E:/Docs/workbuddy/Obsidian库/.obsidian/plugins/planflow/data.json"
 with io.open(path, encoding="utf-8") as f:
     d = json.load(f)
 d["icon"] = "layout-dashboard"

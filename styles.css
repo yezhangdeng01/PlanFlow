@@ -6,7 +6,7 @@
 
 /* ========== 基础 ========== */
 .planboard-root {
-	padding: 16px 18px;
+	padding: 16px 20px;
 	overflow-y: auto;
 	height: 100%;
 	background: var(--background-primary);
@@ -24,8 +24,8 @@
 }
 
 .planboard-tab {
-	padding: 5px 16px;
-	font-size: 13px;
+	padding: 6px 16px;
+	font-size: var(--pf-text-sm);
 	font-weight: 500;
 	letter-spacing: 0.01em;
 	color: var(--text-muted);
@@ -55,17 +55,58 @@
 	gap: 18px; /* v1.4: 区块间距加大，用留白分组代替卡片堆砌 */
 }
 
-/* v1.7.4: 主题色定稿——深空蓝 #4a6fa5（专业效率工具主色，与 banner 淡蓝渐变同色系呼应；行动区珊瑚橙互补） */
+/* v3.9.10: 主题色统一为天蓝 #3572a8（hue≈208，与 banner 渐变 #abd0ee 同色相；
+   白字对比 5.09:1 达 WCAG AA，替代原深空蓝 #3d5a94（hue 220，偏靛偏深）） */
 :root {
 	--pb-accent: #8ab4d8;
 	--pb-accent-hover: #a3c7e6;
-	--pb-accent-dim: #4a6fa5;
+	--pb-accent-dim: #3572a8;
 }
 
 .planboard-root {
 	--pb-accent: #8ab4d8;
 	--pb-accent-hover: #a3c7e6;
-	--pb-accent-dim: #4a6fa5;
+	--pb-accent-dim: #3572a8;
+	/* 徽章语义色（金/银/铜，浅色底） */
+	--pf-badge-gold-grad: linear-gradient(135deg, #fde68a, #fcd34d 55%, #fbbf24);
+	--pf-badge-gold-fg: #78350f;
+	--pf-badge-silver-grad: linear-gradient(135deg, #e2e8f0, #f1f5f9 55%, #cbd5e1);
+	--pf-badge-silver-fg: #334155;
+	--pf-badge-bronze-grad: linear-gradient(135deg, #fed7aa, #fdba74 55%, #fb923c);
+	--pf-badge-bronze-fg: #7c2d12;
+	/* 危险/删除色（深色主题在下方覆盖提亮）*/
+	--pf-danger: #ef4444;
+	/* 奖励分档色（进度条填充，与徽章同语义家族；角度/档数不同故独立成组）*/
+	--pf-tier-gold: linear-gradient(90deg, #d97706, #fbbf24);
+	--pf-tier-silver: linear-gradient(90deg, #8e9aad, #c0ccda);
+	--pf-tier-bronze: linear-gradient(90deg, #b87333, #d19a66);
+
+	/* 字号 token（v6.6 重排）：7 档收敛为 6 个有效值。
+	   v6.1 把卡片标题提到 17 后，与正文 15 只差 2px，实测观感仍是"一样大"；
+	   故 v6.6 改为上限抬一档、下限整体压一档 —— 标题/正文拉开 4px，
+	   正文与表内字段各降 1px。副作用：xs 与 micro 合并到 11px。 */
+	--pf-text-xxl: 24px; /* 超大标题（banner 年度数字 28/26 降档后）*/
+	--pf-text-xl: 20px; /* 页面级大标题（banner/回顾标题）*/
+	--pf-text-lg: 18px; /* 卡片标题、关键数字（v6.6: 17→18，与正文拉开 4px）*/
+	--pf-text-md: 14px; /* 正文基准（v6.6: 15→14）*/
+	--pf-text-sm: 12px; /* 表内字段、meta（v6.6: 13→12）*/
+	--pf-text-xs: 11px; /* 标签、辅助（v6.6: 12→11）*/
+	--pf-text-micro: var(--pf-text-xs); /* 下限档（v6.6: 与 xs 合并，恒为 11px）*/
+
+	/* 间距刻度（v1.0.5）：4 的倍数 + 半档 6/12，替换此前 7px/3px 一类手调值。
+	   存量样式未批量替换（改动量大且与行为无关）；新规则一律用刻度。 */
+	--pf-space-1: 4px;
+	--pf-space-2: 6px;
+	--pf-space-3: 8px;
+	--pf-space-4: 12px;
+	--pf-space-5: 16px;
+	--pf-space-6: 20px;
+}
+
+/* 正文基准（v3.9.10）：未显式声明字号的元素统一继承 md 档，
+   不再散落继承 Obsidian 主题偶然值——换主题时插件内字号仍可预测。 */
+.planboard-root {
+	font-size: var(--pf-text-md);
 }
 
 /* v1.4 布局重排：执行优先——今日打卡/总结提到月/周任务之前（年度目标条保持最上） */
@@ -91,13 +132,13 @@
 }
 
 .planboard-home-date-main {
-	font-size: 15px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	color: var(--text-normal);
 }
 
 .planboard-home-date-sub {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
@@ -132,7 +173,7 @@
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 12px;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-	padding: 14px 16px;
+	padding: 16px;
 	transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
@@ -142,7 +183,7 @@
 }
 
 .planboard-card-title {
-	font-size: 15px;
+	font-size: var(--pf-text-lg);
 	font-weight: 600;
 	margin-bottom: 10px;
 	color: var(--text-normal);
@@ -162,7 +203,7 @@
 
 /* ========== 进度条（分档色） ========== */
 .planboard-progress-number {
-	font-size: 28px;
+	font-size: var(--pf-text-xxl);
 	font-weight: 700;
 	line-height: 1.15;
 	letter-spacing: -0.02em;
@@ -190,17 +231,18 @@
 	transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 奖励分档（奖励机制 v1.2）：≥60 铜 / ≥80 银 / 100 金 */
+/* 奖励分档（奖励机制 v1.2）：≥60 铜 / ≥80 银 / 100 金
+   v3.9.10: 分档色收敛为 --pf-tier-* token（与徽章 --pf-badge-* 同语义家族） */
 .planboard-progress-fill.is-bronze {
-	background: linear-gradient(90deg, #b87333, #d19a66);
+	background: var(--pf-tier-bronze);
 }
 
 .planboard-progress-fill.is-silver {
-	background: linear-gradient(90deg, #8e9aad, #c0ccda);
+	background: var(--pf-tier-silver);
 }
 
 .planboard-progress-fill.is-gold {
-	background: linear-gradient(90deg, #d97706, #fbbf24);
+	background: var(--pf-tier-gold);
 	box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
 	animation: planboard-gold-pulse 2.4s ease-in-out infinite;
 }
@@ -220,7 +262,7 @@
 }
 
 .planboard-progress-meta {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
@@ -234,7 +276,7 @@
 .planboard-check-item {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 8px;
 	padding: 8px 6px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
@@ -253,7 +295,7 @@
 	display: flex;
 	align-items: center;
 	flex: 1;
-	gap: 10px;
+	gap: 8px;
 	cursor: pointer;
 	min-width: 0;
 }
@@ -263,25 +305,25 @@
 	width: 16px;
 	height: 16px;
 	/* v1.7.4: 勾选框统一品牌色（原 var(--pb-accent) 在年度卡内被计划色覆盖——健康绿/复盘紫高饱和突兀） */
-	accent-color: #4a6fa5;
+	accent-color: var(--pb-accent-dim);
 	cursor: pointer;
 }
 
 /* 年度卡内同样统一（plan-card 的 --pb-accent 是计划色，固定品牌色覆盖） */
 .planboard-plan-card .planboard-checkbox {
-	accent-color: #4a6fa5;
+	accent-color: var(--pb-accent-dim);
 }
 
 /* v1.7.4: Obsidian 主题 appearance:none 用背景色画勾选框（accent-color 无效，实测主题紫 #aa95e0）——
    覆盖 checked 背景为品牌深空蓝（对勾符号保留主题的） */
 .planboard-checkbox.planboard-checkbox:checked {
-	background-color: #4a6fa5;
+	background-color: var(--pb-accent-dim);
 }
 
 .planboard-check-text {
 	flex: 1; /* v1.6: 撑满剩余空间——修复窄容器里被 tag/日期挤压成竖排 */
 	min-width: 0;
-	font-size: 13px;
+	font-size: var(--pf-text-md); /* v7.15：原 sm(12px) 是死值——3065 行全站覆盖为 md，这里对齐防误导 */
 	color: var(--text-normal);
 	word-break: break-word;
 }
@@ -293,7 +335,7 @@
 
 .planboard-plan-tag {
 	flex-shrink: 0;
-	font-size: 11px;
+	font-size: var(--pf-text-micro);
 	font-weight: 500;
 	padding: 2px 10px;
 	border-radius: 999px;
@@ -323,9 +365,9 @@
 
 /* ========== 按钮 ========== */
 .planboard-btn {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 500;
-	padding: 5px 14px;
+	padding: 6px 14px;
 	border-radius: 8px;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
@@ -367,7 +409,7 @@
 	border-radius: 6px;
 	background: transparent;
 	color: var(--text-muted);
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	cursor: pointer;
 	padding: 0;
 	line-height: 1;
@@ -380,8 +422,8 @@
 }
 
 .planboard-del-btn:hover {
-	color: #ef4444;
-	background: rgba(239, 68, 68, 0.12);
+	color: var(--pf-danger);
+	background: color-mix(in srgb, var(--pf-danger) 12%, transparent);
 }
 
 /* v1.7.4: 旧 margin-bottom:8px 已删——add-btn 现在用于卡头（header 内 flex row 垂直居中，
@@ -392,8 +434,8 @@
 	width: 100%;
 	min-height: 180px;
 	flex: 1;
-	padding: 10px 12px;
-	font-size: 14px;
+	padding: 12px;
+	font-size: var(--pf-text-md);
 	font-family: inherit;
 	line-height: 1.6;
 	color: var(--text-normal);
@@ -418,7 +460,7 @@
 }
 
 .planboard-review-btn {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 500;
 	width: 100%;
 }
@@ -426,21 +468,21 @@
 /* ========== 临时任务 ========== */
 .planboard-temp-due {
 	flex-shrink: 0;
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 }
 
 .planboard-temp-source {
 	flex-shrink: 0;
-	font-size: 11px;
-	padding: 1px 8px;
+	font-size: var(--pf-text-micro);
+	padding: 2px 8px;
 	border-radius: 999px;
 	color: var(--text-muted);
 	background: var(--background-modifier-border);
 }
 
 .planboard-empty {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-faint);
 	padding: 6px 2px;
 }
@@ -452,9 +494,9 @@
 }
 
 .planboard-missing-desc {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	color: var(--text-muted);
-	margin-bottom: 14px;
+	margin-bottom: 12px;
 }
 
 /* ========== 周期面板 ========== */
@@ -463,13 +505,13 @@
 }
 
 .planboard-period-title {
-	font-size: 16px;
+	font-size: var(--pf-text-xl);
 	font-weight: 600;
 	color: var(--text-normal);
 }
 
 .planboard-period-label {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 	margin-top: 2px;
 	margin-bottom: 10px;
@@ -478,7 +520,7 @@
 
 .planboard-empty-card {
 	color: var(--text-muted);
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 }
 
 .planboard-plan-head {
@@ -489,18 +531,18 @@
 }
 
 .planboard-plan-name {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 600;
 	color: var(--text-normal);
 }
 
 .planboard-plan-rate {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 }
 
 .planboard-plan-percent {
-	font-size: 20px;
+	font-size: var(--pf-text-xl);
 	font-weight: 700;
 	color: var(--text-normal);
 	margin-top: 6px;
@@ -508,7 +550,7 @@
 
 /* ========== 设置 ========== */
 .planboard-setting-hint {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 	margin: -6px 0 12px;
 }
@@ -526,13 +568,13 @@
 	padding: 8px 4px;
 }
 .planboard-welcome-title {
-	font-size: var(--font-ui-large);
+	font-size: var(--pf-text-xl);
 	font-weight: var(--font-semibold);
 	margin-bottom: 4px;
 }
 .planboard-welcome-sub {
 	color: var(--text-muted);
-	margin-bottom: 14px;
+	margin-bottom: 12px;
 }
 .planboard-welcome-step {
 	display: flex;
@@ -545,7 +587,7 @@
 	border-top: none;
 }
 .planboard-welcome-step-emoji {
-	font-size: 20px;
+	font-size: var(--pf-text-xl);
 	line-height: 1.3;
 	flex-shrink: 0;
 }
@@ -561,7 +603,7 @@
 	display: flex;
 	justify-content: flex-end;
 	gap: 8px;
-	margin-top: 14px;
+	margin-top: 16px;
 }
 
 /* 量化目标弹窗日期选择——整块可点（原生日历指示器覆盖全输入区，点击任意位置弹选择窗）+ 按钮外观 */
@@ -572,6 +614,7 @@
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
+	font-size: var(--pf-text-md);
 }
 .planboard-modal input[type="date"].planboard-date-btn:hover {
 	border-color: var(--interactive-accent);
@@ -625,14 +668,14 @@
 }
 
 .planboard-goal-strip-item .planboard-goal-name {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 600;
 	color: var(--text-normal);
 	white-space: nowrap;
 }
 
 .planboard-goal-strip-item .planboard-goal-number {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	font-variant-numeric: tabular-nums;
 	color: var(--text-normal);
@@ -651,7 +694,7 @@
 	min-width: 0;
 	align-self: center;
 	/* v1.7.4: 垂直居中——bar 高 8 vs 文字 17，margin 7px 后 bar 中心与文字中心像素级对齐 */
-	margin-top: 7px;
+	margin-top: 8px;
 }
 
 .planboard-goal-row {
@@ -675,18 +718,18 @@
 	align-items: baseline;
 	justify-content: space-between;
 	gap: 12px;
-	margin-bottom: 7px;
+	margin-bottom: 8px;
 }
 
 .planboard-goal-target {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 	text-align: right;
 	word-break: break-word;
 }
 
 .planboard-goal-meta {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 	margin-top: 6px;
 	display: flex;
@@ -695,13 +738,13 @@
 }
 
 .planboard-goal-number {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 600;
 	color: var(--text-normal);
 }
 
 .planboard-goal-pct {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 }
 
@@ -712,7 +755,7 @@
 
 .planboard-task-dates {
 	flex-shrink: 0;
-	font-size: 11px;
+	font-size: var(--pf-text-micro);
 	color: var(--text-faint);
 	white-space: nowrap;
 }
@@ -726,7 +769,7 @@
 }
 
 .planboard-plan-tasks-title {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	font-weight: 600;
 	color: var(--text-muted);
 	margin: 12px 0 2px;
@@ -757,7 +800,7 @@
 }
 
 .planboard-task-number {
-	font-size: 26px;
+	font-size: var(--pf-text-xxl);
 	font-weight: 700;
 	line-height: 1.1;
 	letter-spacing: -0.02em;
@@ -768,7 +811,7 @@
 /* v1.4: 任务数内联到标题行（省纵向空间）——数字缩小、徽章同行 */
 .planboard-task-number--inline,
 .planboard-progress-number--inline {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	margin-bottom: 0;
 	margin-left: 8px;
@@ -779,12 +822,12 @@
 
 /* 今日打卡 header 内的进度数字（与任务数同款） */
 .planboard-check-card .planboard-progress-number--inline {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 }
 
 /* v1.4: 月/周任务徽章与今日打卡对齐（大、粗） */
 .planboard-task-number--inline .planboard-badge {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	padding: 3px 12px;
 	border-radius: 999px;
@@ -825,7 +868,12 @@
 	height: 16px;
 	margin: 0;
 	cursor: ns-resize;
-	z-index: 2;
+	z-index: 5; /* v3.9.3: 提到热力图格子之上 */
+}
+
+/* v3.9.3: 热力图的把手叠在绿色格子上几乎不可见——加一层由透明到卡底的浅色衬底 */
+.planboard-heatmap-card .planboard-resize-handle {
+	background: linear-gradient(to top, var(--background-primary) 30%, transparent);
 }
 
 /* 分隔线 + ≡ 拖拽把手（grip 保留，下方贴卡片边缘无空白） */
@@ -915,51 +963,192 @@
 /* v1.7.4: 等高规范化——删除 align-items:start（v1.4 残留：当时拖高无联动，担心 grid 拉伸）。
    v1.7 起拖高双向联动，stretch 让并排卡永远等高（打卡/总结、月/周），内容变化不再破相等。 */
 
-/* 自动生成区（v1.4）：✅/⬜/💪 三组并列一行，轻量排版 */
-.planboard-summary-auto {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: 4px 14px;
-	padding: 2px 2px 8px;
-	margin-bottom: 6px;
-	border-bottom: 1px dashed var(--background-modifier-border);
-	font-size: 12.5px;
+/* =========================================================
+   v7.12（用户 143731 截图）：统计行撤掉 + 已完成并入标题行
+   =========================================================
+   原来卡片里有一块 `.planboard-summary-auto`（✅已完成 N/总 ⬜未完成 N/总 两行 +
+   一条虚线）。v7.11 时鼓励语先搬去了标题行，这一区只剩两条计数；
+   本轮用户要求「把未完成去掉，把已完成上移到标题行中间」
+   ⇒ 整块连同虚线一起删除（DOM 在 PlanBoardView.updateSummaryAuto，CSS 就是下面这段
+   改写成标题行的三格布局）。
+
+   标题行因此变成三格：标题左 · 已完成中 · 鼓励语右。
+
+   =========================================================
+   v7.13（用户 150250 截图）：三格不再强制正中 —— 改成「一行 + 距离动态」
+   =========================================================
+   用户看到 v7.12 的实机效果（截图上鼓励语掉到了第二行）后明确表态：
+   「放中间不一定要正中，这三个元素能动态调整距离在一行就好」。
+
+   根因很直接：`1fr auto 1fr` 要让中间那格**精确居中**，代价是左右两列必须**等宽**，
+   于是宽度按 `2×max(标题, 鼓励语) + 已完成` 收账 —— 实测要 458px；
+   而三种内容自身的宽度之和只有 111 + 82 + 188 = 381px。中间白白多花 77px。
+   用户 wide 档双列（卡片 ≈466px ⇒ header 内容盒 438px）就被这 77px 顶掉了：
+   438 ≥ 381 明明放得下，却因为 438 < 458 而把鼓励语挤到第二行。
+
+   ⇒ 改 `grid-template-columns: auto auto auto` + `justify-content: space-between`：
+     三格都按**内容宽**排列，余量**均分**到两个间隙 —— 距离随卡片宽自然伸缩，
+     放得下就永远一行。**代价**：已完成不再落在卡片正中，而是被两侧宽度差推着走
+     （标题 111 / 鼓励语 188 ⇒ 实测偏左约 38px）。用户已明确接受这个取舍。
+
+   **为什么仍用 grid 而不是换回 flex**：下面 @container 的窄档要让「已完成」回到正中
+   （鼓励语下移后第一行只剩「标题 + 已完成」），那需要 `minmax(0,1fr) auto minmax(0,1fr)`
+   这种列宽等式 —— 同一条规则里换个 `grid-template-columns` 值，比切换 `display` 干净。
+   另外 v7.12 记过的那两条 flex 死路依旧成立（供后人参考）：
+     · `margin: 0 auto` —— 落点是「两侧剩余空隙的中点」，不是容器中点；
+     · `position: absolute; left: 50%` —— 能正中但脱离文档流，窄档会和折行内容叠在一起。
+
+   ⚠️ **两档的列写法完全不同，别互相套用**（v7.13 真机各栽过一次）：
+     · 默认档（本规则）：`auto auto auto` —— 三格都按内容宽，靠 `space-between` 分余量。
+     · 窄档（@container）：`minmax(0,1fr) auto minmax(0,1fr)` —— 见那一段里的实测说明，
+       写 `1fr auto 1fr` 会因为「右列是空的」而让中格偏右 55.4px。 */
+/* ⚠️ 查询容器挂在**卡片**上，不是 header 自己 —— v7.13 在这栽了一整轮。
+   规则是「query container 必须是**该元素的祖先**，元素查不了自己」：
+   v7.12 把 container-type 放在 header 上时，下面的 @container 只能管到 header 的
+   **子孙**（鼓励语搬行生效了），管不到 header 自身的 `grid-template-columns` ——
+   那条声明**永远不生效**，而且**一点报错都没有**：查不到祖先容器时容器查询会退回
+   「小视口尺寸」，宽视口下 `max-width: 430px` 自然不成立，看起来就像「本来就不该生效」。
+   实证（`_preview/_g1.js`，视口 520）：只给 header 挂 container-type 时，header 的
+   `grid-template-columns` 恒为 auto 档解析值 `111.125px 81.875px 0px`；
+   把 container-type 挪到卡片上，同一刻立刻变成 `141.462px 81.875px 141.462px`（两侧等宽）。
+   ⇒ 容器 = `.planboard-summary-card`（**命名** `pf-summary`，免得以后有更近的祖先容器插进来）。
+     ⚠️ 阈值仍按 **header 内容盒宽**写，**不要**换算成卡片外框宽：容器查询量的是容器自己的
+     **内容盒**（不含 padding / border），实测卡片内容盒与 header 宽**逐档完全相等**
+     （969/968.8、829/828.8、389/388.8、309/308.8、249/248.8）。
+     v7.13 第一版按「卡片外框 = header + 33.4」把阈值改成 464/364，结果 pane 1100
+     （header 462）被误判进窄档、鼓励语又掉了下去 —— 多算的那 33.4px 是**幽灵宽度**。
+     用窗格宽度判断同样不行：wide 档双列时窗格 1100px 的卡片只有 495px，
+     比窄档单列（窗格 620px）的卡片 510px 还窄。
+   注：卡片原本就是 `position: relative`（`.planboard-card`），拖拽把手的 offsetParent
+     一直是卡片本身，所以这里引入的 `contain: layout` 不会挪动把手（实测四个把手位置一致）。 */
+.planboard-summary-card {
+	container: pf-summary / inline-size;
 }
 
-.planboard-summary-auto-line {
+.planboard-summary-card > .planboard-card-header {
+	display: grid;
+	/* 三格各按内容宽；余量由 space-between 均分进两个间隙 ⇒ 距离动态 */
+	grid-template-columns: auto auto auto;
+	justify-content: space-between;
+	/* 间隙下限：余量分完之后也不能小于这里，免得三样贴到一起 */
+	column-gap: 12px;
+}
+
+/* 已完成计数（标题行中格）。
+   v7.13 起默认档的列是 `auto`（按内容宽），`justify-self: center` 在「列宽=内容宽」时
+   没有可见效果 —— 它现在只对 ≤330px 那档（`grid-column: 1/-1` 独占整行）起作用。
+   字号/配色沿用 v1.4 统计行的原观感（标签绿粗、数字常规色），只是换了位置。 */
+.planboard-summary-done {
+	justify-self: center;
 	display: inline-flex;
 	align-items: baseline;
 	gap: 6px;
-	line-height: 1.5;
 	white-space: nowrap;
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
 }
 
-.planboard-summary-auto-label {
-	flex-shrink: 0;
-	font-size: 12.5px;
+.planboard-summary-done-label {
+	color: var(--pfs-ok); /* v7.15：主题绿 → 设计系统的完成绿，与勾选底色/甘特已完成同族 */
+	font-weight: 700;
 	letter-spacing: 0.01em;
 }
 
-.planboard-summary-auto-line.is-done .planboard-summary-auto-label {
-	color: var(--color-green);
-	font-weight: 700;
-}
-
-.planboard-summary-auto-line.is-pending .planboard-summary-auto-label {
-	color: var(--text-faint);
-	font-weight: 600;
-}
-
-.planboard-summary-auto-line.is-cheer .planboard-summary-auto-text {
-	color: var(--pb-accent-dim);
-	font-weight: 600;
-}
-
-.planboard-summary-auto-text {
+.planboard-summary-done-count {
 	color: var(--text-normal);
-	word-break: break-word;
+}
+
+/* （v7.12 一并删除）`.planboard-summary-auto-line` / `-label` / `-icon` / `-text`，
+   以及 v7.11 那两条「把 ✅ 放大到 1.35em + 基线补偿 -0.083em」的规则 ——
+   它们都是给「✅已完成 / ⬜未完成 并排」服务的，统计区一撤就没有宿主元素了。
+
+   留个记号：那套尺寸/基线补偿**不是随手调的**。同字号下两个 emoji 的**墨迹**差 35%
+   （canvas 实测 12px：✅ 11.88² vs ⬜ 16²），光放大 ✅ 又会因字形相对基线的高度不同而
+   「一样大却一高一低」，所以配了 -0.083em。
+   ⚠️ 若哪天真把「未完成」加回来，别只把 DOM 写回来 —— 这两条得一起恢复，
+   否则立刻退回「一绿一灰明显不齐」的老样子。判据看**墨迹包围盒**，不是 Range 盒宽
+   （盒子一样宽≠字形一样大，v7.11 第一版就在这栽过）。 */
+
+/* v7.11（用户 135859 截图「把已完成……加油的鼓励上移到今日总结标题行」）：
+   鼓励语挂进总结卡 header。v7.12 起 header 是 grid 三格，它占**右格**。
+   💪 用 ::before 画，正文里就不必再存一个 emoji span。
+
+   ⚠️ 这里**不能用 nowrap + 省略号**：窄窗格（<420px，即 is-tiny）下
+   一行放不下，真机 400px 实测鼓励语被截成
+   「已完成 50%，势头不…」——把「继续冲」吞掉，恰好是这句话最要紧的部分。
+   改成允许折行（默认 white-space: normal），放不下就自己折成两行、右对齐。
+   `min-width: 0` 是让它在 grid 里**真的能被压窄**：grid item 的 min-width 默认 auto，
+   中文虽然能任意折行，但那个 auto 会让它顶住列宽不肯让位。
+   `justify-self: end` —— 只占内容宽、贴右缘，不撑满整格（撑满时折行的右对齐看着一样，
+   但 hover/选中要量盒子时会差一整个列宽，脚本容易误判）。 */
+.planboard-summary-cheer {
+	justify-self: end;
+	min-width: 0;
+	font-size: var(--pf-text-xs);
+	font-weight: 600;
+	color: var(--pb-accent-dim);
+	text-align: right;
+}
+
+/* 标题（左格）：任何情况下都不折行。
+   v7.11 真机 400px 实测过标题被压成「📝 今日总」+「结」两行，比截断还难看 ——
+   所以给 nowrap 兜底：无论后面怎么降级，标题都得是一整行。
+   `justify-self: start` 让它只占内容宽（不 stretch），量盒子时拿到的是文字宽。
+   ⚠️ **千万别加 `min-width: 0`**：grid 列的 `1fr` 下限取自 item 的 min-content，
+     而 `min-width: 0` 会把那个下限清零 —— nowrap 的兜底就跟着失效了（v7.12 第一版栽过）。 */
+.planboard-summary-card > .planboard-card-header > .planboard-card-title {
+	justify-self: start;
+	white-space: nowrap;
+}
+
+/* --- 卡片不够宽时的逐级降级 -----------------------------------------------
+   **v7.13 重算阈值**（容器量的是卡片内容盒 = header 内容盒，两者逐档相等，见上面的说明）。
+   默认档不再要求居中，一行放得下的最小宽度因此等于三样内容之和加两个间隙下限：
+     标题(111) + 已完成(82) + 鼓励语(最长一档 205，如「已完成 80%，快完成啦，再坚持一下！」)
+       + 2×12 = 422  →  留余量取 **430**
+   （v7.12 那个 470 是按「左右等宽列」收的账：2×188 + 82 = 458，v7.13 已不再成立。）
+   事实核查（v7.13 真机）：header 内容盒 462（wide 档双列、卡片 495.2、窗格 1100）→ 一行放得下 ✅
+     —— v7.12 正是在这一档把鼓励语挤到了第二行（当时按 470 判，462 < 470）。
+   ⇒ 430 以下：**换回等宽三列**，鼓励语让出第一行、自己占第二行右对齐。
+     第一行只剩「标题 + 已完成」，左右两列收成等宽 ⇒ 已完成回到卡片正中
+     （写法必须是 `minmax(0, 1fr) auto minmax(0, 1fr)`，下面那段有实测解释）。
+   ⇒ 330 以下：第一行的左列已经挤到 111 以下，中列会被顶偏几像素 ——
+     这时让已完成也下来，独占第二行**整行居中**（这才是真居中），鼓励语退到第三行。 */
+@container pf-summary (max-width: 430px) {
+	.planboard-summary-card > .planboard-card-header {
+		/* ⚠️ 这里**必须**是 `minmax(0, 1fr)`，不能写 v7.12 那句 `1fr auto 1fr`。
+		   原因：鼓励语下移后右列是**空的**，而 `1fr` 的 auto 下限取自「该列内容」——
+		   左列被标题 content 宽顶住（111.125）、右列是 0，两个 fr 的**底数就不相等**，
+		   于是中格虽然居中于「两侧剩余空隙」，却整体偏右 **55.4px**（v7.13 真机实测，
+		   960/840/520 三档全是这个数）。`minmax(0, 1fr)` 把两列底数都归零 ⇒ 各得
+		   一半余量 ⇒ 中格精确落在 header 中点（实测偏 0.0px）。
+		   代价：左列可以被压到 111.125 以下、标题溢出列宽 —— 但溢出只发生在本档
+		   「左列 < 111.125 ⇒ header < 328px」时，而 328 < 330 正好由下面那档接管
+		   （那时标题独占第一行，右边两列是空的，溢出去也没有东西可压）。 */
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	}
+
+	.planboard-summary-card > .planboard-card-header > .planboard-summary-cheer {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		justify-self: end;
+	}
+}
+
+@container pf-summary (max-width: 330px) {
+	.planboard-summary-card > .planboard-card-header > .planboard-summary-done {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		justify-self: center;
+	}
+
+	.planboard-summary-card > .planboard-card-header > .planboard-summary-cheer {
+		grid-row: 3;
+	}
+}
+
+.planboard-summary-cheer::before {
+	content: "💪 ";
 }
 
 .planboard-summary-card .planboard-summary-input {
@@ -1009,11 +1198,11 @@
 	margin-left: 0;
 }
 
-/* 标题更醒目：加大加粗 */
+/* 标题更醒目：统一到 lg 档（原 17 vs 19 冲突，取 lg 16px + 700 居中取整） */
 .planboard-goal-card .planboard-card-title {
-	font-size: 17px;
-	font-weight: 800;
-	letter-spacing: 0.03em;
+	font-size: var(--pf-text-lg);
+	font-weight: 700;
+	letter-spacing: 0.02em;
 	color: var(--text-normal);
 }
 
@@ -1038,7 +1227,7 @@
 }
 
 .planboard-period-wall .planboard-badge-wall-empty {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-faint);
 }
 
@@ -1064,7 +1253,11 @@
 	transition: box-shadow 0.15s ease;
 }
 
-.planboard-board-col.is-col-dragging {
+/* v7.11：加 `.planboard-root` 前缀提特异度到 (0,3,0)。
+   原因：上面那条 `.planboard-root .planboard-board-col` 把 `box-shadow` 压成 none，
+   与本条同为 (0,2,0) 但位置更靠后 —— 不加前缀的话拖拽中的列会**丢掉抬升投影**，
+   拖起来看着像没被拿起来（本轮差点踩）。 */
+.planboard-root .planboard-board-col.is-col-dragging {
 	z-index: 45;
 	box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
 	opacity: 0.96;
@@ -1095,17 +1288,17 @@
 }
 
 .planboard-board-col-title {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 700;
 }
 
 .planboard-board-col-count {
-	font-size: 11px;
+	font-size: var(--pf-text-micro);
 	font-weight: 600;
 	color: var(--text-muted);
 	background: var(--background-modifier-hover);
 	border-radius: 999px;
-	padding: 1px 8px;
+	padding: 2px 8px;
 }
 
 .planboard-board-col .planboard-check-item {
@@ -1141,7 +1334,7 @@
 
 .planboard-gantt-axis-cell {
 	flex: none;
-	font-size: 10px;
+	font-size: var(--pf-text-micro);
 	color: var(--text-faint);
 	text-align: center;
 	overflow: visible;
@@ -1162,7 +1355,7 @@
 
 .planboard-gantt-label {
 	flex: 0 0 150px;
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1187,12 +1380,9 @@
 	position: absolute;
 	top: 0;
 	bottom: 0;
-	width: 1.5px;
-	background: var(--pb-accent-dim);
-	opacity: 0.6;
 	z-index: 1;
 	pointer-events: none;
-}
+} /* width/background/opacity 由 .planboard-root 档与 v7.1 节接管 */
 
 .planboard-gantt-bar {
 	position: absolute;
@@ -1203,29 +1393,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 10px;
+	font-size: var(--pf-text-micro);
 	color: #fff;
 	overflow: hidden;
 	z-index: 2;
 	transition: opacity 0.2s;
-	/* applyPlanColor 注入的计划色（变量缺失时回退中性蓝） */
-	background: var(--plan-gantt-bg, rgba(138, 180, 216, 0.55));
-	border-color: var(--plan-gantt-border, #8ab4d8);
-}
-
-.planboard-gantt-bar.is-done {
-	opacity: 0.5;
-}
-
-.planboard-gantt-bar.is-done::after {
-	content: "";
-	position: absolute;
-	left: 10%;
-	right: 10%;
-	top: 50%;
-	height: 1.5px;
-	background: #fff;
-	border-radius: 1px;
 }
 
 /* 年度视图：新建任务按钮 */
@@ -1240,7 +1412,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	font-weight: 600;
 	color: #f59e0b;
 	background: rgba(245, 158, 11, 0.12);
@@ -1275,7 +1447,7 @@
 
 /* 打卡项卡片式：整块圆角、hover 高亮、勾选态明显 */
 .planboard-check-card .planboard-check-item {
-	border-radius: 10px;
+	border-radius: 8px;
 	padding: 8px 10px;
 	margin-bottom: 4px;
 	background: var(--background-primary);
@@ -1295,12 +1467,21 @@
 }
 
 .planboard-check-card .planboard-check-item.is-checked .planboard-check-text {
-	color: var(--text-faint);
-	text-decoration: line-through;
+	/* v7.8（用户 115512 截图 #4）：删除线下线，文字回到正常色。
+	     绿底 + 灰字 + 删除线 = 三重「这行废了」的暗示，太丧；
+	     已打卡该是**正向反馈**，只留底色承担状态，文字照旧可读。
+	     （底色本身由文件末尾的 v7.8 节统一给，这里只管文字。）
+
+	     ⚠️ 必须**显式写 `none`**，不能只把原来那行 `text-decoration: line-through` 删掉：
+	     本文件 324 行还有一条 `.planboard-check-item.is-checked .planboard-check-text`
+	     也声明了 line-through，删掉声明只是「本规则不再设置」，324 那条照样生效
+	     （本轮实测就踩了：色改了、线还在）。 */
+	color: var(--text-normal);
+	text-decoration: none;
 }
 
 .planboard-check-card .planboard-progress-number {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 }
 
 .theme-dark .planboard-streak {
@@ -1312,7 +1493,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 11px;
+	font-size: var(--pf-text-micro);
 	font-weight: 600;
 	border-radius: 999px;
 	padding: 2px 10px;
@@ -1320,31 +1501,7 @@
 	white-space: nowrap;
 }
 
-.planboard-badge.is-bronze {
-	color: #b87333;
-	background: rgba(184, 115, 51, 0.15);
-	border: 1px solid rgba(184, 115, 51, 0.35);
-}
 
-.planboard-badge.is-silver {
-	color: #64748b;
-	background: rgba(148, 163, 184, 0.15);
-	border: 1px solid rgba(148, 163, 184, 0.4);
-}
-
-.theme-dark .planboard-badge.is-silver {
-	color: #c0ccda;
-}
-
-.planboard-badge.is-gold {
-	color: #d97706;
-	background: rgba(251, 191, 36, 0.15);
-	border: 1px solid rgba(251, 191, 36, 0.45);
-}
-
-.theme-dark .planboard-badge.is-gold {
-	color: #fbbf24;
-}
 
 /* 徽章墙（年度视图顶部） */
 .planboard-badge-wall {
@@ -1356,7 +1513,7 @@
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 12px;
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
@@ -1366,12 +1523,12 @@
 }
 
 .planboard-badge-wall-empty {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-faint);
 }
 
 .planboard-badge-wall .planboard-badge {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	padding: 3px 12px;
 }
 
@@ -1434,13 +1591,7 @@
 	flex-shrink: 0;
 }
 
-/* v1.7.4: 卡头"＋ 新增量化目标"按钮——与年度 header 的"＋ 新增计划"同风格（outline，紧凑变体） */
-.planboard-goal-add-btn {
-	padding: 2px 10px;
-	font-size: 12px;
-	border-radius: 8px; /* v1.7.4: 收敛——圆角与 planboard-btn 体系统一（原 999px pill 孤立） */
-	flex-shrink: 0;
-}
+/* （v7.16: 卡头「＋ 新增量化目标」按钮已撤——并入新增计划表单，样式一并删除） */
 
 /* 计划卡头（含编辑/删除按钮）垂直居中 */
 .planboard-plan-card > .planboard-plan-head {
@@ -1455,12 +1606,12 @@
 
 /* v1.4 标题层级统一（与今日页卡标题同级） */
 .planboard-plan-name {
-	font-size: 15px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 }
 
 .planboard-plan-target-line {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 	margin: -4px 0 8px;
 	word-break: break-word;
@@ -1474,15 +1625,15 @@
 
 /* 量化目标区（年度视图计划卡内） */
 .planboard-goals-box {
-	margin: 10px 0 4px;
-	padding: 8px 12px 10px;
+	margin: 12px 0 4px;
+	padding: 8px 12px;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 10px;
+	border-radius: 8px;
 }
 
 .planboard-goals-title {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	font-weight: 600;
 	color: var(--text-muted);
 	margin-bottom: 4px;
@@ -1493,8 +1644,8 @@
 .planboard-goal-row--mini {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 5px 2px;
+	gap: 8px;
+	padding: 4px 2px;
 	border-bottom: none;
 	border-radius: 0;
 }
@@ -1504,7 +1655,7 @@
 }
 
 .planboard-goal-name {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 600;
 	color: var(--text-normal);
 	min-width: 0;
@@ -1514,7 +1665,7 @@
 }
 
 .planboard-goal-count {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 	white-space: nowrap;
 	flex-shrink: 0;
@@ -1552,7 +1703,7 @@
 }
 
 .planboard-goal-subrow {
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	color: var(--text-muted);
 	padding-left: 2px;
 }
@@ -1561,12 +1712,12 @@
 .planboard-subtabs {
 	display: flex;
 	gap: 6px;
-	margin: 4px 0 10px;
+	margin: 4px 0 12px;
 }
 
 .planboard-subtab {
-	padding: 4px 14px;
-	font-size: 12px;
+	padding: 4px 12px;
+	font-size: var(--pf-text-xs);
 	font-weight: 500;
 	letter-spacing: 0.01em;
 	color: var(--text-muted);
@@ -1588,66 +1739,13 @@
 	border-color: var(--pb-accent-dim);
 }
 
-/* ========== v1.3 甘特拖拽手柄 ========== */
-.planboard-gantt-handle {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	width: 8px;
-	cursor: ew-resize;
-	z-index: 3;
-	transition: background 0.15s;
-}
-
-.planboard-gantt-handle::before {
-	content: "";
-	position: absolute;
-	top: 3px;
-	bottom: 3px;
-	width: 2px;
-	border-radius: 1px;
-	background: rgba(255, 255, 255, 0.85);
-	opacity: 0.7;
-	transition: opacity 0.15s;
-}
-
-.planboard-gantt-handle:hover::before {
-	opacity: 1;
-}
-
-.planboard-gantt-handle:hover {
-	background: rgba(255, 255, 255, 0.15);
-}
-
-.planboard-gantt-handle.is-left {
-	left: 0;
-}
-
-.planboard-gantt-handle.is-left::before {
-	left: 3px;
-}
-
-.planboard-gantt-handle.is-right {
-	right: 0;
-}
-
-.planboard-gantt-handle.is-right::before {
-	right: 3px;
-}
-
-/* 拖拽中状态（Hermes 的 drag.ts 会加 class） */
-.planboard-gantt-bar.is-dragging {
-	opacity: 0.75;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
 /* ========== v1.3 看板状态视图列头配色 ========== */
 .planboard-board-col-status-doing .planboard-board-col-title {
 	color: var(--pb-accent-dim);
 }
 
 .planboard-board-col-status-done .planboard-board-col-title {
-	color: var(--color-green);
+	color: var(--pfs-ok); /* v7.15：同上，完成语义收进同一支绿 */
 }
 
 /* ========== v1.4 徽章强化（文件末尾，确保覆盖 .planboard-badge 基类）：全站渐变 + 弹出动画 ========== */
@@ -1659,7 +1757,11 @@
 	background: transparent;
 	border: none;
 	box-shadow: none;
-	padding: 2px 4px;
+	/* v7.15：水平内边距 4 → 16px。去框化时收成 4px，但相邻的今日打卡/总结卡
+	   都是 16px——同一行里左列卡文字比右列卡左移 12px，行与列对不上（真机实测
+	   week/month 内容左缘 4.8 vs check-card 16.8）。透明卡没有边框可对，
+	   对的就是**文字**，所以内边距必须一致。 */
+	padding: 2px 16px;
 }
 
 .planboard-goal-card .planboard-card-header,
@@ -1667,29 +1769,13 @@
 .planboard-week-task-card .planboard-card-header {
 	padding: 0 0 6px;
 }
-.planboard-badge.is-gold {
-	background: linear-gradient(135deg, #b45309, #f59e0b 55%, #fbbf24);
-	color: #fff;
-	border-color: transparent;
-}
 
-.planboard-badge.is-silver {
-	background: linear-gradient(135deg, #64748b, #94a3b8 55%, #cbd5e1);
-	color: #fff;
-	border-color: transparent;
-}
-
-.planboard-badge.is-bronze {
-	background: linear-gradient(135deg, #92400e, #b87333 55%, #d19a66);
-	color: #fff;
-	border-color: transparent;
-}
 
 /* 今日打卡徽章稍大（上下文覆盖） */
 .planboard-today-badge {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
-	padding: 3px 12px;
+	padding: 2px 12px;
 	border-radius: 999px;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
@@ -1721,26 +1807,26 @@
 	background: linear-gradient(135deg, rgba(138, 180, 216, 0.16), rgba(138, 180, 216, 0.04) 55%, rgba(138, 180, 216, 0.08));
 	/* v1.7.4: 1px 细边框 → 4px 彩色边框（与周月视图卡片统一） */
 	border: 4px solid rgba(138, 180, 216, 0.28);
-	border-radius: 14px;
-	padding: 14px 18px 12px;
+	border-radius: 12px;
+	padding: 16px 16px 12px;
 	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 
 .planboard-goal-card .planboard-card-title {
-	font-size: 19px;
-	font-weight: 800;
+	font-size: var(--pf-text-xl);
+	font-weight: 700;
 	letter-spacing: -0.01em;
 }
 
 /* 四个计划项更醒目：名称/数字加大、进度条加高 */
 .planboard-goal-strip-item .planboard-goal-name {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 700;
 }
 
 .planboard-goal-strip-item .planboard-goal-number {
-	font-size: 16px;
-	font-weight: 800;
+	font-size: var(--pf-text-lg);
+	font-weight: 700;
 }
 
 .planboard-goal-strip-item .planboard-progress-bar--mini {
@@ -1780,29 +1866,16 @@
 	border: 1px solid var(--background-modifier-border);
 }
 
-.theme-light .planboard-goal-card {
-	/* v1.7.4 八改：更淡的天空蓝（用户要求再淡） */
-	background: linear-gradient(180deg, #bcddf5 0%, #e2f1fc 55%, #fcfdff 100%);
-}
+/* v3.9.10: 删除旧 banner 渐变块（.theme-light/.theme-dark .planboard-goal-card 的
+   v1.7.4 #bcddf5 版）——该文件末尾 v2.4 区有同选择器完整定义（含 border + box-shadow），
+   此处旧定义已被完全覆盖，属死代码。 */
 
-.theme-dark .planboard-goal-card {
-	background: linear-gradient(180deg, rgba(70, 130, 190, 0.4) 0%, rgba(70, 130, 190, 0.15) 65%, rgba(70, 130, 190, 0.05) 100%);
-}
-
-/* 行动区点缀：总结标题前珊瑚橙色条（v1.7.4 标题已包进 header，选择器改后代） */
-.planboard-summary-card .planboard-card-title::before {
-	content: "";
-	width: 4px;
-	height: 16px;
-	border-radius: 2px;
-	background: #ef8354;
-	margin-right: 8px;
-	align-self: center;
-	flex-shrink: 0;
-}
+/* v7.17：总结标题前的珊瑚橙色条已删（用户：今日打卡前面的彩色竖线也不要了——
+   打卡/总结两卡同款装饰，成对一起撤，标题文字回到卡片 16px 内容缘）。
+   原 v1.7.4 规则 `.planboard-summary-card .planboard-card-title::before`（4px 色条）整条删除。 */
 
 /* v1.7.4 修复：打卡卡 header 是 flex space-between——色条原为 header::before flex item 会把标题挤右移 135px。
-   色条已移入标题内（下方规则）。四修：两卡 header 等高 min-height:38px + align-items:center——
+   四修：两卡 header 等高 min-height:38px + align-items:center——
    打卡 header 被 30px 按钮撑高、总结 header 只有 20px 标题，高度不同导致标题/按钮中心错位；
    等高后标题、按钮、总结卡标题全部同一中心线 */
 .planboard-check-card > .planboard-card-header,
@@ -1811,21 +1884,9 @@
 	align-items: center;
 }
 
-.planboard-check-card .planboard-check-title::before {
-	content: "";
-	width: 4px;
-	height: 16px;
-	border-radius: 2px;
-	background: #ef8354;
-	margin-right: 8px;
-	flex-shrink: 0;
-}
-
-/* summary 的标题是 block div——::before 需 inline-block 才有宽高（否则色条不显示） */
-.planboard-summary-card > .planboard-card-title::before {
-	display: inline-block;
-	vertical-align: -2px;
-}
+/* v7.17：打卡标题前的珊瑚橙色条已删（`.planboard-check-card .planboard-check-title::before`
+   4px 色条整条删除，总结卡同款一起撤）。标题文字从 16+4+8=28px 回到 16px 卡片内容缘，
+   与月/周卡标题、清单行同缘；配套的 summary 标题 inline-block 修补（只为撑色条）一并删除。 */
 
 /* v1.7.4：打卡/总结卡底色统一为透明（与月/周/年度卡一致——"浅灰边框骨架"体系；
    旧 background-secondary 灰底是 v1.4 残留，与全插件透明卡不统一） */
@@ -1845,6 +1906,12 @@
 }
 
 .planboard-check-card .planboard-checklist > * {
+	/* v7.5 真机补漏：这里是 flex column，li 默认 flex-shrink:1 ——
+	   行内内容一变高（窄档下标题折行 + 控件组换行），li 就被**压扁**而不是撑开，
+	   实测 239px 右栏里 li 只有 43px 高却装着 120px 内容，控件直接压到下一行上。
+	   flex-shrink:0 让 li 保持内容高度，超出部分交给上面那条 overflow-y:auto 滚动，
+	   正是 v1.7.4 注释里「空间不足 → 顶部堆叠 + 滚动」的原意（此前滚动其实没生效）。 */
+	flex-shrink: 0;
 	margin-top: auto;
 	margin-bottom: auto;
 }
@@ -1868,20 +1935,20 @@
 }
 
 .planboard-home-date-main {
-	font-size: 16px;
-	font-weight: 800;
+	font-size: var(--pf-text-lg);
+	font-weight: 700;
 	letter-spacing: 0.01em;
 }
 
 .planboard-home-date-sub {
-	font-size: 12.5px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
-/* 进度数字再加大 + 计划项 hover 浅蓝高亮 */
+/* 计划项数字：统一字重到 700（原 900 过重且与全局 600/700 冲突） */
 .planboard-goal-strip-item .planboard-goal-number {
-	font-size: 17px;
-	font-weight: 900;
+	font-size: var(--pf-text-lg);
+	font-weight: 700;
 }
 
 .planboard-goal-strip-item {
@@ -1900,17 +1967,17 @@
 .planboard-home-date {
 	flex-direction: row;
 	align-items: baseline;
-	gap: 18px;
+	gap: 16px;
 }
 
 .planboard-home-date-main {
-	font-size: 16px;
-	font-weight: 800;
+	font-size: var(--pf-text-lg);
+	font-weight: 700;
 	letter-spacing: 0.01em;
 }
 
 .planboard-home-date-sub {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
@@ -1922,9 +1989,9 @@
 	opacity: 0.8;
 }
 
-/* ========== v1.6 问候语再加大 ========== */
+/* 问候语字号与主日期同档（原 14px 单独档，归入 sm） */
 .planboard-home-date-sub {
-	font-size: 14px;
+	font-size: var(--pf-text-sm);
 	color: var(--text-muted);
 }
 
@@ -1944,7 +2011,7 @@
 
 /* 分栏后小卡内部紧凑：数字与徽章同行 */
 .planboard-plan-grid .planboard-plan-percent {
-	font-size: 16px;
+	font-size: var(--pf-text-lg);
 	margin-top: 2px;
 	display: flex;
 	align-items: center;
@@ -1960,7 +2027,7 @@
 .planboard-plan-grid .planboard-plan-tasks {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 2px 18px;
+	gap: 2px 16px;
 	align-items: start;
 }
 
@@ -2041,7 +2108,7 @@
 	flex-wrap: wrap;
 	gap: 4px 8px;
 	margin-left: 26px; /* 与 checkbox 对齐：16px + gap 10px */
-	font-size: 10.5px;
+	font-size: var(--pf-text-micro);
 	opacity: 0.9;
 	min-width: 0;
 }
@@ -2052,7 +2119,7 @@
 }
 
 .planboard-task-meta .planboard-task-dates {
-	font-size: 10.5px;
+	font-size: var(--pf-text-micro);
 }
 
 /* 文本：统一撑满/可压缩（标题独占第一行） */
@@ -2072,7 +2139,7 @@
 .planboard-drag-grip {
 	cursor: grab;
 	color: var(--text-faint);
-	font-size: 12px;
+	font-size: var(--pf-text-xs);
 	padding: 2px 6px 2px 0;
 	user-select: none;
 	flex-shrink: 0;
@@ -2121,13 +2188,13 @@
 .planboard-check-stats-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-	gap: 6px 20px;
+	gap: 6px 16px;
 }
 
 /* ========== v1.6 徽章墙徽章与今日打卡同规格 ========== */
 .planboard-period-wall .planboard-badge,
 .planboard-badge-wall .planboard-badge {
-	font-size: 14px;
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	padding: 3px 12px;
 	border-radius: 999px;
@@ -2136,7 +2203,7 @@
 
 /* ========== v1.6 徽章 emoji 放大（奖牌数字清晰） ========== */
 .planboard-badge-emoji {
-	font-size: 20px;
+	font-size: var(--pf-text-xl);
 	line-height: 1;
 	vertical-align: -3px;
 	margin-right: 4px;
@@ -2144,7 +2211,7 @@
 }
 
 .planboard-badge-text {
-	font-size: 13px;
+	font-size: var(--pf-text-sm);
 	font-weight: 700;
 	vertical-align: middle;
 }
@@ -2188,16 +2255,12 @@
 	border-radius: 6px;
 }
 
-.planboard-plan-card .planboard-plan-name::before {
-	content: "";
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	margin-right: 6px;
-	vertical-align: 1px;
-	background: var(--pb-accent, var(--text-muted));
-}
+/* v7.13（用户 150250 截图）：**计划名前的彩色圆点取消**。
+   「所有页面遗留的彩色圆点都取消了吧，没什么用了」—— 卡头已经有计划自己的 emoji 图标
+   （✍️/🔵/🌿…）+ 计划名，再挂一颗同色圆点纯属重复。
+   ⚠️ 这条 `::before` 不只是「不显示」——它是 `display:inline-block` 的**真占位**元素
+   （8px 宽 + `margin-right: 6px`），删掉后计划名会**左移 14px** 贴到卡头内边距上，
+   与其它卡片的标题左缘一致。这是预期效果，不是错位。 */
 
 /* ========== v1.7.2 看板任务卡拖拽 ========== */
 /* v1.7.3: 任务卡拖拽已取消（碰撞判定体验差），仅保留列头拖拽排序 */
@@ -2295,7 +2358,7 @@
 	border-radius: 8px;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
-	font-size: 16px;
+	font-size: var(--pf-text-lg);
 	line-height: 1;
 	cursor: pointer;
 	display: flex;
@@ -2314,3 +2377,2696 @@
 .planflow-flip-fast { transition: transform 0.15s ease; }
 .planflow-flip-med { transition: transform 0.18s ease; }
 .planflow-flip-slow { transition: transform 0.2s ease; }
+
+/* =========================================================
+   v2.0-a11y 无障碍与对比度修复区（2026-09-09 UI 审计）
+   原则：纯追加覆盖，不动旧规则，可整块回滚。
+   覆盖项：C1 对比度 / C2 键盘焦点 / C3 触屏 hover-only /
+           M1 字号下限 / M2 触控热区 / m1 emoji 渲染
+   ========================================================= */
+
+/* ---- 1) token：文字/焦点用强色，装饰色保持不变 ---- */
+.planboard-root {
+	--pb-focus: #3572a8; /* 焦点环与强文字（浅色 AA 5.02）*/
+}
+.theme-dark .planboard-root {
+	--pb-focus: #8ab4d8; /* 深色主题下提亮（AAA 7.54）*/
+}
+
+/* ---- 2) 键盘焦点环（C2）---- */
+/* 修复原 :focus { outline:none } —— 键盘触发时补回可见焦点环 */
+.planboard-summary-input:focus-visible {
+	outline: 2px solid var(--pb-focus);
+	outline-offset: 1px;
+}
+.planboard-tab:focus-visible,
+.planboard-subtab:focus-visible,
+.planboard-btn:focus-visible,
+.planboard-icon-btn:focus-visible,
+.planboard-checkbox:focus-visible,
+.planboard-check-label:focus-visible,
+.planboard-drag-head:focus-visible,
+.planboard-resize-handle:focus-visible,
+.planboard-gantt-bar:focus-visible,
+.planboard-board-col-header:focus-visible {
+	outline: 2px solid var(--pb-focus);
+	outline-offset: 2px;
+}
+
+/* ---- 3) 触屏：hover-only 操作改为常显（C3）---- */
+@media (hover: none), (pointer: coarse) {
+	.planboard-item-actions,
+	.planboard-goal-actions {
+		opacity: 1;
+	}
+	/* v7.4c: hover 浮现的按钮在触屏上没有 hover，恢复常显（须压过新规则的高特异度） */
+	.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn,
+	.planboard-root .planboard-goals-head .planboard-goal-actions {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	/* 触屏热区扩大（桌面保持 24px 紧凑） */
+	.planboard-icon-btn {
+		width: 32px;
+		height: 32px;
+	}
+}
+
+/* ---- 4) 高对比文字色（C1）---- */
+/* 写复盘按钮：浅色加深 / 深色提亮 */
+.theme-light .planboard-btn.planboard-review-btn {
+	color: #c2410c;
+	border-color: rgba(194, 65, 12, 0.5);
+}
+.theme-dark .planboard-btn.planboard-review-btn {
+	color: #fb923c;
+	border-color: rgba(251, 146, 60, 0.5);
+}
+
+/* 连击 streak：浅色下加深（原 #f59e0b on 浅底 FAIL 2.1） */
+.theme-light .planboard-streak {
+	color: #92400e;
+}
+
+/* 甘特「今天」标识：深色主题下提亮（原 dim 蓝 3.22 仅 AA-large） */
+.theme-dark .planboard-gantt-axis-cell.is-today {
+	color: var(--pb-accent);
+}
+/* 次级小字 faint→muted：浅色下 2.80 → 5.64（text-faint 是主题变量不可全局改） */
+.planboard-gantt-axis-cell,
+.planboard-task-dates,
+.planboard-temp-due {
+	color: var(--text-muted);
+}
+.planboard-task-meta {
+	color: var(--text-muted);
+}
+
+/* 完成态任务文字：faint→muted（删除线仍在，语义不变但可读） */
+.planboard-check-item.is-checked .planboard-check-text {
+	color: var(--text-muted);
+}
+
+/* 铜银金徽章：浅底深字（原渐变白字 金 1.67 / 银 2.56 FAIL） */
+.planboard-badge.is-gold {
+	background: var(--pf-badge-gold-grad);
+	color: var(--pf-badge-gold-fg);
+	border-color: transparent;
+}
+.planboard-badge.is-silver {
+	background: var(--pf-badge-silver-grad);
+	color: var(--pf-badge-silver-fg);
+	border-color: transparent;
+}
+.planboard-badge.is-bronze {
+	background: var(--pf-badge-bronze-grad);
+	color: var(--pf-badge-bronze-fg);
+	border-color: transparent;
+}
+
+/* ---- 5) 字号下限（M1：甘特轴/任务条原 10px、meta 原 10.5px） ---- */
+.planboard-gantt-axis-cell {
+	font-size: var(--pf-text-micro);
+}
+.planboard-gantt-bar {
+	font-size: var(--pf-text-micro);
+}
+.planboard-task-meta,
+.planboard-task-meta .planboard-task-dates {
+	font-size: var(--pf-text-xs);
+}
+.planboard-temp-source,
+.planboard-plan-tag,
+.planboard-board-col-count {
+	font-size: var(--pf-text-xs);
+}
+
+/* ---- 6) emoji 渲染跨平台稳定（m1：Windows/macOS/iOS 一致） ---- */
+.planboard-badge-emoji,
+.planboard-welcome-step-emoji {
+	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
+		"Segoe UI Symbol", sans-serif;
+}
+
+/* =========================================================
+   v2.1-visual 视觉重心与识别度增强（2026-09-09 审计二轮，用户已选定方案）
+   ① 强调色统一：#4a6fa5 → v2.1 #3d5a94（压深）→ v3.9.10 #3572a8（天蓝同色相，白字 5.09:1 AA）
+   ② 年度 banner：v2.1 深蓝实底 → v2.3 浅底深蓝文字 → v2.4 回最初渐变蓝略加深、去两条左竖线（用户指定）
+   ③ 今日打卡/总结 = 全站唯一实心层（白底+微阴影），与透明月/周卡分层
+   纯追加，可整块回滚。
+   ========================================================= */
+
+/* ---- 1) 主强调色压深（bg 类元素全站自动生效） ---- */
+:root,
+.planboard-root {
+	--pb-accent-dim: #3572a8;
+}
+/* 焦点环：浅色深蓝 / 深色亮蓝 */
+.theme-light .planboard-root {
+	--pb-focus: #3572a8;
+}
+.theme-dark .planboard-root {
+	--pb-focus: #8ab4d8;
+	--pf-danger: #f87171; /* 深色底上提亮（原 #ef4444 偏暗）*/
+	/* 徽章语义色（金/银/铜，深底浅字）——深/浅仅需这一处切换 */
+	--pf-badge-gold-grad: linear-gradient(135deg, #78350f, #92400e 55%, #b45309);
+	--pf-badge-gold-fg: #fde68a;
+	--pf-badge-silver-grad: linear-gradient(135deg, #1e293b, #334155 55%, #475569);
+	--pf-badge-silver-fg: #e2e8f0;
+	--pf-badge-bronze-grad: linear-gradient(135deg, #431407, #7c2d12 55%, #9a3412);
+	--pf-badge-bronze-fg: #fed7aa;
+}
+/* 勾选框与甘特 fallback 同步到新主色 */
+.planboard-checkbox {
+	accent-color: var(--pb-accent-dim);
+}
+.planboard-plan-card .planboard-checkbox {
+	accent-color: var(--pb-accent-dim);
+}
+.planboard-checkbox.planboard-checkbox:checked {
+	background-color: var(--pb-accent-dim);
+}
+/* 深色主题：accent-dim 当「文字 on 深底」时提亮 */
+.theme-dark .planboard-summary-cheer {
+	color: var(--pb-accent);
+}
+.theme-dark .planboard-board-col-status-doing .planboard-board-col-title {
+	color: var(--pb-accent);
+}
+
+/* ---- 2) 年度 banner（v2.4：回到最初渐变蓝并略加深；去掉左竖线。
+         演化记录：v1.7.4 渐变 #bcddf5 → v2.1 深蓝实底（用户：太深太实）
+         → v2.3 浅底+深蓝文字（用户：没更好看）
+         → v2.4 用户指定：最初渐变蓝加深约一档 + 文字回近黑 + 去竖线） ---- */
+.theme-light .planboard-goal-card {
+	background: linear-gradient(180deg, #abd0ee 0%, #e3f0fb 55%, #fcfdff 100%);
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: 0 1px 6px rgba(138, 180, 216, 0.14);
+}
+.theme-dark .planboard-goal-card {
+	background: linear-gradient(180deg, rgba(74, 138, 200, 0.5) 0%, rgba(74, 138, 200, 0.18) 60%, rgba(74, 138, 200, 0.06) 100%);
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.14);
+}
+
+/* ---- 3) 行动双卡（v2.5：用户选定恢复「透明 + 细边框」——
+         撤销 v2.1 白底实心方案，回到 v1.7.4 透明卡观感。
+         细边框与透明底由文件中段 v1.7.4 规则提供，此处不再覆盖） ---- */
+
+/* =========================================================
+   v2.2-forms 表单字段级错误（M4，2026-09-09，配合 TS attachFieldError）
+   错误红字显示在字段正下方 + 输入框红边框，输入时自动清除。
+   ========================================================= */
+.planboard-field-error {
+	color: var(--text-error, #b91c1c);
+	font-size: var(--pf-text-xs);
+	line-height: 1.5;
+	margin: 2px 2px 4px;
+	padding: 0 2px;
+}
+.planboard-field-error[hidden] {
+	display: none;
+}
+.planboard-modal input.is-invalid,
+.planboard-modal textarea.is-invalid {
+	border-color: var(--text-error, #b91c1c) !important;
+	box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.12) !important;
+}
+
+/* =========================================================
+   v2.9-首页 dashboard（v3.6 重排：banner 置顶为标题，热力图通栏垫底）
+   banner(1) → KPI(2) → 打卡+总结(3) → 周柱+趋势(4) → 月/周卡(5) → 热力图通栏(6)
+   （带 .planboard-content 前缀，特异性压过中段历史 order 规则）
+   ========================================================= */
+.planboard-content .planboard-card.planboard-goal-card {
+	order: 1; /* 年度目标 banner = 整页标题 */
+}
+.planboard-content .planboard-grid-4 {
+	order: 2;
+	display: grid; /* 修复：缺 display:grid 导致 KPI 4 卡纵向堆叠 */
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.planboard-content .planboard-grid-2.planboard-daily-only {
+	order: 3; /* 今日打卡 + 总结（高频行动区） */
+}
+.planboard-content .planboard-grid-2.planboard-charts {
+	order: 4; /* 本周每日柱状 + 月度趋势 */
+}
+.planboard-content .planboard-grid-2:not(.planboard-daily-only):not(.planboard-charts) {
+	order: 5; /* 月/周任务卡 */
+}
+.planboard-content .planboard-card.planboard-heatmap-card {
+	order: 6; /* 打卡热力图：整条通栏，页面最底 */
+	width: 100%;
+}
+@media (max-width: 760px) {
+	.planboard-content .planboard-grid-4,
+	.planboard-content .planboard-grid-2.planboard-charts {
+		grid-template-columns: 1fr;
+	}
+}
+.planboard-chart-card {
+	min-width: 0;
+	position: relative; /* v3.8.2: 拖拽把手是 absolute 贴底，必须有定位祖先否则锚到别处不可见 */
+	/* v3.8: 纵向 flex——卡高可拖拽后 body 自动拉伸填满 */
+	display: flex;
+	flex-direction: column;
+}
+.planboard-chart-body {
+	display: flex;
+	align-items: flex-end; /* v3.8: 贴底——月柱/趋势 0 轴贴卡底，不再垂直居中悬空 */
+	justify-content: center;
+	gap: 8px;
+	padding: 4px 0 6px;
+	min-height: 0; /* v3.9: 0 + overflow hidden——拖矮时内容跟随裁剪，不再"底线上升内容留在原地" */
+	flex: 1 1 auto; /* v3.8: 配合卡高拖拽 */
+	overflow: hidden;
+}
+.planboard-heatmap-body {
+	min-height: 90px; /* v3.8.2: 无固定卡高时的默认高度（svg 100% 拉伸填充） */
+	justify-content: flex-start;
+	align-items: stretch; /* v3.8.2: 格子随卡高拉伸 */
+	padding: 6px 0 8px;
+}
+.planboard-heatmap-body svg {
+	height: 100%;
+	min-height: 90px; /* v3.9: 卡高自适应时 svg 百分比高度无参照会塌缩——给默认下限 */
+}
+.planboard-trend-body {
+	min-height: 0; /* v3.9: 跟随卡高，不再有独立下限 */
+}
+.planboard-trend-body svg {
+	flex: 1 1 auto;
+	max-height: 56px;
+}
+.planboard-chart-body.planboard-heatmap-body svg {
+	/* v3.7: 热力图通栏——svg width:100% 随卡片缩放（TS 侧已去固定 640px），不再横向滚动 */
+	max-width: 100%;
+	flex: 1 1 auto;
+}
+.planboard-chart-body svg {
+	display: block;
+	max-width: 100%;
+}
+.planboard-chart-rings {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 12px;
+	width: 100%;
+}
+.planboard-ring-unit {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+.planboard-ring-meta {
+	min-width: 0;
+}
+.planboard-ring-name {
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.planboard-ring-pct {
+	font-size: var(--pf-text-md);
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+/* KPI 卡：标签/大数/小字三级 */
+.planboard-kpi-card {
+	padding: 12px 14px;
+}
+.planboard-kpi-label {
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}
+.planboard-kpi-value {
+	font-size: var(--pf-text-xxl);
+	font-weight: 700;
+	line-height: 1.15;
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+}
+.planboard-kpi-sub {
+	font-size: var(--pf-text-micro);
+	color: var(--text-tertiary);
+	margin-top: 4px;
+}
+
+/* =========================================================
+   v3.6-计划名用色（banner 内计划名 = 计划色强调）
+   浅色主题用加深版（白底可读），深色主题用柔化提亮版；
+   两个变量由 TS 按计划注入（--plan-title-light / --plan-title-dark）
+   ========================================================= */
+.planboard-goal-name.is-plan-colored {
+	color: var(--plan-title-light, var(--text-normal));
+	font-weight: 600;
+}
+.theme-dark .planboard-goal-name.is-plan-colored {
+	color: var(--plan-title-dark, var(--text-normal));
+}
+
+/* =========================================================
+   v3.9-连击位置 + 图表卡拖拽收缩
+   =========================================================
+   v7.11（用户 135859 截图）：连击徽章已从「今日总结」标题行搬到
+   「📅 本月每日打卡」标题行（TS 里 weekChartHeader）。原来那套
+   absolute + left:50% + translateX(-50%) 的居中定位随之作废 ——
+   新家不需要它：图表卡 header 本来就是 space-between，徽章是第 2 个 flex item，
+   自动贴右端，跟右边「📊 本月各计划打卡」的 `本月合计 N 次` 同一个落点。
+   ⇒ 一并删掉了 `.planboard-summary-card .planboard-card-header { position: relative }`，
+   那条只为给绝对定位的徽章当锚点，现在没有绝对定位的子元素了。
+   ⚠️ 别把它加回来：`.planboard-streak` 基础规则里的 margin-left: 8px 在
+   space-between + 两子项下不起作用，视觉上不需要任何补偿。 */
+
+/* =========================================================
+   v4.0 窗格宽度断点 —— 按容器宽度，不按视口宽度
+   =========================================================
+   为什么：Obsidian 的插件视图是分栏窗格，宽度由用户拖拽决定。
+   同一个 1920px 视口里，插件窗格可以是 300px 也可以是 1400px，
+   而原 @media (max-width: 640px) 读的是视口 —— 分栏时永不触发，
+   双列被硬撑进窄窗格，卡片全部压扁（年度横幅最明显）。
+
+   is-narrow / is-tiny 由 PlanBoardView.observePaneWidth() 的
+   ResizeObserver 挂在 .planboard-root 上。特异度 (0,3,0) 高于
+   原 @media 里的 (0,1,0)，所以无需 !important 即可覆盖；
+   原 @media 规则保留作兜底，两者结论一致不冲突。 */
+
+/* --- 窄窗格 < 720px：双列塌单列 --- */
+.planboard-root.is-narrow {
+	padding: 16px 16px 20px;
+}
+
+.planboard-root.is-narrow .planboard-content {
+	gap: 14px;
+}
+
+.planboard-root.is-narrow .planboard-grid-2 {
+	grid-template-columns: 1fr;
+}
+
+/* v7.5c 补漏（2026-10-01 10:3x 实测）：**极窄档漏了「栅格塌单列」**。
+   is-narrow / is-tiny 互斥不叠加（TS 里 `<420 ? is-tiny : <720 ? is-narrow : ""`），
+   而上面那条是 (0,3,0) 只挂在 is-narrow 上 —— 所以 <420px 窗格里双列栅格从来没塌过，
+   只是碰巧被「视口 <640px」的 @media 兜住。桌面端把插件放进窄右栏（视口仍 >640）时，
+   「今日打卡 + 今日总结」就会被压成两个 110px 的小格 —— 用户说的「窄窗自动分行」其实是缺的。 */
+.planboard-root.is-tiny .planboard-grid-2 {
+	grid-template-columns: 1fr;
+}
+
+/* 年度横幅：4 个计划从「挤一行」改为 2×2 换行 */
+.planboard-root.is-narrow .planboard-goal-strip {
+	flex-wrap: wrap;
+}
+
+.planboard-root.is-narrow .planboard-goal-strip-item {
+	flex: 1 1 46%;
+}
+
+/* 年度标题行：三列（标题|日期|空）压不下，收成两列 */
+.planboard-root.is-narrow .planboard-goal-card .planboard-card-header {
+	grid-template-columns: 1fr auto;
+}
+
+/* --- 极窄窗格 < 420px（手机侧栏 / 窄分栏）：再收一档 --- */
+.planboard-root.is-tiny {
+	padding: 12px 12px 20px;
+}
+
+.planboard-root.is-tiny .planboard-content {
+	gap: 12px;
+}
+
+.planboard-root.is-tiny .planboard-tabs {
+	flex-wrap: wrap;
+}
+
+/* 极窄下年度横幅标题与日期改为上下排列，避免互相挤压 */
+.planboard-root.is-tiny .planboard-goal-card .planboard-card-header {
+	grid-template-columns: 1fr;
+	justify-items: start;
+	gap: 4px;
+}
+
+.planboard-root.is-tiny .planboard-goal-card .planboard-home-date {
+	grid-column: 1;
+	justify-self: start;
+}
+
+/* 极窄下计划条一行只放得下一个，改回单列 */
+.planboard-root.is-tiny .planboard-goal-strip-item {
+	flex: 1 1 100%;
+}
+
+/* =========================================================
+   v6.0 外观层（2026-09-30：原 v5.0「纸墨/暖米」→「中性冷白」）
+   ---------------------------------------------------------
+   只改外观，不改布局、不改交互。四节：
+     ① 变量与色板  ② 面层  ③ 组件  ④ 层级（哪张卡是主角）
+   回滚：整节删除 → 完全回到 v4.0 状态
+   换肤：只改 ① 里的变量即可，②③④ 不用动
+   原则：所有面层都是半透明膜叠在宿主变量上，不写死底色，
+         换 Obsidian 主题时插件仍然跟得上
+   ========================================================= */
+
+/* ---------- ① 变量与色板 ---------- */
+.planboard-root {
+	/* 标题层字体。2026-09-30：关掉衬线——衬线 + 暖底 = 旧书感，与"清爽"相反；
+	   清爽靠的是字重差，不是字形差。想把衬线打开，把下面这行换成：
+	   "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, Georgia, serif; */
+	--pfs-serif: inherit;
+
+	/* 面层。页面压一层极淡冷灰，卡片用近纯白浮起来 ——
+	   分层靠"卡比页亮"，所以页面必须**比卡片暗一点**；
+	   页面若也刷成纯白，白卡落在白页上等于没有层（2026-09-30 实测过）。 */
+	--pfs-page: rgba(15, 23, 42, 0.045);
+	--pfs-card: rgba(255, 255, 255, 0.92);
+	--pfs-hover: rgba(59, 91, 219, 0.055);
+
+	/* 发丝线与轨道 */
+	--pfs-hair: rgba(15, 23, 42, 0.09);
+	--pfs-hair-strong: rgba(15, 23, 42, 0.18);
+	--pfs-track: rgba(15, 23, 42, 0.07);
+
+	/* 次级文字与强调 */
+	--pfs-sub: #64748b;
+	--pfs-accent: #3572a8;
+	--pfs-accent-soft: #8ab4d8;
+
+	/* v7.8（用户 115512 截图 #4）：已打卡行的浅绿底。
+	   取低饱和绿而不是主题的 --color-green：主题绿在浅色下过于鲜艳，
+	   整行铺满会抢走标题的注意力；这里只要「一眼看出这行已经完成」。
+	   flash 是打卡瞬间那一下的加深版（配合 keyframe 做一次呼吸）。 */
+	--pfs-ok: #2f9e5f;
+	--pfs-ok-soft: rgba(47, 158, 95, 0.12);
+	--pfs-ok-flash: rgba(47, 158, 95, 0.3);
+
+	/* 覆盖旧的天蓝强调——进度条/勾选框/焦点环/标题页自动跟随 */
+	--pb-accent: var(--pfs-accent-soft);
+	--pb-accent-hover: #a3c7e6;
+	--pb-accent-dim: var(--pfs-accent);
+	--pb-focus: var(--pfs-accent);
+	--pf-danger: #d64545;
+
+	/* 档位色：三套各来的渐变 → 收进同一套冷阶金属色 */
+	--pf-tier-bronze: linear-gradient(90deg, #a8743f, #c99357);
+	--pf-tier-silver: linear-gradient(90deg, #7d8794, #9ba5b1);
+	--pf-tier-gold: linear-gradient(90deg, #b8860b, #dcae3c);
+
+	/* 徽章：实心渐变 → 描边式（透明底 + 同色边 + 同色字） */
+	--pf-badge-gold-grad: transparent;
+	--pf-badge-silver-grad: transparent;
+	--pf-badge-bronze-grad: transparent;
+	--pf-badge-gold-fg: #8a5f12;
+	--pf-badge-silver-fg: #64707d;
+	--pf-badge-bronze-fg: #8a5c33;
+}
+
+.theme-dark .planboard-root {
+	/* 深色下方向相反：卡片要比页面**亮**，所以页面压暗、卡片提亮 */
+	--pfs-page: rgba(0, 0, 0, 0.34);
+	--pfs-card: rgba(255, 255, 255, 0.055);
+	--pfs-hover: rgba(124, 156, 255, 0.12);
+	--pfs-hair: rgba(255, 255, 255, 0.1);
+	--pfs-hair-strong: rgba(255, 255, 255, 0.2);
+	--pfs-track: rgba(255, 255, 255, 0.1);
+	--pfs-sub: #9aa3af;
+	--pfs-accent: #3572a8;
+	--pfs-accent-soft: #8ab4d8;
+	/* v7.8 深色下的对应值：底色要**低透明度叠在暗底上**才像浅绿，
+	   直接搬浅色那支会糊成一块脏绿。 */
+	--pfs-ok: #4cc38a;
+	--pfs-ok-soft: rgba(76, 195, 138, 0.16);
+	--pfs-ok-flash: rgba(76, 195, 138, 0.34);
+	--pb-accent-hover: #a3c7e6;
+	--pf-danger: #f07178;
+	--pf-badge-gold-fg: #d8b05f;
+	--pf-badge-silver-fg: #aab4c0;
+	--pf-badge-bronze-fg: #cf9463;
+}
+
+/* ---------- ② 面层 ---------- */
+
+/* 页面：叠一层极淡冷灰膜（底色仍来自宿主主题，不是写死的颜色） */
+.planboard-root {
+	background-image: linear-gradient(var(--pfs-page), var(--pfs-page));
+}
+
+/* 卡片：面差分层——卡面比页面亮一档（近纯白浮在冷灰页上），去投影，边框只留发丝线
+   v7.11（用户 135859 截图「把任务看板里的卡片也改成白色，和计划管理里的卡片一致」）：
+   `.planboard-board-col`（任务看板的三/四个列容器）也并进这条。
+   它原来自带一套旧面色：`background: var(--background-secondary)` + 宿主主题的
+   `--background-modifier-border`（浅色下是 rgb(228,228,228)，比发丝线重得多）——
+   真机实测两处**实际生效值**：
+     计划管理卡  bg rgb(246,246,246) + 白 0.92 渐变，border rgba(15,23,42,0.09)
+     任务看板列  bg rgb(246,246,246) + **无渐变**，      border rgb(228,228,228)
+   底色其实一样，差的是那层 `--pfs-card` 近白渐变（"比页面亮一档"的观感全靠它）和边框。
+   并进来即两页同一种卡，不必另抄一份属性 —— 将来改卡面只改这一处。 */
+.planboard-root .planboard-card,
+.planboard-root .planboard-board-col {
+	background-color: var(--background-secondary);
+	background-image: linear-gradient(var(--pfs-card), var(--pfs-card));
+	border: 1px solid var(--pfs-hair);
+	border-radius: 12px;
+	box-shadow: none;
+}
+
+.planboard-root .planboard-card:hover,
+.planboard-root .planboard-board-col:hover {
+	border-color: var(--pfs-hair-strong);
+	box-shadow: none;
+}
+
+/* v6.2: 渐变天蓝从「年度目标卡」上移到「顶栏 banner」——
+   标签要和标题落在同一块底色上，才叫"一体"。
+   渐变回到 v2.4 的初始天蓝（#abd0ee 起），只把最底一档留在淡蓝而不是近白：
+   标签带正好压在底部，底色若收到 #fcfdff，标签会视觉上"掉出"banner。 */
+.theme-light .planboard-root .planboard-header {
+	background-image: linear-gradient(180deg, #abd0ee 0%, #cfe4f7 52%, #e4f0fb 100%);
+	border-color: var(--pfs-hair);
+	box-shadow: 0 1px 6px rgba(138, 180, 216, 0.16);
+}
+
+.theme-dark .planboard-root .planboard-header {
+	background-image: linear-gradient(
+		180deg,
+		rgba(74, 138, 200, 0.42) 0%,
+		rgba(74, 138, 200, 0.24) 55%,
+		rgba(74, 138, 200, 0.16) 100%
+	);
+	border-color: var(--pfs-hair);
+	box-shadow: none;
+}
+
+/* banner 里的年度目标条：不再自绘底色/边框，交给 banner 当底 */
+.planboard-root .planboard-header .planboard-goal-card {
+	background: transparent;
+	background-image: none;
+	border: none;
+	border-left: none;
+	box-shadow: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* ---------- ③ 组件 ---------- */
+
+/* 标题层用衬线：只限卡片标题与关键数字，正文/按钮/标签/输入一律不碰 */
+.planboard-root .planboard-card-title,
+.planboard-root .planboard-goal-number,
+.planboard-root .planboard-progress-number,
+.planboard-root .planboard-task-number {
+	font-family: var(--pfs-serif);
+	letter-spacing: 0.01em;
+}
+
+.planboard-root .planboard-card-title {
+	font-weight: 500;
+}
+
+.planboard-root .planboard-goal-card .planboard-card-title {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+/* 进度条：8px → 6px，轨道改冷墨 */
+.planboard-root .planboard-progress-bar {
+	height: 6px;
+	background: var(--pfs-track);
+}
+
+.planboard-root .planboard-progress-bar--thick {
+	height: 8px;
+}
+
+/* 标签页：实心胶囊去掉投影，hover 换冷色 */
+.planboard-root .planboard-tab.is-active {
+	box-shadow: none;
+	border-color: transparent;
+}
+
+.planboard-root .planboard-tab:hover {
+	background: var(--pfs-hover);
+}
+
+/* 徽章：缩成小描边章 */
+.planboard-root .planboard-badge {
+	background: transparent;
+	border: 1px solid currentColor;
+	box-shadow: none;
+	font-size: var(--pf-text-micro);
+	font-weight: 500;
+	line-height: 1.6;
+	padding: 0 6px;
+	letter-spacing: 0.02em;
+}
+
+/* 清单行：卡片式白盒 → 无底色无边框的素行，行高提到 40
+   v7.16：padding-left 24 → 0。原 24px 是给行首计划色点让位（8px 点 + 间隙），
+   v7.13 彩点退役后这块缩进成了「复选框比卡头标题右缩 24px」的错位源
+   （用户 164212 截图）；现在复选框左缘与卡头标题左缘（内容盒 0）严格对齐。
+   右侧仍留 8px；行内 task-meta 的 margin-left 36 是相对 li 内容缘与文字对齐的，
+   随 padding 一起平移，不需要跟着改。
+   注意：必须连同 background / border 一起覆盖——`.planboard-check-card .planboard-check-item`
+   给了「白底 + 1px 灰边 + 圆角 10」，只改内边距会留下一排白盒子（2026-09-30 首版踩过） */
+.planboard-root .planboard-check-item {
+	position: relative;
+	min-height: 40px;
+	padding: 8px 8px 8px 0;
+	background: transparent;
+	border: none;
+	border-radius: 8px;
+}
+
+/* 勾选态：原为「secondary 底 + 强调色边 + 降透明度」，同样要拆掉 */
+.planboard-root .planboard-check-item.is-checked {
+	background: transparent;
+	border: none;
+	opacity: 1;
+}
+
+.planboard-root .planboard-check-item:hover {
+	background: var(--pfs-hover);
+}
+
+.planboard-root .planboard-check-text {
+	font-size: var(--pf-text-md);
+}
+
+/* v6.7（#5）修正：原来这里写「与勾选框对齐」并取消补偿，方向反了——
+   实测 li 的 padding-left 24px 是留给行首色点 + 勾选框的，meta 作为 li 的直接
+   子元素，margin-left:0 就落在 24px（= 勾选框左缘）；而标题文字在 60px。
+   36px = 勾选框 22 + 间距 8 + 主题默认 margin 6（在真实 DOM 上量的，不是数的）。 */
+.planboard-root .planboard-task-meta {
+	margin-left: 36px;
+}
+
+/* 勾选框：原生方框 → 22px 圆角方（甲图 1/2 的规格） */
+.planboard-root .planboard-checkbox {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 22px;
+	height: 22px;
+	flex-shrink: 0;
+	border: 1.5px solid var(--pfs-hair-strong);
+	border-radius: 6px;
+	background-color: transparent;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.planboard-root .planboard-checkbox:hover {
+	border-color: var(--pfs-accent-soft);
+}
+
+/* v7.5（用户 084611「勾位置偏了、大小也不对」）：v7.2 把勾交给主题 ::after，
+   但主题那条是「16px 绝对定位」的 mask-SVG，给原生小方框写死的坐标 —— 方框放大到
+   22px 后勾就停在旧原点上（偏左上 + 显小）。结论：方框改了尺寸就不能再借主题勾，
+   要么方框退回去，要么自己画。这里选自画：同一伪元素 content:none + display:none
+   让主题勾不生成（特异性 0,3,1 > 主题 0,2,1），勾改由 input 本体居中背景图承担。 */
+.planboard-root .planboard-checkbox.planboard-checkbox::after {
+	content: none;
+	display: none;
+}
+
+.planboard-root .planboard-checkbox:checked {
+	background-color: var(--pfs-accent);
+	border-color: var(--pfs-accent);
+	/* 14px 白勾居中：22px 方框 - 2×1.5px 边 = 19px 内区，勾占 14px 留 2.5px 呼吸 */
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.75 9.5 17.25 19 7.25'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 14px 14px;
+}
+
+/* 计划标签：彩色药丸 → 素色小字；v6.7（#4）恢复文字计划色。
+   用户反馈「这四个分类小字之前是分别有自己的颜色的」——v6.0 把颜色只留在
+   行首色点（::before）上，小字本身成了灰的，实测 color=rgb(100,116,139)。
+   现在文字用 --plan-tag-text-light（浅色主题的可读加深版），深色另给一档。
+   药丸底仍不要（保持 v6.0 的去彩虹糖方向），只把颜色还给文字。 */
+.planboard-root .planboard-plan-tag {
+	padding: 0;
+	background: transparent;
+	border-radius: 0;
+	color: var(--plan-tag-text-light, var(--pfs-sub));
+	font-weight: 600; /* 11px 上的计划色要看清，500 偏虚 */
+	font-size: var(--pf-text-xs);
+	letter-spacing: 0.03em;
+}
+
+/* v7.13（用户 150250 截图）：**行首计划色点取消**。
+   两条都删：上面那条（`.planboard-plan-tag::before`）是 v6.8 之前的旧实现，
+   早就被下面这条 `content: none` 关掉了（保留它只会让人误以为还有一份色点在生效）；
+   下面那条（`.planboard-plan-dot`）是 v6.8 起生效的真元素 —— DOM 侧
+   （PlanBoardView.renderCheckItem / renderPoolTask 里的 createSpan）已同步不再创建。
+   归属信息并没有丢：今日任务行的标题里已带计划 emoji（「✍️ 写作」），
+   计划页的任务行本身就在该计划的卡里，任务看板另有 `planboard-plan-tag` 药丸。
+   ⚠️ 两者都是 `position: absolute`，**不占布局宽** ⇒ 删掉后行内文字位置不变。 */
+
+/* 输入框：近纯白面 + 圆角 8。
+   v7.10：边框 `--pfs-hair`(0.09) → `--pfs-hair-strong`(0.18)——
+   总结卡改回白卡后，输入框的 `--pfs-card` 也是近纯白，"白叠白"就只剩这条发丝线在划边界，
+   0.09 太弱（同卡上「写复盘」按钮的描边是 0.5 透明度的珊瑚橙，输入框会显得比它还不存在）。
+   取齐打卡卡的 `.planboard-check-input`（那边一直用 hair-strong），两卡控件观感一致。 */
+.planboard-root .planboard-summary-input {
+	background: var(--pfs-card);
+	border: 1px solid var(--pfs-hair-strong);
+	border-radius: 8px;
+}
+
+.planboard-root .planboard-summary-input:focus {
+	border-color: var(--pfs-accent-soft);
+	box-shadow: none;
+}
+
+/* 按钮：描边式，hover 冷底 */
+.planboard-root .planboard-btn {
+	border-radius: 8px;
+	border-color: var(--pfs-hair-strong);
+	background: transparent;
+}
+
+.planboard-root .planboard-btn:hover {
+	background: var(--pfs-hover);
+	border-color: var(--pfs-accent-soft);
+}
+
+/* （v7.12 删除）「总结自动区：虚线 → 暖色实线」——
+   统计区连同那条分隔线一起撤掉了，宿主元素不存在，这条覆盖规则随之作废。
+   已完成计数现在在标题行中间，颜色沿用统计行原有的 `--color-green`（未进设计系统），
+   与旁边标题的 `--text-normal`、鼓励语的 `--pb-accent-dim` 三者并存是刻意的：
+   绿=完成度、珊瑚橙=语气，和打卡卡的勾/标题同源。 */
+
+/* 空态文字统一到冷灰 */
+.planboard-root .planboard-empty {
+	color: var(--pfs-sub);
+}
+
+/* 年度目标条：行内 hover 由旧天蓝改靛蓝淡底 */
+.planboard-root .planboard-goal-strip-item:hover {
+	background: var(--pfs-hover);
+}
+
+/* 年度横幅底下那条浅蓝分隔线 → 统一发丝线 */
+.planboard-root .planboard-goal-card .planboard-goal-strip {
+	border-bottom-color: var(--pfs-hair);
+}
+
+/* 年度计划名：高饱和计划色 → 向墨色压 32%，保留可辨性、去掉"彩虹感"
+   （计划色值来自设置、CSS 改不了，这里的做法是降饱和而不是改色） */
+.planboard-root .planboard-goal-name.is-plan-colored {
+	color: color-mix(in srgb, var(--plan-title-light, var(--text-normal)) 68%, #334155);
+}
+
+.theme-dark .planboard-root .planboard-goal-name.is-plan-colored {
+	color: color-mix(in srgb, var(--plan-title-dark, var(--text-normal)) 72%, #e2e8f0);
+}
+
+/* ---------- ④ 层级（2026-09-30 新增）：不再"人人平权" ---------- */
+
+/* 降档：两张任务列表不套盒子——直接坐在页面上，靠留白分组。
+   一档（保留实心白卡 + 发丝边）：年度目标 / 今日打卡 / 今日总结 / 两张图表。
+   为什么：8 张卡同一个底色同一条边 = 没有主次，视线落不下去，
+   "不清爽"的真正来源（实测 8 张卡 background-color 全等）在此。
+
+   v7.10（用户 134657 截图）：**今日总结卡从这张降档名单里摘出来了**。
+   用户原话「这个卡片可以和左边的今日打卡一样是白色的吗」——这两张卡在宽档是
+   grid 同一行并排的一对，一白一透明并排看像"掉了半边盒子"，用户要它们成对。
+   ⇒ 今日总结回到一档：不再在这里写 background/border，改由
+   `.planboard-root .planboard-card`（2795 行）给「近纯白底 + 发丝边 + 圆角 12」。
+   ⚠️ 别顺手把 `.planboard-summary-card` 加回来"统一降档"——那是用户明确否掉的观感。
+   周任务 / 月任务两张**仍然降档**（用户只点了总结卡）。 */
+.planboard-root .planboard-week-task-card,
+.planboard-root .planboard-month-task-card {
+	background-color: transparent;
+	background-image: none;
+	border-color: transparent;
+	box-shadow: none;
+}
+
+/* 呼吸：区块间距 18 → 22（窄窗格 14 → 16，极窄 12 → 14）。
+   注意必须连窄窗格一起写——`.planboard-root.is-narrow .planboard-content`
+   特异度 (0,3,0) 高过 (0,2,0)，只改宽档在本机 560px 窗格上根本不生效。 */
+.planboard-root .planboard-content {
+	gap: 22px;
+}
+
+.planboard-root.is-narrow .planboard-content {
+	gap: 16px;
+}
+
+.planboard-root.is-tiny .planboard-content {
+	gap: 12px;
+}
+
+/* 字重：全站只留三处重字（hero 数字 / 卡标题 / 态标），其余压到 500。
+   到处加粗 = 没有强调。 */
+.planboard-root .planboard-badge,
+.planboard-root .planboard-plan-tag,
+.planboard-root .planboard-tab,
+.planboard-root .planboard-task-meta,
+.planboard-root .planboard-home-date-sub {
+	font-weight: 500;
+}
+
+/* =========================================================
+   v6.2 顶栏一体化（2026-09-30）
+   ① 四个切换标签并入顶栏 banner，落在 banner 最下层（参考用户给的截图）
+   ② banner = 渐变天蓝（原 v2.4 色系）
+   ③ 强调色回到旧天蓝 #3572a8（撤销 v6.0 的靛蓝，同色相、低饱和）
+   纯追加：整节删除即回到 v6.1（渐变会留在年度目标卡上）。
+   ========================================================= */
+
+/* ---------- 顶栏容器 ---------- */
+.planboard-root .planboard-header {
+	margin: 0 0 22px;
+	padding: 16px 16px 12px;
+	border: 1px solid var(--pfs-hair);
+	border-radius: 12px;
+}
+
+.planboard-root.is-narrow .planboard-header {
+	margin-bottom: 16px;
+}
+
+.planboard-root.is-tiny .planboard-header {
+	margin-bottom: 12px;
+	padding: 12px 12px 10px;
+}
+
+/* 标题区：各页自己渲染（行动页=年度目标条，其余三页=周期页头） */
+.planboard-root .planboard-header-main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* banner 里的页头：去掉原来"排在页面流里"时留下的下边距 */
+.planboard-root .planboard-header .planboard-period-header {
+	margin-bottom: 0;
+}
+
+.planboard-root .planboard-header .planboard-period-label {
+	margin-bottom: 0;
+	color: #40607e;
+}
+
+/* ---------- 标签：banner 最下层的一条轨道 ---------- */
+.planboard-root .planboard-header .planboard-tabs {
+	position: static;
+	top: auto;
+	margin-top: 12px;
+	padding: 4px;
+	gap: 4px;
+	/* v7.14（155009 截图）：轨道的浅色底框撤掉，四个标签直接落在 banner 渐变上。
+	   当前页的辨认不靠底框——活动标签的「开口」机关（同画布色 + 双肩内凹圆角，
+	   见 v7.0/v7.1 节）原样保留，它本身就是指示器。 */
+	background: transparent;
+}
+
+/* 四等分：与截图一致的 segmented 观感 */
+.planboard-root .planboard-header .planboard-tab {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 7px 8px;
+	text-align: center;
+	color: #2c5b86;
+	background: transparent;
+	border-color: transparent;
+	border-radius: 8px;
+	box-shadow: none;
+}
+
+.planboard-root .planboard-header .planboard-tab:hover {
+	color: #1c4569;
+	background: rgba(255, 255, 255, 0.6);
+	border-color: transparent;
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active {
+	color: var(--pb-accent-dim);
+	background: #ffffff;
+	border-color: transparent;
+	box-shadow: 0 1px 3px rgba(28, 69, 105, 0.18);
+}
+
+/* 深色：轨道底框同样撤掉（v7.14）；选中标签仍是亮底 —— 与截图同一读法 */
+.theme-dark .planboard-root .planboard-header .planboard-tabs {
+	background: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-period-label {
+	color: rgba(226, 238, 248, 0.72);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab {
+	color: rgba(226, 238, 248, 0.72);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:hover {
+	color: #eaf4fd;
+	background: rgba(255, 255, 255, 0.14);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active {
+	color: #17405f;
+	background: rgba(255, 255, 255, 0.9);
+	border-color: transparent;
+	box-shadow: none;
+}
+
+/* =========================================================
+   v6.3 回顾页：年度任务 + 打卡统计（彩色环形图）并置
+   ---------------------------------------------------------
+   ① .planboard-period-duo —— 两卡并排；窄窗格塌单列
+   ② .planboard-donut-*   —— 环形图 + 右侧图例
+   纯追加：整节删除即回到 v6.2 的两卡上下堆叠。
+   （打卡统计那部分的 DOM 已换成环形图，只删 CSS 不会还原旧的分行进度条，
+     要还原请用 _archive/v6.2-顶栏一体化/ 里的两份 .saved）
+   ========================================================= */
+
+/* ---------- ① 并置两列 ---------- */
+.planboard-period-duo {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 18px;
+	align-items: stretch;
+}
+
+/* 年度任务卡（v6.4 起也是「环图 + 图例」，与右侧打卡统计同构）。
+   两卡图例行数不等（任务 2 行 / 打卡 4 行），grid 拉伸等高后让内容在剩余
+   高度里居中 —— 否则短的那张贴着顶，底下空一片。 */
+.planboard-review-task {
+	justify-content: flex-start;
+}
+
+.planboard-review-task .planboard-donut-wrap {
+	margin-top: auto;
+	margin-bottom: auto;
+}
+
+/* 窄窗格（<720px）：两列会把卡片压到 200px 出头，图例放不下 → 塌单列。
+   必须连 is-tiny 一起写 —— is-tiny 不继承 is-narrow 的规则。 */
+.planboard-root.is-narrow .planboard-period-duo,
+.planboard-root.is-tiny .planboard-period-duo {
+	grid-template-columns: 1fr;
+	gap: 14px;
+}
+
+.planboard-root.is-tiny .planboard-period-duo {
+	gap: 12px;
+}
+
+/* ---------- ② 环形图 + 图例 ---------- */
+/* flex-wrap 是关键：卡片窄到图例挤不下时（并排的中等窗格），
+   图例整块换到环图下方，而不是把名称压成省略号。 */
+.planboard-donut-wrap {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: center;
+	gap: 12px 18px;
+}
+
+.planboard-donut-chart {
+	flex: 0 0 148px;
+	max-width: 148px;
+}
+
+.planboard-donut-chart svg {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.planboard-donut-legend {
+	flex: 1 1 186px;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.planboard-donut-legend-row {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+}
+
+.planboard-donut-legend-row.is-zero .planboard-donut-name,
+.planboard-donut-legend-row.is-zero .planboard-donut-num {
+	color: var(--text-faint);
+}
+
+.planboard-donut-dot {
+	flex: 0 0 auto;
+	width: 9px;
+	height: 9px;
+	border-radius: 3px;
+}
+
+.planboard-donut-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--pf-text-sm);
+	color: var(--text-normal);
+}
+
+.planboard-donut-val {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: baseline;
+	gap: 7px;
+	font-variant-numeric: tabular-nums;
+}
+
+.planboard-donut-num {
+	font-size: var(--pf-text-sm);
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.planboard-donut-pct {
+	font-size: var(--pf-text-micro);
+	color: var(--pfs-sub); /* v7.15：faint(#ababab) 在白卡上读不清，统一进次级灰 */
+	min-width: 30px;
+	text-align: right;
+}
+
+.planboard-root.is-tiny .planboard-donut-wrap {
+	gap: 10px;
+}
+
+.planboard-root.is-tiny .planboard-donut-legend-row {
+	gap: 6px;
+}
+
+/* =========================================================
+   v6.5 顶栏常驻 + 页内标题上移（2026-09-30）
+   ---------------------------------------------------------
+   ① banner 常驻：年度目标条只在 onOpen 建一次，四页共享同一份 DOM，
+      切标签时只换下面内容（此前每个页头都在 banner 里重建）
+   ② 四个标签即每页标题：页内不再重复放标题
+      —— 计划页留一条动作行、任务页把计数并到形态切换行右侧、
+         回顾页的说明行随页头一起撤销
+   ③ 标签由两字改四字，窄档收紧内边距防换行
+   纯追加：删掉本节 + 用 _archive/v6.4-年度任务环图/ 还原 TS 即回退。
+   ========================================================= */
+
+/* ---------- 页内动作行（计划管理）---------- */
+.planboard-root .planboard-page-bar {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	margin: 0 0 12px;
+}
+
+.planboard-root .planboard-page-bar .planboard-year-add-btn {
+	margin: 0 0 0 auto;
+	flex-shrink: 0;
+}
+
+.planboard-root .planboard-page-hint {
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	letter-spacing: 0.01em;
+}
+
+/* ---------- 页内计数（任务看板 / 甘特）---------- */
+.planboard-root .planboard-page-count {
+	margin-left: auto;
+	align-self: center;
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 任务页窄档：pills 与计数挤在一行，pills 先让路不被压扁 */
+.planboard-root.is-narrow .planboard-subtabs,
+.planboard-root.is-tiny .planboard-subtabs {
+	flex-wrap: wrap;
+	row-gap: 6px;
+}
+
+.planboard-root.is-narrow .planboard-page-count,
+.planboard-root.is-tiny .planboard-page-count {
+	margin-left: auto;
+}
+
+/* ---------- 四字标签：窄档收紧，不换行 ---------- */
+.planboard-root.is-narrow .planboard-header .planboard-tab,
+.planboard-root.is-tiny .planboard-header .planboard-tab {
+	padding-left: 6px;
+	padding-right: 6px;
+	white-space: nowrap;
+}
+
+.planboard-root.is-tiny .planboard-header .planboard-tab {
+	font-size: var(--pf-text-xs);
+	padding-left: 3px;
+	padding-right: 3px;
+}
+
+/* =========================================================
+   v6.7 细节修正（2026-09-30，用户截屏逐条）
+   ① 顶栏四个标签 = 页面标题字号（#3）
+   ② 计划标签文字恢复各自的计划色（#4，浅色在上面就地改过，这里补深色）
+   ③ 计划管理页说明文字抬一档（#7）
+   ④ 任务行操作按钮改绝对定位——原来即使隐形也占 50px，把标题挤到过早换行（#8）
+   ⑤ 计划卡「目标 + 进度条 + 打卡率」同一行（#9）
+   纯追加：删掉本节 + 还原 _archive/v6.6-字号阶梯/ 即回退。
+   ========================================================= */
+
+/* ---------- ① 四个切换标签：标签即标题 ---------- */
+.planboard-root .planboard-header .planboard-tab {
+	font-size: var(--pf-text-lg); /* 18px，与卡片标题同档（原来继承 sm=12px）*/
+	font-weight: 600;
+	padding: 8px 8px;
+}
+
+/* 窄档：18px 的四字标题在 559px 窗格下只剩 1px 余量（实测 scrollWidth 117 / 可用 118），
+   收左右内边距换来 8px 余量——标签本身等宽，内边距小不影响观感。 */
+.planboard-root.is-narrow .planboard-header .planboard-tab {
+	padding-left: 2px;
+	padding-right: 2px;
+}
+
+/* 极窄档：四字 × 18px 会顶到边，降一档并把内边距清零 */
+.planboard-root.is-tiny .planboard-header .planboard-tab {
+	font-size: var(--pf-text-md);
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* ---------- ② 深色主题下的标签文字色 ---------- */
+.theme-dark .planboard-root .planboard-plan-tag {
+	color: var(--plan-tag-text-dark, var(--pfs-sub));
+}
+
+/* ---------- ③ 计划管理页说明行 ---------- */
+.planboard-root .planboard-page-hint {
+	font-size: var(--pf-text-md); /* v6.6 时被压到 xs=11px，用户：过小 */
+	color: var(--text-normal);
+}
+
+/* ---------- ④ 任务行操作按钮：隐形也不占宽 ---------- */
+/*  原状态：按钮 opacity:0 但仍参与 flex 排版，实测吃掉 50px + 8px 间距；
+    计划卡两列网格里每格只有 244px，标题文字因此只剩 118px → "（第 1 / 篇）" 过早换行。
+    改绝对定位后文字拿回全部宽度，按钮仍只在 hover 出现。 */
+.planboard-root .planboard-check-item .planboard-item-actions {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 2;
+}
+
+/* ---------- ⑤ 计划卡度量行：目标 + 进度条 + 打卡率 ---------- */
+.planboard-root .planboard-plan-metric {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap; /* 极窄档放不下时，打卡率单独落到第二行，不做横向挤压 */
+}
+
+.planboard-root .planboard-plan-metric .planboard-plan-target-line {
+	margin: 0;
+	flex: 1 1 auto; /* 吃掉余量，把「条 + 打卡率」推到右端对齐 */
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.planboard-root .planboard-plan-metric .planboard-progress-bar {
+	margin: 0; /* 原 margin-bottom:8px 是给竖排留的，横排不要再撑高 */
+	/* v6.7 定稿：固定长度，不用 flex:1 —— 弹性长度会让四张卡的条长短不一（取决于
+	   各自目标文案多长），看起来像四把不同的尺子。 */
+	flex: 0 0 120px;
+}
+
+/* 极窄档：卡内横排放不下三段，条收窄、文案留给目标 */
+.planboard-root.is-narrow .planboard-plan-metric .planboard-progress-bar,
+.planboard-root.is-tiny .planboard-plan-metric .planboard-progress-bar {
+	flex-basis: 80px;
+}
+
+/* 窄档实测定稿：258px 的卡里「目标 84 + 条 80 + 打卡率 118 + 间距 20」= 302 放不下，
+   与其让条吊在目标那行右端（第三行又单独跑出来），不如让目标独占首行，
+   「条 + 打卡率」成对落到第二行 —— 三行变两行，且两个相关元素挨在一起。 */
+.planboard-root.is-narrow .planboard-plan-metric .planboard-plan-target-line,
+.planboard-root.is-tiny .planboard-plan-metric .planboard-plan-target-line {
+	flex: 1 1 100%;
+}
+
+.planboard-root .planboard-plan-metric .planboard-goal-meta {
+	margin: 0;
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+/* =========================================================
+   v6.8 第二轮截屏五修（2026-09-30，用户截屏逐条）
+   ① 顶栏四个标签前加图标（#1）
+   ② 行首色点对齐勾选框——色点改成标签行的真元素，旧 ::before 关闭（#2）
+   ③ 计划卡度量行：卡头间距加大、条贴住目标文案、百分比落在条上（#3）
+   ④ 计划管理页「2026 · 计划与目标管理」做成带底色的标题行（#4）
+   ⑤ 任务页 分类|状态|甘特 三档做宽（#5）
+   纯追加：删掉本节 + 还原 _archive/v6.7-度量行/ 即回退。
+   ========================================================= */
+
+/* ---------- ① 顶栏标签：图标 + 文字 ---------- */
+/*  四个标签是 flex:1 等分，只要单个标签的内容装得下，整条轨道就不会挤。
+    图标按 em 走：文字 18px 时图标约 16.5px；窄档（<720px）再缩一档。 */
+.planboard-root .planboard-header .planboard-tab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+}
+
+.planboard-root .planboard-header .planboard-tab .planboard-tab-icon {
+	flex: 0 0 auto;
+	/* v7.15：0.92em 的父级是 tab 自身（16.04px 的怪值），算出 14.76px；
+	   显式钉死，与 label 的 18px 拉开且不再继承漂移 */
+	font-size: 16px;
+	line-height: 1;
+}
+
+.planboard-root .planboard-header .planboard-tab .planboard-tab-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 窄档：图标再小一档、间距收 1px —— 18px 四字标题本来就只剩几像素余量 */
+.planboard-root.is-narrow .planboard-header .planboard-tab,
+.planboard-root.is-tiny .planboard-header .planboard-tab {
+	gap: 4px;
+}
+
+.planboard-root.is-narrow .planboard-header .planboard-tab .planboard-tab-icon,
+.planboard-root.is-tiny .planboard-header .planboard-tab .planboard-tab-icon {
+	font-size: 14px;
+}
+
+/* ---------- ② 行首色点：挂到「标签行」上，和勾选框同一根轴线 ---------- */
+/*  旧做法：色点挂在 .planboard-plan-tag::before，top:50% 量的是 **整条 li** 的中线；
+    而任务行的 li 里还有第二行（标签 + 日期），于是色点比勾选框低半行
+    （用户 193837 截屏：彩点吊在标题行和 meta 行中间）。
+    新做法：色点由 TS 建成标签行的第一个子元素，绝对定位挂在标签行上——
+    标签行本来就用 align-items:center 摆勾选框，两者都居中，色点自然同轴；
+    标题换行变高时也仍与勾选框同轴（旧写法会跟着整条 li 的中线一起漂）。 */
+.planboard-root .planboard-check-label {
+	position: relative;
+}
+
+/* （v7.13 删除）原本这里还有两条色点规则：
+   `.planboard-check-item .planboard-plan-tag::before { content: none; }`（关旧伪元素）
+   与 `.planboard-plan-dot { position:absolute; left:-18px; … }`（v6.8 起的真元素）。
+   见本文件 3086 行附近那段说明 —— 色点整体取消，`.planboard-check-label` 的
+   `position: relative` 保留（仍是标签行的定位上下文，其它元素在用）。 */
+
+/* ---------- ③ 计划卡度量行：间距 + 条贴住文案 + 百分比上条 ---------- */
+/*  卡头到度量行：原来只隔 .planboard-plan-head 的 4px，贴太近（用户 194009） */
+.planboard-root .planboard-plan-metric {
+	margin-top: 14px;
+}
+
+/*  条改成「贴住目标文案、一路铺到卡右缘」：v6.7 给文案 flex:1 1 auto，
+    余量全被文案吃掉 → 条被推到 200px 开外（用户：进度条和每日运动打卡过远）。 */
+.planboard-root .planboard-plan-metric .planboard-plan-target-line {
+	flex: 0 1 auto;
+}
+
+.planboard-root .planboard-plan-metric .planboard-progress-bar {
+	flex: 1 1 auto;
+	min-width: 64px;
+	height: 16px; /* 8 → 16：11px 的百分比要压在条上（原来 8px 塞不进字） */
+	position: relative;
+}
+
+/* 百分比：居中压在条上，字用主题正色 + 一圈底色描边
+   —— 不管底下是灰轨道还是填色（金/银/铜渐变、计划色），都读得清 */
+.planboard-root .planboard-plan-metric .planboard-progress-pct {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--pf-text-xs);
+	font-weight: 700;
+	color: var(--text-normal);
+	text-shadow: 0 0 3px var(--background-primary), 0 0 3px var(--background-primary);
+	pointer-events: none;
+}
+
+/* 窄档：文案独占首行，条 + 百分比占满第二行
+   （v6.7 的分行策略保留，只是条不再固定 80px，而是吃满剩下的宽度） */
+.planboard-root.is-narrow .planboard-plan-metric .planboard-progress-bar,
+.planboard-root.is-tiny .planboard-plan-metric .planboard-progress-bar {
+	flex: 1 1 80px;
+}
+
+/* ---------- ④ 计划管理页：带底色的标题行 ---------- */
+.planboard-root .planboard-page-bar {
+	align-items: center; /* 原来是 baseline：加了底色后按钮会和文字错开中线 */
+	padding: 8px 12px;
+	background: rgba(53, 114, 168, 0.08);
+	border-radius: 8px;
+}
+
+.theme-dark .planboard-root .planboard-page-bar {
+	background: rgba(138, 180, 216, 0.12);
+}
+
+.planboard-root .planboard-page-bar .planboard-page-hint {
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+/* ---------- ⑤ 任务页三档：分类 | 状态 | 甘特 做宽 ---------- */
+.planboard-root .planboard-subtab {
+	min-width: 72px; /* 两字 × 11px ≈ 22px，原宽仅 ~46px；72 后三档不再像小胶囊 */
+	padding: 5px 12px;
+	text-align: center;
+}
+
+/* =========================================================
+   v6.9 第三轮截屏四改（2026-09-30，用户截屏逐条）
+   ① banner 问候语：抬到 lg(18px) + 落到右半行居中（#1）
+   ② 计划管理页标题行：抬到 lg(18px) + 改蓝色（#2）
+   ③ 任务页 分类|状态|甘特 三档加一条共同底框（#3）
+   ④ 甘特图：低饱和四态（已完成/进行中/逾期未完成/未开始）+ 图例（#4）
+   纯追加：删掉本节 + 还原 _archive/v6.8-甘特低饱和/ 即回退。
+   ========================================================= */
+
+/* ---------- ① banner 问候语：右半行居中 + 抬到 lg 档 ---------- */
+/*  banner 头是 grid「1fr auto 1fr」：①标题 ②日期 ③空。
+    问候语原来是 .planboard-home-date 的第二个孩子（挤在第 2 格日期屁股后头），
+    v6.9 由 TS 挪成 goalHeader 的第 3 个直接孩子 → 落进第 3 格，右半行居中。
+    字号 12px(sm) → 18px(lg)，与日期同档，靠字重 500 vs 700 分主次。 */
+.planboard-root .planboard-goal-card .planboard-home-greet {
+	grid-column: 3;
+	justify-self: center;
+	font-size: var(--pf-text-lg);
+	font-weight: 500;
+	letter-spacing: 0.01em;
+	color: var(--text-muted);
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/*  日期后面那个「·」本是给「日期 · 问候」当分隔的——问候搬走后成了孤零零一个点 */
+.planboard-root .planboard-goal-card .planboard-home-date-main::after {
+	content: none;
+}
+
+/*  窄档（<720px）：三格平分后第 3 格只 ~200px，18px 的整句要截断，压回 md(14px)；
+    极窄档（<420px）：banner 头本就塌成一列（v6.5 的 is-tiny 规则），问候回到第 1 列
+    左对齐、允许换行。 */
+.planboard-root.is-narrow .planboard-goal-card .planboard-home-greet,
+.planboard-root.is-tiny .planboard-goal-card .planboard-home-greet {
+	font-size: var(--pf-text-md);
+}
+
+.planboard-root.is-tiny .planboard-goal-card .planboard-home-greet {
+	grid-column: 1;
+	justify-self: start;
+	white-space: normal;
+	overflow: visible;
+}
+
+/* ---------- ② 计划管理页标题行：字号 + 蓝色（#2） ---------- */
+/*  14px(md) → 18px(lg)：与卡片标题同档，坐实它是「页内标题行」而不是说明文字。
+    蓝色取与底纹同色相（底 rgba(53,114,168,.08) ⇒ #eff4f8）的加深蓝，该底上 7.1:1；
+    直接用强调色 #3572a8 只有 4.57:1，标题这种字号偏险。 */
+.planboard-root .planboard-page-bar .planboard-page-hint {
+	font-size: var(--pf-text-lg);
+	color: #1f5580;
+}
+
+.theme-dark .planboard-root .planboard-page-bar .planboard-page-hint {
+	color: #9dc6ea;
+}
+
+/* ---------- ③ 任务页三档：一条共同底框（segmented） ---------- */
+/*  原来是三颗各自白底 + 灰边的独立胶囊（用户 202645：能不能做一个共同的底框）。
+    底框只包按钮；行尾「共 N 个任务」由调用方 append 到 .planboard-subtabs 上，在框外。 */
+.planboard-root .planboard-subtab-track {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 3px;
+	background: rgba(53, 114, 168, 0.08);
+	border-radius: 10px;
+}
+
+.theme-dark .planboard-root .planboard-subtab-track {
+	background: rgba(138, 180, 216, 0.12);
+}
+
+.planboard-root .planboard-subtab {
+	padding: 4px 14px;
+	color: var(--text-muted);
+	background: transparent;
+	border-color: transparent;
+	border-radius: 7px;
+}
+
+.planboard-root .planboard-subtab:hover {
+	color: var(--text-normal);
+	background: rgba(53, 114, 168, 0.1);
+}
+
+.planboard-root .planboard-subtab.is-active {
+	color: #1f5580;
+	background: var(--background-primary);
+	border-color: transparent;
+	box-shadow: 0 1px 3px rgba(28, 69, 105, 0.18);
+}
+
+.theme-dark .planboard-root .planboard-subtab.is-active {
+	color: #cfe5f8;
+	background: rgba(255, 255, 255, 0.16);
+	box-shadow: none;
+}
+
+/* ---------- ④ 甘特图：低饱和四态（#4） ---------- */
+/*  条本身 = 「没走完的部分」（浅底），里面的 .planboard-gantt-bar-fill = 「走过的部分」（实心）。
+      已完成     fill 100%          → 整条实心
+      进行中     fill 到「今天」    → 左实心 + 右浅底
+      逾期未完成 fill 100% + 虚线边 → 实心但轮廓是断的
+      未开始     fill 0% + 虚线边   → 空心（fill 直接隐藏）
+    轨道 20 → 24px（条 12 → 16px）：胶囊形和「左实心右浅底」这个切分，12px 分不清。 */
+.planboard-root .planboard-gantt-track {
+	height: 24px;
+}
+
+/*  今日线加粗提亮：1.5px/opacity .6 在浅灰轨道上几乎找不着，
+    而下面的图例给「今天」配了一块实心蓝——对不上就是图例撒谎。
+    仍留在 z-index 1（条之下），穿条而过会把条切一道口子。 */
+.planboard-root .planboard-gantt-today {
+	width: 2px;
+} /* opacity 由 v7.1 节接管 */
+
+.planboard-root .planboard-gantt-bar {
+	border-radius: 999px;
+	border: 1px solid transparent;
+}
+
+.planboard-root .planboard-gantt-bar-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	border-radius: 999px;
+	pointer-events: none; /* 拖拽靠 .planboard-gantt-bar 上的委托，别让填充段截走指针 */
+}
+
+.planboard-root .planboard-gantt-bar.is-todo .planboard-gantt-bar-fill {
+	display: none;
+}
+
+/* 图例：色块用中性灰——这里的颜色只表达「状态」，不是「哪个计划」 */
+.planboard-root .planboard-gantt-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 18px;
+	margin-top: 12px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.planboard-root .planboard-gantt-legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+}
+
+.planboard-root .planboard-gantt-legend-swatch {
+	position: relative;
+	flex: 0 0 auto;
+	width: 30px;
+	height: 12px;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-done {
+	background: var(--text-muted);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-doing::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 46%;
+	border-radius: 999px;
+	background: var(--text-muted);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-overdue {
+	background: var(--text-muted);
+	border: 1px dashed var(--background-primary);
+	background-image: repeating-linear-gradient(
+		45deg,
+		rgba(255, 255, 255, 0.6) 0 3px,
+		transparent 3px 6px
+	);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-todo {
+	background: transparent;
+	border: 1px dashed var(--text-muted);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-today {
+	width: 3px;
+	height: 14px;
+	border-radius: 2px;
+	background: var(--pb-accent-dim);
+}
+
+/* =========================================================
+   v7.0 第四轮截屏四改（2026-09-30，用户截屏逐条）
+   ① 整页加浅蓝底框：页面转蓝调 + 内容区一块浅蓝画布（#1）
+   ② 选中标签做出「开口」：底边打通 + 两侧内凹圆角（#2）
+   ③ 计划卡度量行末尾补回「计数/总数」（#3）
+   ④ 甘特图重做：白卡承载 + 月份网格 + 去虚线框 + 逾期换低饱和暖色（#4）
+   纯追加：删掉本节 + 还原 _archive/v6.9-度量计数/ 即回退。
+   ========================================================= */
+
+/* ---------- ① 整页浅蓝底框 ---------- */
+/*  参考图（用户 205438）：外层极淡蓝灰页 → 一块浅蓝画布 → 白色卡片，三层。
+    原来只有「白卡落在冷灰页上」两层面差，卡片彼此之间没有共同容器；
+    补上中间这层浅蓝画布后，卡片/图表/清单被收进同一块面板，整页更像一体。
+    层次方向不能反：画布要比卡片**暗一点**，白卡才浮得起来（深色主题相反）。
+    注意 .planboard-content 是 flex 列容器（gap 18px），加内边距即可，
+    不需要动子元素——所有页（行动/计划/任务/成就）共用它。 */
+.planboard-root {
+	background-image: linear-gradient(rgba(53, 114, 168, 0.075), rgba(53, 114, 168, 0.075));
+}
+
+.theme-dark .planboard-root {
+    /* 深色主题方向相反（页面压暗、卡片提亮），所以两层叠：底下仍是原来的压暗，
+       最上面再叠一层极淡蓝借色相——不反转明度关系，只把整页拉进同一个色族。 */
+	background-image:
+		linear-gradient(rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.34)),
+		linear-gradient(rgba(138, 180, 216, 0.05), rgba(138, 180, 216, 0.05));
+}
+
+.planboard-root .planboard-content {
+	background: rgba(53, 114, 168, 0.055);
+	border: 1px solid rgba(53, 114, 168, 0.1);
+	border-radius: 14px;
+	padding: 14px;
+}
+
+.theme-dark .planboard-root .planboard-content {
+	background: rgba(138, 180, 216, 0.07);
+	border-color: rgba(138, 180, 216, 0.16);
+}
+
+/*  窄档（<720px）画布只剩 ~500px：内边距从 14 收到 10，别把卡片挤窄；
+    极窄档（<420px）再收到 8 并降一档圆角。 */
+.planboard-root.is-narrow .planboard-content {
+	padding: 10px;
+	border-radius: 12px;
+}
+
+.planboard-root.is-tiny .planboard-content {
+	padding: 8px;
+	border-radius: 10px;
+}
+
+/* ---------- ② 选中标签做出「开口」 ---------- */
+/*  参考图（用户 205710）：选中项与紧邻的内容区同色、边界消失，看起来像内容区
+    从侧栏「开口」探出来。顶栏这里没有右侧栏，对应关系是**下方内容区**——
+    于是把选中标签的底边打通（圆角只留上两角），左右各接一个内凹圆角，
+    让它像从 banner 里长出来、朝向下面那一页。
+    做法：banner 与标签轨道都去掉下内边距 → 选中标签底边正好落在 banner 下缘；
+    再用 2px 负外边距让它盖住那根发丝线，开口才真的「通」。
+    （文字位置不动：padding-bottom 8→10 与 margin-bottom -2 正好抵消。）
+    v7.0 补（真机 21:17）：header 基础规则里还压着 margin-bottom:22px（窄档 16px），
+    开口下方悬空 23px——光清 padding 不够，margin 也得归零，标签才算踩到框上。 */
+.planboard-root .planboard-header {
+	margin-bottom: 0;
+	padding-bottom: 0;
+}
+
+/*  is-narrow / is-tiny 的 margin-bottom 覆盖（0,3,0）比上面 (0,2,0) 高，
+    不一起归零的话窄档下开口照样悬空。 */
+.planboard-root.is-narrow .planboard-header,
+.planboard-root.is-tiny .planboard-header {
+	margin-bottom: 0;
+}
+
+.planboard-root .planboard-header .planboard-tabs {
+	padding: 4px 4px 0;
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active {
+	position: relative;
+	margin-bottom: -2px;
+	padding-bottom: 10px;
+	border-radius: 10px 10px 0 0;
+	background: var(--pf-tab-open-bg);
+	border-color: transparent;
+	/* v7.1 修正：margin-bottom:-2 只是把下面的内容上提，标签盒子并不真的伸出去——
+	   真机像素扫描发现发丝线从标签正下方横穿（用户说的「横线截断」）。
+	   用 2px 同色硬阴影把线真正盖掉；上一层负阴影仍管悬浮感。 */
+	box-shadow: 0 -1px 3px rgba(28, 69, 105, 0.1), 0 2px 0 0 var(--pf-tab-open-bg);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active {
+	background: var(--pf-tab-open-bg);
+	border-color: transparent;
+	box-shadow: none;
+	/* v7.14 顺手修：文字色一直没跟 v7.0 的暗画布一起换——#17405f 落在 #1e2326 上
+	   几乎读不出来（v7.14 真机截图确认）。改亮色，与深色 hover 文字同档。 */
+	color: #eaf4fd;
+}
+
+/*  内凹圆角：9×9 小方块 + 径向渐变。渐变心在角上、半径 9px，
+    于是只有「离角超过 9px」的那一小块被填色——正好是贴着标签底角外侧的月牙，
+    两片合起来就是开口两肩的弧。 */
+.planboard-root .planboard-header .planboard-tab.is-active::before,
+.planboard-root .planboard-header .planboard-tab.is-active::after {
+	content: "";
+	position: absolute;
+	bottom: 0;
+	width: 9px;
+	height: 9px;
+	background: radial-gradient(circle at 0 0, transparent 9px, var(--pf-tab-open-bg) 9px);
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active::before {
+	left: -9px;
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active::after {
+	right: -9px;
+	background: radial-gradient(circle at 100% 0, transparent 9px, var(--pf-tab-open-bg) 9px);
+}
+
+/* ---------- ③ 计划卡度量行末尾：计数/总数（#3） ---------- */
+/*  宽档：条 flex:1 吃掉余量，这段被推到卡右缘（就是「进度条末尾」）；
+    窄档：目标文案 flex 100% 独占首行，这段跟条成对落到第二行。 */
+.planboard-root .planboard-plan-metric .planboard-progress-count {
+	flex: 0 0 auto;
+	font-size: var(--pf-text-xs);
+	color: var(--pfs-sub);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* ---------- ④ 甘特图重做（#4） ---------- */
+/*  卡面：参考图里图表都住在白卡里。甘特原来直接铺在画布上，
+    加了浅蓝画布后会像一块「没穿衣服」的图，补上卡面与标题。 */
+.planboard-root .planboard-gantt-card {
+	padding: 14px 16px 12px;
+}
+
+/*  轴与轨道左缘必须严格对齐：标签 150 + 间距 8 = 158，原来给的是 160，
+    12 个月份格摊到 924px 上会恒定错 2px（本月要按月份画竖网格，先把这个修掉）。 */
+.planboard-root .planboard-gantt-axis {
+	padding-left: 158px;
+	margin-bottom: 6px;
+}
+
+/*  轨道：去掉灰色实底 + 方框边（一排十块灰板正是「表格感」的来源），
+    改「极淡蓝底 + 每月一条竖网格线」。网格线用 repeating 背景画：
+    background-size 取 100/12% —— 每个平铺块正好一个月份格，线落在格的左缘，
+    于是 12 条线就是 12 个月的分界，不用往 DOM 里塞 120 个元素。 */
+.planboard-root .planboard-gantt-track {
+	height: 26px;
+	background-color: rgba(53, 114, 168, 0.05);
+	background-image: linear-gradient(to right, rgba(53, 114, 168, 0.16) 0 1px, transparent 1px);
+	background-size: 8.333333% 100%;
+	background-repeat: repeat-x;
+	border: none;
+	border-radius: 8px;
+}
+
+.theme-dark .planboard-root .planboard-gantt-track {
+	background-color: rgba(255, 255, 255, 0.05);
+	background-image: linear-gradient(to right, rgba(255, 255, 255, 0.13) 0 1px, transparent 1px);
+}
+
+.planboard-root .planboard-gantt-row {
+	min-height: 28px;
+}
+
+/*  条上下各内缩 4px：轨道 26 - 8 = 18px 胶囊，比 v6.9 的 16px 舒展一档 */
+.planboard-root .planboard-gantt-bar {
+	top: 4px;
+	bottom: 4px;
+}
+
+/*  未开始：v7.0 的「幽灵条」两条已删（v7.14）——最终形态 = 未开始条直接吃
+    v7.1 色板块里 .planboard-gantt-bar 的基础色浅卡其（--pg-rest），
+    特异度高的旧覆盖留着会把卡其压住，见 v7.14 节的说明。 */
+
+/*  逾期未完成：低饱和暖色实心，脱离计划色——这一档最该被一眼看见，
+    而 v6.9 的白色斜纹压在 16px 高的条上像贴了张警告标签，脏且看不清比例。 */
+.planboard-root .planboard-gantt-bar.is-overdue {
+	background: rgba(201, 132, 132, 0.22);
+	border-color: transparent;
+}
+
+.planboard-root .planboard-gantt-bar.is-overdue .planboard-gantt-bar-fill {
+	background: #c98484;
+	background-image: none;
+}
+
+.theme-dark .planboard-root .planboard-gantt-bar.is-overdue {
+	background: rgba(201, 132, 132, 0.26);
+}
+
+.theme-dark .planboard-root .planboard-gantt-bar.is-overdue .planboard-gantt-bar-fill {
+	background: #b87d7d;
+}
+
+/*  图例色块与图上元素一一对应：未开始=极浅实心、逾期=暖色实心 */
+.planboard-root .planboard-gantt-legend-swatch.is-todo {
+	background: rgba(15, 23, 42, 0.07);
+	border: none;
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-overdue {
+	background: #c98484;
+	border: none;
+	background-image: none;
+}
+
+.theme-dark .planboard-root .planboard-gantt-legend-swatch.is-todo {
+	background: rgba(255, 255, 255, 0.09);
+}
+
+/* ---------- ② 补：极窄档（<420px）开口与标签 ---------- */
+/*  真机 21:22 wintest 实测两处破绽：
+    ① is-tiny 基础规则用简写 padding: 12px 12px 10px 把 header 下内边距顶回 10px，
+       开口下方悬空 11px——本节上面的 padding-bottom:0 (0,2,0) 压不过 (0,3,0)，
+       必须以同特异度在后面再写一遍（后写的赢）。 */
+.planboard-root.is-tiny .planboard-header {
+	padding-bottom: 0;
+}
+
+/*  ② 四个标签加上图标后，极窄档 14px 文字 + 图标把余量吃光，
+       「任务看板」溢出。图标不能删（v6.8 #1 用户点名要的），降一档字号 + 图标再缩。
+       21:26 复验：12px 时四枚 61px/枚 < 轨道 ~338，绰绰有余；11px 能省 4px/枚但太委屈，
+       注：选中标签的 scrollWidth 恒比 clientWidth 大 9px——那是开口肩块（绝对定位、
+       故意伸出角外 9px），用 scrollWidth 判溢出时要把_active 这一条排除掉。 */
+.planboard-root.is-tiny .planboard-header .planboard-tab {
+	font-size: var(--pf-text-sm);
+}
+
+.planboard-root.is-tiny .planboard-header .planboard-tab .planboard-tab-icon {
+	font-size: 12px;
+}
+/* =========================================================
+   v7.1 第五轮（2026-09-30，用户截屏三改）
+   ① 选中标签 = 下方画布同色（#e6edf4），肩块改画布色并加大到 10px；
+     「横线截断」由标签自身下沿（margin-bottom:-2）与肩块一起盖掉
+   ② 甘特改参考图单色状态色板（--pg-*）：已完成=橄榄绿 / 进行中=赭橙+浅卡其 /
+     未开始=虚线框（参考图原样请回来；**v7.14 用户定论再取消**，改浅卡其实心、与进行中未来段同色）/ 逾期=赭橙虚线框；今日线换赭红；
+     计划的区分 → 左侧任务名文字色（--plan-tag-text-light/dark）
+   ③ 拖拽与把手取消（TS 侧已移除元素与接线，本节只管配色）
+   纯追加：删掉本节即回退。注意本文件自 v7.0 起是 LF 行尾。
+   ========================================================= */
+
+/* ---------- ① 开口：同色融合 ---------- */
+/*  画布合成色实测 = rgb(230,237,244)：白页 × root 叠蓝 0.075 × content 叠蓝 0.055。
+    标签与画布同色后，肩块的「月牙」不能再画标签色（画了也隐形）——
+    改画画布色，让透明四分之一圆去露 banner：弧成了 banner 底缘「绕着标签抬起来」的曲线，
+    这才是参考图（Hasmart 侧栏选中项）的引导方式。 */
+.planboard-root {
+	/* v7.2 再修正（四点实测 rgb(229,237,244)=#e5edf4）：v7.1 的 #dde7f1 是
+	   「涂红实验」取到标签自身漆面的自证值——用户实测「标签与底框不同色」。
+	   底框真值 = 白页 × root 叠蓝 0.075 × content 叠蓝 0.055，多点采样一致。 */
+	--pf-tab-open-bg: #e5edf4;
+}
+
+.theme-dark .planboard-root {
+	/* v7.3 实测（四点采样 rgb(30,35,38)）：原 #2a3138 是估算值，比底框亮一截。 */
+	--pf-tab-open-bg: #1e2326;
+}
+
+/*  肩块 9 → 10px：同色方案下这条弧是唯一的引导线索，加大一档 */
+.planboard-root .planboard-header .planboard-tab.is-active::before,
+.planboard-root .planboard-header .planboard-tab.is-active::after {
+	/* v7.1 修正：向下多探 2px（height 10→12、bottom 0→-2），把肩块宽度内那段发丝线
+	   也一并盖掉——否则弧的两端还各有一小截线悬着。弧半径仍是 10。 */
+	bottom: -2px;
+	width: 10px;
+	height: 12px;
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active::before {
+	left: -10px;
+	background: radial-gradient(circle at 0 0, transparent 10px, var(--pf-tab-open-bg) 10px);
+}
+
+.planboard-root .planboard-header .planboard-tab.is-active::after {
+	right: -10px;
+	background: radial-gradient(circle at 100% 0, transparent 10px, var(--pf-tab-open-bg) 10px);
+}
+
+/* ---------- ② 甘特单色状态色板（参考图取色） ----------
+   v7.16：--pg-done 改指设计系统的完成绿 --pfs-ok（用户：甘特的绿色要不要和其他
+   绿色一致？）。原橄榄绿 #7d9364 是参考图自己的调子，v7.15 全站收绿后它是唯一
+   的编外绿；var() 在使用处解析，深浅两主题自动跟随 --pfs-ok 的各自取值。
+   v7.17：直接上 --pfs-ok 偏亮偏浓——甘特色板整体是低饱和暖调（卡其/赭橙/赭红），
+   全饱和绿在里面跳。用户问「降饱和还是改淡」：取**改淡**——往底色方向 color-mix
+   一步同时降饱和降明度，色相不脏；降饱和（往灰混）会发闷。浅色往白混 38%，
+   深色往黑混 22% 压亮度（深底上亮绿刺眼）。图例色块同源自动跟随。 */
+.planboard-root {
+	--pg-done: color-mix(in srgb, var(--pfs-ok) 62%, white); /* 已完成：完成绿淡化版（v7.17，v7.16 曾直接用 --pfs-ok） */
+	--pg-fill: #c0622f;      /* 进行中已走部分 / 逾期：赭橙 */
+	--pg-rest: #ded8ba;      /* 进行中未走部分 / 未开始整条：浅卡其 */
+	--pg-todo-edge: #b3ac9a; /* （v7.14 起未开始不再画虚线框，此变量暂无引用，保留供回退） */
+	--pg-today: #b04a2f;     /* 今日线：赭红 */
+}
+
+.theme-dark .planboard-root {
+	--pg-done: color-mix(in srgb, var(--pfs-ok) 78%, black); /* 深色：完成绿压暗一档（v7.17） */
+	--pg-fill: #d98f5f;
+	--pg-rest: #56503c;
+	--pg-todo-edge: #8a8471;
+	--pg-today: #d0654a;
+}
+
+.planboard-root .planboard-gantt-bar {
+	background: var(--pg-rest);
+	border-color: transparent;
+}
+
+.planboard-root .planboard-gantt-bar .planboard-gantt-bar-fill {
+	background: var(--pg-fill);
+	background-image: none;
+}
+
+.planboard-root .planboard-gantt-bar.is-done {
+	background: var(--pg-done);
+}
+
+.planboard-root .planboard-gantt-bar.is-done .planboard-gantt-bar-fill {
+	background: var(--pg-done);
+}
+
+/*  「尚未开工」的虚线框曾在 v7.0 取消、v7.1 为对齐参考图又恢复；
+    **v7.14 用户定论（154815 截图）**：「没必要做虚线框，今日线右面的任务都是浅卡其就行了」
+    —— 别再翻烧饼。未开始不再覆盖，直接吃条的基础色 = 浅卡其实心：
+    整条纯卡其 = 未开始；「赭橙头 + 卡其尾」= 进行中 —— 一眼区分，信息不丢。 */
+.planboard-root .planboard-gantt-bar.is-overdue {
+	background: rgba(192, 98, 47, 0.12);
+	border: 1px dashed var(--pg-fill);
+}
+
+.planboard-root .planboard-gantt-bar.is-overdue .planboard-gantt-bar-fill {
+	background: var(--pg-fill);
+	background-image: none;
+}
+
+/* 今日线与图例色块，跟条同一套色 */
+.planboard-root .planboard-gantt-today {
+	background: var(--pg-today);
+	opacity: 0.9;
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-done {
+	background: var(--pg-done);
+	border: none;
+	background-image: none;
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-doing {
+	background: var(--pg-rest);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-doing::after {
+	background: var(--pg-fill);
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-overdue {
+	background: var(--pg-fill);
+	border: none;
+	background-image: none;
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-todo {
+	background: var(--pg-rest); /* v7.14：与图上的未开始条同色（浅卡其实心），虚线框退役 */
+	border: none;
+}
+
+.planboard-root .planboard-gantt-legend-swatch.is-today {
+	background: var(--pg-today);
+}
+
+/* 任务名：计划区分搬到文字色上（与清单标签同一套变量） */
+.planboard-root .planboard-gantt-label[data-plan] {
+	color: var(--plan-tag-text-light, var(--text-normal));
+}
+
+.theme-dark .planboard-root .planboard-gantt-label[data-plan] {
+	color: var(--plan-tag-text-dark, var(--text-normal));
+}
+/* ---------- v7.4：计划卡进度条重构 ---------- */
+/* ① 量化目标迷你条：6px → 14px（百分比压条上）；计数已挪到条尾（TS 侧） */
+.planboard-root .planboard-goal-row--mini .planboard-goal-bar {
+	height: 14px;
+	position: relative;
+}
+
+.planboard-root .planboard-goal-row--mini .planboard-goal-bar .planboard-progress-pct {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--pf-text-xs);
+	font-weight: 700;
+	color: var(--text-normal);
+	text-shadow: 0 0 3px var(--background-primary), 0 0 3px var(--background-primary);
+	pointer-events: none;
+}
+/* ---------- v7.4b/v7.4c：量化目标标题行按钮（hover 浮现） ---------- */
+/* 标题行：🎯 量化目标 居左、✏️🗑️ 居右 hover 浮现（单目标计划；多目标回退行内 hover 按钮） */
+.planboard-root .planboard-goals-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 4px;
+}
+
+.planboard-root .planboard-goals-head .planboard-goals-title {
+	margin-bottom: 0;
+}
+
+/* v7.4c: 改 hover 浮现（用户 020852）——透明占位防跳动，悬停标题行浮现，
+   透明时 pointer-events:none 防误触隐形按钮 */
+.planboard-root .planboard-goals-head .planboard-goal-actions {
+	display: flex;
+	gap: 2px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+}
+
+.planboard-root .planboard-goals-head:hover .planboard-goal-actions {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* ---------- v7.4c：计划卡头 ✏️🗑️ 改 hover 浮现 ---------- */
+/* 透明占位（布局不跳动），悬停卡头浮现；「＋新增量化目标」常驻不受影响。
+   transition 保留 icon-btn 原有 background/color 过渡 */
+.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.planboard-root .planboard-plan-head:hover .planboard-head-actions .planboard-icon-btn,
+.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn:focus-visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* （v7.16: 随卡头按钮一起删除的还有 v7.4d 的 .planboard-goal-add-btn order 重排） */
+
+/* ==========================================================================
+   v7.5（用户截图 084611 + 参考图 002818）：今日打卡行重做
+   —— 行首复选框取消，打卡动作后置为按钮；行内常驻三个可选框
+      （本次完成 / 用时 / 日期）。值写入笔记的 `## ⏱ 打卡记录` 区。
+   ========================================================================== */
+
+/* ① 日记区栅格 = v7.4 的响应式行为（2026-10-01 10:20 用户要求恢复并置）：
+     宽窗格 ≥720px 时「今日打卡 + 今日总结」并置（靠 .planboard-grid-2 的 1fr 1fr），
+     <720px 由 .is-narrow 塌成单列自动分行。
+     ⚠️ 不要再在这里写死 grid-template-columns —— v7.5 初版写死成 1fr，
+     把宽窗格的并置也一起干掉了（用户当天就发现：「怎么不是并置了」）。
+     半屏放不下四个控件的问题，改由下方 ⑤ 的「按比例宽度 + 允许换行」吃掉，
+     而不是拆双列。 */
+
+/* ② 左区：色点 + 标题，吃掉全部余量（原 <label> 已拆掉）。
+     v7.6：**这一列不再挂计划标签** —— 计划名已在标题里（「✍️ 写作」），
+     再挂一颗同内容药丸纯属重复；归属改由 8px 色点承担。
+     省下的 ~66px 让「标题 + 四控件」在宽卡片里同排的余量更大。
+
+     min-width：**给标题留一条底线**，空间不够时是「控件整组落下一行」，而不是「标题被挤死」。
+     取 56px = 标准项名「✍️ 写作」实测字宽 51px + 5px 余量。
+     （v7.6 写的是 96px。v7.7 收到 56px：grow 改成 0 之后，标题已经不可能被控件压扁
+     ——控件放不下会整组换行，不受这条约束；它现在只在「标题自己都放不下」时兜底，
+     而那时**越窄越该让它换行**，太大反而会把行撑破。96 的副作用是给短标题凭空补
+     45px 空白，正好又落进「标题和打卡框之间间距过大」里。）
+
+     v7.7（用户 113001 截图「标题和打卡框之间间距过大」）：flex-grow 1 → 0。
+     原来标题列**吃掉一半剩余宽度**（与控件组同为 grow:1，各分 50%），
+     于是「✍️ 写作」右边挂着一两百像素空白，控件被推到卡片最右侧 —— 用户看到的就是这个。
+     注意 grow 只影响**剩余空间的分配**，不影响换行判定（判行看的是 flex-basis = 内容宽），
+     所以改这一条不会把本来同排的行顶成两行。
+     改完标题紧贴内容，余量全部给控件组（输入框按比例变宽，与换行后的复盘行一致）。 */
+.planboard-root .planboard-check-main {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 1 auto;
+	min-width: 56px;
+}
+
+/* ②c v7.6：打卡卡里若仍有计划标签一律不显示（上面 ② 已不再渲染，这条是兜底，
+     防止别的渲染路径复用 .planboard-check-card 时又把标签带回来）。 */
+.planboard-root .planboard-check-card .planboard-plan-tag {
+	display: none;
+}
+
+/* ②b 行允许换行：控件组放不下时整组落到第二行。
+     这是「宽窗并置」能成立的关键 —— 并置时卡片只有 320~490px，
+     四个控件（≈334px）挤在标题右边必然溢出，换行比拆双列更合理。 */
+.planboard-root .planboard-check-card .planboard-check-item {
+	flex-wrap: wrap;
+	row-gap: 6px;
+}
+
+/* ③ 行末尾簇（↑↓✕ + 打卡按钮）
+     ---------------------------------------------------------------------------
+     v7.8（用户 115512 截图 #3「把打卡这一列放到行末右对齐」）：这两个元素
+     **包在同一个 div 里**，作为一个整体被 `margin-left: auto` 顶到卡片右缘。
+
+     为什么不干脆让它们当 li 的两个并列子元素（只给其中一个挂 auto 外边距）：
+     auto 外边距只能把「自己所在那一行」的剩余空间吸走。一旦这一行放不下、
+     发生换行，另一个元素就会单独落到第二行**行首**——实测 419px 卡片上
+     「✓ 已打卡」按钮停在 x=112，离右缘差 262px。包成一个整体后，
+     两者要么同在行内右端、要么整簇落到第二行右端，两种情形都是「行末右对齐」。
+
+     为什么 auto 挂在**末簇**而不是按钮上：挂了 auto 的那个元素会连同它**后面**的
+     兄弟一起被推到行末；挂在按钮上则只有按钮过去，↑↓✕ 会被留在原地
+     （夹在标题和「用时」之间，正是 v7.7 那个「间距过大」）。
+
+     ↑↓✕ 仍是 `opacity: 0`、只在 hover 显形，但**照占 76px**（SKILL 坑 8：透明元素照占布局）。
+     它现在紧挨打卡按钮左侧，那 76px 正好落在「日期」与「打卡」之间本来就存在的空档里。
+
+     v7.7 的容器查询（够宽才绝对定位到 right:4px）随之整段删除：
+     绝对定位到右缘会**直接压在行末的打卡按钮上**，而按钮挪到行末后行内空档本就够用。 */
+.planboard-root .planboard-check-card .planboard-check-tail {
+	order: 2;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+	margin-left: auto;
+}
+
+/* 末簇内部：↑↓✕ 回到静态流内。
+   注意 order —— 全局有一条 `.planboard-check-item .planboard-item-actions { order: 1 }`
+   （本文件 1979 行附近，为任务行的「标题第一行 / meta 第二行」服务），
+   在末簇里它会把 ↑↓✕ 排到打卡按钮**后面**；这里显式归零，让两者按 DOM 顺序排。 */
+.planboard-root .planboard-check-card .planboard-check-item .planboard-item-actions {
+	position: static;
+	transform: none;
+	order: 0;
+	margin-left: 0;
+}
+
+/* ④ 右区控件组 */
+/* v7.8：`flex: 1 1 270px` → `flex: 0 0 auto`，**控件组不再吃掉剩余宽度**。
+     截图 #3 的选择是「用时/日期紧跟标题，只有按钮靠右」，所以这一组按内容宽排，
+     剩余空间全部让给操作组的 `margin-left: auto`（见 ③），由它把按钮顶到行末。
+     旧值 270px 是「四个控件写死宽度之和」，v7.8 只剩两个下拉，这个阈值已无意义。
+
+     注：v7.5/v7.6 曾用 `justify-content: flex-end` 把控件推到卡片右侧，
+     v7.7 改成 flex-start 让它们贴标题 —— 本版延续 flex-start。 */
+.planboard-root .planboard-check-controls {
+	order: 1;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+	min-width: 0;
+	justify-content: flex-start;
+}
+
+.planboard-root .planboard-check-input {
+	height: 28px;
+	padding: 0 8px;
+	border: 1px solid var(--pfs-hair-strong);
+	border-radius: 8px;
+	background: var(--pfs-card);
+	color: var(--text-normal);
+	font-size: var(--pf-text-sm);
+	line-height: 1;
+	box-shadow: none;
+}
+
+.planboard-root .planboard-check-input:focus {
+	border-color: var(--pfs-accent-soft);
+	box-shadow: none;
+	outline: none;
+}
+
+/* v7.8：下拉框（用时 / 日期）。
+   旧版这里写着「flex-basis 取能放下的最小宽度，再靠 flex-grow 撑开」——
+   那是因为旧的文本框**需要被拉宽**（宽度＝可读性，写「2500」不能挤成「25…」）。
+   现在剩两个 select：内容宽由最长选项决定，再撑宽只会让「用时」和「日期」之间
+   多出一段死白，反而把按钮推得离标题更远。所以改成 `flex: 0 0 auto`（按内容定宽、
+   不伸不缩），`min-width: 0` 让它们在极窄档里可以被压。
+   最窄内容宽度反推：用时放得下「60分 ▾」（3 字），日期放得下「昨天 ▾」（2 字）。
+
+   v7.9：**用时不再是 select，写不了 `width: auto`**——
+   select 的 auto 是「按最长选项定宽」，input 的 auto 是浏览器默认的 ~20 个字符（≈173px），
+   一行里塞进两个这种宽度就全崩了。所以用时单独给死宽。 */
+.planboard-root .planboard-check-date {
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 0;
+}
+
+/* 用时输入框：**60px + 右侧只留 2px，都是量出来的**。
+   ---------------------------------------------------------------------------
+   ① 宽度预算：v7.8 那个 select 盒宽 58，而这一行在卡片 410~419px（并置档 + 已打卡按钮
+      80px 宽）刚好卡在一行上，多 6px 就会掉成两行（实测 64px 时 960 档 44→78）。
+      所以宽度按「够用就好」配：8(左内边距) + 34(最长的「999分」，实测 12px 字号)
+      + 14(浏览器画的档位按钮) + 2(右内边距) = 58，取 60；同时把日期下拉的右内边距
+      从 22 收到 20（它只需要 16：箭头 6+10），一进一出，控件组总宽仍是 120，与 v7.8 持平。
+
+   ② 宽度：控件组总宽**必须仍是 120px**（v7.8 是 58+6+56）——这一行在卡片 410~419px
+      （并置档 + 已打卡按钮 80px 宽）刚好卡在一行上，多 6px 就掉成两行（实测 64px 时
+      960 档行高 44→78）。所以：用时 60 + 间距 6 + 日期 54 = 120，一分不多。
+   ③ 输入框自己留 16px 右内边距，给绝对定位的档位按钮让位（两者叠成一个控件）。 */
+.planboard-root .planboard-check-minutes-field {
+	/* 输入框 + 档位按钮的外壳：按钮绝对定位盖在输入框右端，两者视觉上是一个控件 */
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+.planboard-root input.planboard-check-minutes {
+	width: 60px;
+	min-width: 0;
+	padding-right: 16px;
+}
+
+/* v7.9：档位按钮（自绘箭头，点开是 Obsidian 原生 Menu）。
+   ---------------------------------------------------------------------------
+   为什么不用 `<input list>` + `<datalist>`（本节第一版就是那么写的）：
+   `<input list>` 的档位箭头由 Blink 画在 `::-webkit-calendar-picker-indicator` 上，而这版
+   Electron（Obsidian 1.13.x）里那个指示器**不稳定** —— 同一份规则写在 styles.css 里它不出现
+   （字段和普通文本框长得一模一样、用户根本不知道能点开；鼠标点上去倒是能展开，属于
+   SKILL 坑 8 那类「隐形但可点」），临时注入一份同样的规则却又出现；二分十几轮
+   （换 padding、换 width、加 color / -webkit-text-fill-color、换选择器、独立注入对照、
+   甚至重启实例）都没找出稳定触发条件。**不赌 UA 的实现，改自己画。**
+   现在这颗箭头是我们自己的按钮：样式跟主题走，点的行为和外观一致。
+   浅/深两套 data URI（写不进 var()），与日期下拉那支 V 同款。 */
+.planboard-root .planboard-check-tiers-btn {
+	position: absolute;
+	right: 2px;
+	top: 1px;
+	bottom: 1px;
+	width: 16px;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 6px;
+	background-color: transparent;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-size: 10px 10px;
+	background-repeat: no-repeat;
+	background-position: center;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.planboard-root .planboard-check-tiers-btn:hover {
+	background-color: var(--pfs-hair);
+}
+
+.theme-dark .planboard-root .planboard-check-tiers-btn {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%239aa3af' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* select 在 Obsidian 里被全局 `appearance: none` 洗掉了原生箭头，而主题只给
+   `.dropdown` 这个类偷偷画了一个（见 obsidian.css 里 `select, .combobox-button, .dropdown`
+   与 `.dropdown { background-image: url(...svg...) }`）。我们的下拉没有 .dropdown 类，
+   于是「用时」「今天」看起来就是两个**普通文本框**——用户根本不知道能点开（v7.8 实测截图确认）。
+   所以自己画一个：10px 的 V 形，贴在右侧 6px 处。颜色分浅深两套，
+   因为 data URI 里写不进 `var()`，只能给两份。 */
+/* v7.9：padding-right 22 → 20。这支 V 从右缘 6px 起、宽 10px，所以 16px 就够，
+   20 留 4px 余量；省下的 2px 让给了「用时」输入框（见下），控件组总宽不变。 */
+.planboard-root select.planboard-check-input {
+	padding-right: 20px;
+	cursor: pointer;
+	background-repeat: no-repeat;
+	background-position: right 6px center;
+	background-size: 10px 10px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.theme-dark .planboard-root select.planboard-check-input {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%239aa3af' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.planboard-root .planboard-check-btn {
+	/* v7.8（截图 #3）：本按钮已从控件组挪进「末簇」（`.planboard-check-tail`），
+	   与 ↑↓✕ 同级；顺序靠末簇内部的 DOM 序（actions 在前、按钮在后），
+	   所以这里不再需要 order。 */
+	height: 28px;
+	padding: 0 14px;
+	border: 1px solid var(--pfs-accent);
+	border-radius: 8px;
+	background: var(--pfs-accent);
+	color: #fff;
+	font-size: var(--pf-text-sm);
+	font-weight: 500;
+	line-height: 1;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: filter 0.15s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* 提亮会掉白字对比度，所以 hover 走「压暗」方向 */
+.planboard-root .planboard-check-btn:hover {
+	filter: brightness(0.93);
+}
+
+/* 已打卡：按钮退成描边态（再点一次 = 取消打卡，记录行一并移除） */
+.planboard-root .planboard-check-btn.is-checked {
+	background: transparent;
+	color: var(--pfs-accent);
+	border-color: var(--pfs-hair-strong);
+}
+
+/* ⑤ 窄档兜底（v7.5 真机实测补漏）：右栏这类 239px 窗格下卡片只有 186px，
+   而四个控件按上面的硬编码宽度合计要 334px —— 实测**溢出卡片 189px**，
+   控件会被裁到卡外。这里只在 is-tiny 下把控件组整行下移、内部允许换行、
+   输入框改成按比例分配宽度（比例宽度随卡片走，不必再按 padding 反推像素）。
+   注意：is-tiny 不继承 is-narrow 的规则（见本节上方 3028 行的老坑），
+   所以窄档要单独写一条，不能只写 is-narrow。 */
+.planboard-root.is-tiny .planboard-check-item {
+	flex-wrap: wrap;
+}
+
+/* 操作按钮（↑↓✕）在窄档退回绝对定位（v6.x 的老写法）：实测窄档 li 内容宽只剩 ~130px，
+   按钮若留在流内会**独占一行**白占 24px 行高。它们本来就只在 hover 时显形，绝对定位不挡内容。 */
+.planboard-root.is-tiny .planboard-check-card .planboard-check-item .planboard-item-actions {
+	position: absolute;
+	right: 4px;
+	top: 8px;
+	transform: none;
+}
+
+.planboard-root.is-tiny .planboard-check-controls {
+	flex: 1 1 100%;
+	min-width: 0;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+/* v7.8：只剩两个控件，44% + 44%（+ 4px 间距）刚好一行排下；
+   排不下就各自占满一行，不会溢出。
+   v7.9：用时的 flex item 换成了外壳（输入框 + 档位按钮叠在一起的那个 div），
+   所以这里改挂在外壳上；input 自己写死 60px，极窄档要放到 100% 才撑得开。 */
+.planboard-root.is-tiny .planboard-check-minutes-field,
+.planboard-root.is-tiny .planboard-check-date {
+	flex: 1 1 44%;
+	min-width: 0;
+}
+
+.planboard-root.is-tiny .planboard-check-minutes-field {
+	width: 0; /* flex-basis 44% 会盖掉它，写 0 是兜第二道（免得哪天基宽改回 auto） */
+}
+
+.planboard-root.is-tiny input.planboard-check-minutes {
+	width: 100%;
+}
+
+.planboard-root.is-tiny .planboard-check-date {
+	width: auto;
+}
+
+/* 窄档里操作组已绝对定位（见上一条），末簇里只剩打卡按钮参与排版，
+   由末簇自己的 `margin-left: auto` 贴到那一行行末 —— 不必再给按钮挂 auto。 */
+
+/* =========================================================================
+   v7.8（用户 115512 截图）：已打卡行改「浅绿底」
+   -------------------------------------------------------------------------
+   用户原话：「已打卡内容不用删除线，而是整行加一个浅绿的底色可行吗？」——可行。
+   删除线那套（v1.x 白盒时代定的：faint 灰字 + line-through + opacity .85）是
+   「把这条划掉」的语义，用在打卡上等于告诉用户「这事翻篇了」；而打卡要的是
+   正向反馈，所以换成一层低饱和绿底，文字保持正常色。
+
+   为什么这里要写一整条新规则而不是改上面那几条：
+   `.planboard-root .planboard-check-item.is-checked { background: transparent }`
+   （本文件 2883 行附近，管的是**任务池/看板**里勾掉的条目）与
+   `.planboard-check-card .planboard-check-item.is-checked`（1309 行附近）**同为 3 个类**，
+   后者在文件里更靠前 → 输；所以绿色底必须写在 2883 之后再盖一层，
+   并用 `.planboard-check-card` 限定**只给今日打卡卡**，别把任务池那些行也刷绿。
+   （文字色与删除线在 1315 行那条上直接改掉了，见那里的注释。） */
+.planboard-root .planboard-check-card .planboard-check-item.is-checked {
+	background: var(--pfs-ok-soft);
+	opacity: 1; /* 旧值是 .85，压在绿底上会让绿色发灰 */
+	animation: planboard-check-ok 0.4s ease;
+}
+
+/* 打卡瞬间的一次绿色呼吸：从加深版呼吸到常态版。
+   注意 100% 必须落在**最终规则值**上（--pfs-ok-soft），否则动画结束的瞬间
+   底色会从「动画最后一帧」跳回规则值，肉眼能看到一记闪。
+   这条覆盖的是本文件 1387 行的 `planboard-check-fade`（琥珀→透明），
+   那支是给任务池那些行用的，不动它。 */
+@keyframes planboard-check-ok {
+	0% {
+		background: var(--pfs-ok-flash);
+	}
+	100% {
+		background: var(--pfs-ok-soft);
+	}
+}
+
+/* =========================================================================
+   v7.15 全站一致性统一（2026-10-01，用户：「统一一下颜色、样式、字号等等，
+   比如勾选之后的呈现；还有需要对齐的文字，行和列」）
+   清点方式：_tools/v7.15-inventory.js 真机逐页抓 computed style 分组。
+   回滚：整节删除 → 回到 v7.14。
+   ========================================================================= */
+
+/* ---------- ① 次级灰统一：全站一只灰 ----------
+   清点结果：次级文字同时存在三种灰——
+     · var(--text-muted)（Obsidian 浅色 = #5c5c5c 中性灰）：任务日期、subtab、计数
+     · var(--pfs-sub)（#64748b 冷灰）：空态、进度计数
+     · var(--text-faint)（#ababab 过浅）：环形图百分比（白卡上快看不见）
+   角色相同、灰不同 = 行与列视觉上「不齐」的主要来源之一。
+   处理：在视图作用域内把 Obsidian 的 --text-muted 重映射到 --pfs-sub
+   （深色主题下 --pfs-sub 有自己的覆盖 #9aa3af，自动跟随）。
+   --text-faint 不动——把手线条等用它在做**面**不是**字**，另案处理百分比那一处。 */
+.planboard-root {
+	--text-muted: var(--pfs-sub);
+}
+
+/* ---------- ② 勾选态统一：绿底正向，全站一套 ----------
+   清点结果：勾选后有三种呈现并存——
+     · 今日打卡卡：浅绿底 + 正常文字（v7.8 用户定论）
+     · 任务池/计划卡：muted 灰字 + 删除线
+     · 看板列：再叠 opacity 0.55（三重变灰）
+   同一个「完成」动作三种读法。统一采用 v7.8 的正向语义：
+   低饱和绿底承担状态，文字保持正常色可读，不做任何压淡。
+   特异性说明：`.planboard-root .planboard-check-item.is-checked`（4 类）与
+   2883/1310/1309 行那几条 3 类规则同源更靠后 → 全部压住，无需逐处修改。 */
+.planboard-root .planboard-check-item.is-checked {
+	background: var(--pfs-ok-soft);
+	opacity: 1;
+	animation: planboard-check-ok 0.4s ease;
+}
+
+.planboard-root .planboard-check-item.is-checked .planboard-check-text {
+	color: var(--text-normal);
+	/* ⚠️ 必须显式 none：322 行的 line-through 不删声明就照样生效（v7.8 踩过） */
+	text-decoration: none;
+}
+
+/* =========================================================================
+   v7.16（2026-10-01 下午，用户四点反馈）
+   ========================================================================= */
+
+/* ---------- ③ 打卡进度条加框：与「🎯 量化目标」盒子同一形式 ----------
+   用户 165222：计划卡里打卡进度条裸在卡面上，量化目标进度条却带着
+   .planboard-goals-box 的白底描边框，同卡两条条形式不一。
+   处理：给度量行同一副框（同 padding/边框/圆角/外边距），两框上下相邻
+   读作一组；度量行内部布局（目标文案 + 条 + 计数）不动。 */
+.planboard-root .planboard-plan-metric {
+	margin: 12px 0 4px;
+	padding: 8px 12px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+}
+
+/* ---------- ④ 新增计划表单的量化目标段 ---------- */
+.planboard-modal .planboard-modal-goal-section {
+	margin-top: 14px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.planboard-modal .planboard-modal-goal-section h3 {
+	margin: 0 0 2px;
+	font-size: var(--pf-text-md);
+	font-weight: 700;
+}
+
+.planboard-modal .planboard-modal-goal-hint {
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	margin-bottom: 8px;
+}
+
+/* =========================================================================
+   v7.17（2026-10-01 傍晚，用户四点反馈）
+   ① 今日打卡/今日总结标题珊瑚色竖条 → 已在 v1.7.4 区原位删除（回 16px 内容缘）
+   ② 新增计划弹窗量化段补起止日期 → 纯 TS，无 CSS
+   ③ 甘特绿改淡 → 已在 v7.16 色板块原位改 color-mix
+   ========================================================================= */
+
+/* ---------- ③ 度量框标题「✅ 打卡行动」 ----------
+   v7.16 给打卡进度条加了框（.planboard-plan-metric），但框里没标题；
+   下方「🎯 量化目标」框有标题行（.planboard-goals-title）——同卡两框形式不一。
+   这里与 goals-title 同一字号/字重/灰（有意各写各的类：一个在 metric 框内、
+   一个在 goals-head 里跟着 hover 按钮走，DOM 不同，共用类日后改样式容易顾此失彼）。 */
+.planboard-root .planboard-plan-metric-title {
+	flex: 1 1 100%; /* 度量行是 v6.7 的横向 flex（目标+条+打卡率一行）——标题必须独占整行，否则挤成行内 flex 项 */
+	font-size: var(--pf-text-xs);
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+	letter-spacing: 0.02em;
+}
+
+/* =========================================================================
+   v7.18（2026-10-01 晚，用户 190343 截图两点）
+   ① 任务看板只读化 —— 纯 TS（renderTaskItem 撤 ✏️/✕ 与点击编辑），
+      TaskModal/saveTask/deletePoolTask 退役删除。无 CSS。
+   ② 新增计划弹窗：起止日期上移为计划级字段；「目标描述」栏退役（纯 TS）；
+      名称输入挂 datalist 选已有计划（选已有名 = 只加量化目标，纯 TS）。
+      仅下条 CSS：周期行双 date 输入横排。
+   ========================================================================= */
+
+/* 起止日期：一个 Setting 里两个 date 输入并排（Obsidian 的 setting-item-control
+   默认 flex 但 gap 走主题变量且挤压窄输入，这里显式给间距与最小宽） */
+.planboard-root .planboard-period-range {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.planboard-root .planboard-period-range input[type="date"] {
+	min-width: 130px;
+}
+
+/* =========================================================================
+   v7.21（2026-10-01 晚，用户指令：编辑量化目标的「量化到每日打卡」不是一个开关，
+   要和「添加打卡项」一样的几个可编辑内容）——弹窗内段标题 + 说明行。
+   逻辑全在 GoalEditModal（开关换四栏：名称/计划/起止/复盘链接），仅这两条 CSS。
+   ========================================================================= */
+.planboard-modal .planboard-modal-section-title {
+	font-size: var(--pf-text-sm);
+	font-weight: 600;
+	color: var(--text-normal);
+	margin: 16px 0 0;
+	padding-bottom: 4px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.planboard-modal .planboard-modal-section-desc {
+	font-size: var(--pf-text-xs);
+	color: var(--text-muted);
+	margin: 2px 0 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.0.5 UI/UX 审查整改（P0/P1/P2）
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── P0-2 触控目标：iPad / 触屏设备点击区扩到 40px+（门禁 44px 的务实档）──
+   视觉尺寸不变，透明 padding 扩大命中区；桌面（hover 设备）零变化。 */
+@media (hover: none) and (pointer: coarse) {
+	.planboard-icon-btn {
+		min-width: 40px;
+		min-height: 40px;
+	}
+	.planboard-tab {
+		min-height: 40px;
+	}
+	.planboard-check-btn {
+		min-height: 40px;
+	}
+	.planboard-move-btn,
+	.planboard-del-btn {
+		margin: 0 2px; /* 扩区后相邻按钮留出间隙，防误触邻键 */
+	}
+}
+
+/* ── P2-1 Lucide 图标尺寸：setIcon 生成 svg，约束到原字符字号观感 ── */
+.planboard-icon-btn svg {
+	width: 15px;
+	height: 15px;
+	stroke-width: 2;
+}
+.planboard-icon-btn.planboard-del-btn svg {
+	/* 删除键略小一号：破坏性操作视觉降权，与文本按钮拉开 */
+	width: 14px;
+	height: 14px;
+}
+
+/* ── P1-2 按压与禁用态：此前 :active 仅 3 处、disabled 0 处 ── */
+.planboard-btn:active:not([disabled]),
+.planboard-icon-btn:active:not([disabled]) {
+	transform: translateY(1px);
+	filter: brightness(0.94);
+}
+.planboard-btn:disabled,
+.planboard-icon-btn:disabled,
+.planboard-btn[disabled],
+.planboard-icon-btn[disabled] {
+	opacity: 0.45;
+	cursor: not-allowed;
+	transform: none;
+	pointer-events: none;
+}
+
+/* ── P0-1 撤销式删除：Notice 里的撤销按钮 ── */
+.pf-notice-undo {
+	margin-left: 8px;
+	padding: 2px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: var(--pf-text-sm);
+}
+.pf-notice-undo:hover {
+	background: var(--background-modifier-hover);
+}
+.pf-notice-undo:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* ── P2-2 空状态引导：文案 + 主行动按钮 ── */
+.planboard-empty,
+.planboard-empty-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+}
+.pf-empty-cta {
+	color: var(--pb-accent, #3572a8);
+}
+.theme-dark .pf-empty-cta {
+	color: var(--pb-accent, #8ab4d8);
+}
+.planboard-goals-empty {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 0;
+	color: var(--text-muted);
+	font-size: var(--pf-text-sm);
+}
+
+/* ── v1.0.5.2 打卡项管理收归计划管理页 ── */
+/* v1.0.5.2b: metric 改纵向两行制（与量化目标区同构）——
+   容器原是 flex row + wrap，head/row 两个子块宽度够时会并排（视觉仍是一行），
+   必须显式转纵向，head/row 各占一整行。 */
+.planboard-root .planboard-plan-metric {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 6px;
+}
+/* 「✅ 打卡行动」标题行：标题 + hover 浮现的 ✏️（同量化目标标题行模式） */
+.planboard-plan-metric-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+/* 进度行：原 v6.7 横排内容（target + bar + count），窄档 wrap 回退保留 */
+.planboard-plan-metric-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.planboard-plan-metric-head .planboard-item-actions {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+.planboard-plan-metric-head:hover .planboard-item-actions {
+	opacity: 1;
+}
+/* 管理弹窗列表 */
+.planboard-manage-list {
+	margin: 8px 0 4px;
+	padding: 0;
+	list-style: none;
+}
+.planboard-manage-list .planboard-check-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 5px 2px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.planboard-manage-empty {
+	color: var(--text-muted);
+	font-size: var(--pf-text-sm);
+	padding: 6px 2px;
+}
+
+/* ── v1.0.5.2b 管理弹窗：自动项标记 + inline 编辑行 ── */
+.planboard-manage-auto-tag {
+	flex-shrink: 0;
+	padding: 1px 8px;
+	border-radius: 8px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: var(--pf-text-xs);
+}
+.planboard-manage-editing {
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.planboard-manage-edit-name {
+	flex: 1 1 120px;
+	min-width: 0;
+}
+.planboard-manage-editing input[type="date"] {
+	flex: 0 0 auto;
+}

@@ -10,6 +10,8 @@ import type { PlanTemplate } from "./settings";
 
 export const CHECK_HEADING = "## ✅ 今日打卡";
 export const SUMMARY_HEADING = "## 📝 今日总结";
+/** v7.5: 打卡记录独立区（三个可选框的值落在这里，任务行格式零污染）。 */
+export const LOG_HEADING = "## ⏱ 打卡记录";
 
 /**
  * Parse a single Tasks-style line (DEV.md §5 踩坑记录 #6).
@@ -19,14 +21,15 @@ export const TASK_LINE_RE =
 	/^- \[([ x])\] (.+?)(?: #计划\/(\S+))?(?: 🛫 (\d{4}-\d{2}-\d{2}))?(?: 📅 (\d{4}-\d{2}-\d{2}))?$/;
 
 /** A check-in item inside the daily note. */
-export interface CheckItem {
-	/** Task content (no `- [ ]` marker, no plan tag). */
+export interface CheckItem {	/** Task content (no `- [ ]` marker, no plan tag). */
 	text: string;
 	/** Plan tag name (without `#计划/`), or null for temp tasks. */
 	plan: string | null;
 	checked: boolean;
 	/** Due date `📅` (falls back to scheduled date), or null. */
 	due: string | null;
+	/** v7.19: Scheduled date `🛫`, or null（添加打卡项弹窗的「起止日期」写入）。 */
+	start: string | null;
 	/** 0-based line index inside the note file. */
 	line: number;
 	/** The full raw line. */
@@ -185,6 +188,7 @@ export function parseDailyContent(file: TFile, content: string, date: string): D
 			plan,
 			checked,
 			due: m[5] ?? m[4] ?? null,
+			start: m[4] ?? null,
 			raw: line,
 		};
 		if (plan) {
@@ -265,42 +269,73 @@ export function replaceSummary(content: string, summary: string): string {
 // Line-level mutations (checkbox / add / remove / move)
 // ---------------------------------------------------------------------------
 
-export function toggleTaskLine(content: string, lineIndex: number, checked: boolean, expectedRaw?: string): string {
-	const lines = content.split("\n");
-	// v2.5 (B2): 内容定位兜底——行号处内容与预期不符说明文件被外部改动（行号漂移），
-	// 按原始行文本重定位；找不到则放弃写回（fail-safe，防改错行）
+/**
+ * 定位待改动的行号（v2.5 B2 的 fail-safe，各行级操作共用）。
+ *
+ * 行号处内容与预期不符说明文件被外部改动（行号漂移），按原始行文本重定位；
+ * 找不到、或重定位后仍越界，一律返回 -1 让调用方放弃写回——绝不猜测改哪一行。
+ *
+ * ⚠️ 调用方**必须**先判 `idx === -1` 再去索引 `lines[idx]` / 算偏移：
+ * 早先 `moveTaskLine` 先算 `idx + delta` 再判越界，idx=-1 时 delta=1 会得到
+ * target=0，恰好骗过 `target >= 0` 检查，随后拿 `lines[0]` 去交换——静默改错数据。
+ */
+function resolveLineIndex(lines: string[], lineIndex: number, expectedRaw?: string): number {
 	let idx = lineIndex;
 	if (expectedRaw && lines[idx] !== expectedRaw) {
 		idx = lines.findIndex((l) => l === expectedRaw);
-		if (idx === -1) return content;
 	}
+	return idx >= 0 && idx < lines.length ? idx : -1;
+}
+
+export function toggleTaskLine(content: string, lineIndex: number, checked: boolean, expectedRaw?: string): string {
+	const lines = content.split("\n");
+	const idx = resolveLineIndex(lines, lineIndex, expectedRaw);
+	if (idx === -1) return content;
 	const line = lines[idx];
-	if (line === undefined || !/^- \[[ x]\]/.test(line)) return content;
+	if (!/^- \[[ x]\]/.test(line)) return content;
 	lines[idx] = line.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
 	return lines.join("\n");
 }
 
 export function removeLine(content: string, lineIndex: number, expectedRaw?: string): string {
 	const lines = content.split("\n");
-	let idx = lineIndex;
-	if (expectedRaw && lines[idx] !== expectedRaw) {
-		idx = lines.findIndex((l) => l === expectedRaw);
-		if (idx === -1) return content;
-	}
-	if (idx < 0 || idx >= lines.length) return content;
+	const idx = resolveLineIndex(lines, lineIndex, expectedRaw);
+	if (idx === -1) return content;
 	lines.splice(idx, 1);
+	return lines.join("\n");
+}
+
+/**
+ * v1.0.5.2: 编辑打卡项——把指定行整体替换为 newRaw（重建的完整行）。
+ * newRaw 由调用方重建（保留 checkbox 状态与 #计划/ 标签、更新名称/窗口），
+ * 这里只负责按 expectedRaw 定位原行并替换；定位失败原样返回（fail-safe 同族口径）。
+ */
+export function replaceLine(content: string, lineIndex: number, expectedRaw: string, newRaw: string): string {
+	const lines = content.split("\n");
+	const idx = resolveLineIndex(lines, lineIndex, expectedRaw);
+	if (idx === -1) return content;
+	lines[idx] = newRaw;
+	return lines.join("\n");
+}
+
+/**
+ * v1.0.5: 撤销删除——把一行插回指定下标。
+ * lineIndex 是删除前那行的下标；若期间文件又变了，下标可能略偏，
+ * 所以夹到 [0, lines.length] 内兜底（打卡项都在打卡区内，位置基本稳定）。
+ * 与 removeLine 成对使用：`insertLine(removeLine(data, i, raw), i, raw)` 逐字节还原。
+ */
+export function insertLine(content: string, lineIndex: number, raw: string): string {
+	const lines = content.split("\n");
+	const at = Math.max(0, Math.min(lineIndex, lines.length));
+	lines.splice(at, 0, raw);
 	return lines.join("\n");
 }
 
 export function moveTaskLine(content: string, lineIndex: number, delta: number, expectedRaw?: string): string {
 	const lines = content.split("\n");
-	let idx = lineIndex;
-	if (expectedRaw && lines[idx] !== expectedRaw) {
-		idx = lines.findIndex((l) => l === expectedRaw);
-		if (idx === -1) return content;
-	}
+	const idx = resolveLineIndex(lines, lineIndex, expectedRaw);
+	if (idx === -1) return content;
 	const target = idx + delta;
-	if (idx < 0 || idx >= lines.length) return content;
 	if (target < 0 || target >= lines.length) return content;
 	if (!/^- \[[ x]\]/.test(lines[idx]) || !/^- \[[ x]\]/.test(lines[target])) return content;
 	const tmp = lines[idx];
@@ -311,9 +346,9 @@ export function moveTaskLine(content: string, lineIndex: number, delta: number, 
 
 /** Append a task line inside the `## ✅ 今日打卡` section (after the last task). */
 export function appendCheckItem(content: string, line: string): string {
-	const lines = content.split("\n");
-	const headingIdx = lines.findIndex((l) => l.startsWith(CHECK_HEADING));
-	if (headingIdx === -1) {
+ 	const lines = content.split("\n");
+  const headingIdx = lines.findIndex((l) => l.startsWith(CHECK_HEADING));
+  if (headingIdx === -1) {
 		return content.replace(/\s*$/, "\n\n" + CHECK_HEADING + "\n" + line + "\n");
 	}
 	let insertIdx = headingIdx + 1;
@@ -326,23 +361,281 @@ export function appendCheckItem(content: string, line: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// v7.22 补卡（backfill）：在**目标日期**那篇日记里定位 / 勾选 / 追加打卡行
+//
+// 为什么需要这一组（补卡踩坑第 2 坑）：
+//   补卡写的是**另一篇**文件，行号完全不同（今天第 2 行 ≠ 昨天第 2 行），
+//   所以 `toggleTaskLine(content, item.line, ...)` 那种「按行号改」在这里一律不能用
+//   —— 拿今天的行号去改昨天，会改错行（项目里 toggleTaskLine 的兜底是「按 raw 文本
+//   找」，找不到就原样返回；跨文件时 raw 也不一样，于是静默不动，用户只看到
+//   「补卡没反应」）。
+//
+//   唯一可靠的锚点是**打卡项名**（界面上显示的那串，如 `✍️ 写作`）。它由
+//   `checkDisplayText` 产出，两侧同源，所以能在目标文件里唯一定位。
+// ---------------------------------------------------------------------------
+
+/**
+ * v7.22 补卡：在打卡区内**按计划名**找那一行，返回行号；找不到返回 -1。
+ *
+ * ## 为什么用「计划名」而不是「显示名」——单测实测出来的结论（重要）
+ *
+ * 第一版按界面显示名（`✍️ 写作`）匹配，单测直接挂了：真库里 `2026-10-01.md`
+ * 那种老行写的是 `✍️ 写作 1小时`、复盘行是 `📈 复盘 复盘+次日计划 → [[... 复盘]]`，
+ * 而界面名已经把这些剥干净了。两侧形态不同，而 `stripLegacyDuration` 的闸门
+ * （「剥完必须正好等于计划标准名」）在**拿不到 plan 上下文时根本不触发** ——
+ * 也就是说，按显示名匹配注定对不上历史行。
+ *
+ * 改用计划名（`#计划/写作`）后：
+ *   · 它写在任务行的 `#计划/` 标签里，**不参与任何显示层剥离**，两侧逐字相同；
+ *   · 复盘项、写作项、健康项都能对上，包括带 `1小时` 后缀的老行；
+ *   · 唯一前提是**同一计划在同一天只有一个打卡项** —— 这正是插件的数据模型
+ *     （打卡项由「计划」推导，见 buildDefaultCheckItems；重复计划打卡项
+ *     本来就会让统计口径失真）。
+ *   · 边界回退：没有 `#计划/` 标签的手写行 → 退回按归一名匹配，尽量找到。
+ *
+ * @param plan 计划名（对应 `#计划/{plan}`），主锚点
+ * @param displayName 界面显示名，仅用于无计划标签时的回退匹配
+ */
+export function findCheckLineByPlan(content: string, plan: string | null, displayName: string): number {
+	const lines = content.split("\n");
+	let inCheckSection = false;
+	let fallback = -1;
+	const wantName = normalizeCheckName(displayName);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (/^##\s/.test(line)) {
+			inCheckSection = line.startsWith(CHECK_HEADING);
+			continue;
+		}
+		if (!inCheckSection) continue;
+		const m = TASK_LINE_RE.exec(line);
+		if (!m) continue;
+		// 主锚点：计划名逐字比对（两侧形态一致，不受显示层剥离影响）
+		if (plan && m[3] === plan) return i;
+		// 回退：手写行没有 #计划/ 标签时，按归一名匹配。
+		// ⚠️ 判「无标签」必须用 == null 而不是 === null —— 正则的可选组没参与匹配时
+		//   捕获组是 **undefined**（不是 null）。单测实测：写 `=== null` 回退路径永不触发。
+		if (fallback === -1 && m[3] == null && normalizeCheckName(m[2]) === wantName) fallback = i;
+	}
+	return fallback;
+}
+
+/** 勾/取消某行（按行号）。找不到或行型不对时原样返回，fail-safe。 */
+export function setCheckLineChecked(content: string, lineIndex: number, checked: boolean): string {
+	const lines = content.split("\n");
+	const line = lines[lineIndex];
+	if (line === undefined || !/^- \[[ x]\]/.test(line)) return content;
+	lines[lineIndex] = line.replace(/^- \[[ x]\]/, checked ? "- [x]" : "- [ ]");
+	return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// v7.5: 打卡记录区（`## ⏱ 打卡记录`）
+//
+// 为什么单开一区而不是写进任务行：任务行是 Tasks 格式（PRD §2），多加字段会污染
+// 解析器与其它插件（Tasks/Dataview）；而「本次完成 / 用时 / 日期」是打卡的**过程量**，
+// 和任务本身的完成状态不是一回事，分开存最安全。
+// ---------------------------------------------------------------------------
+
+/** 记录行锚点：`- {日期} · {打卡项} ·`——同一「日期 + 打卡项」只保留一条。 */
+function logAnchor(date: string, key: string): string {
+	return `- ${date} · ${key} ·`;
+}
+
+/**
+ * 记录行是否属于「某日期 + 某打卡项」。
+ *
+ * v7.7：打卡项名（key）里不再带复盘链接尾段，但**历史上已经写进笔记的记录行**带过
+ * （`- 2026-10-01 · 📈 复盘 → [[2026-10-01 复盘]] · 用时 30 分钟`）。若只比一种写法，
+ * 再点一次打卡会**认不出旧行** → 同一天记两条。所以两种写法都认。
+ */
+function logLineMatches(line: string, date: string, key: string): boolean {
+	if (line.startsWith(logAnchor(date, key))) return true;
+	// 旧写法：项名后面紧跟复盘链接，`·` 在链接之后
+	return key.includes("→ [[") === false && line.startsWith(`- ${date} · ${key} → [[`);
+}
+
+/** 记录区在文中的插入位置：优先 `## 📝 今日总结` 之前，没有就落到文末。 */
+function insertLogBlock(lines: string[], block: string[]): string[] {
+	const anchor = lines.findIndex((l) => l.startsWith(SUMMARY_HEADING));
+	if (anchor !== -1) {
+		lines.splice(anchor, 0, ...block);
+		return lines;
+	}
+	while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+	lines.push("", ...block);
+	return lines;
+}
+
+/**
+ * 写入 / 更新一条打卡记录（v7.5）。
+ * 已存在同「日期 + 打卡项」的行则整行替换（重复打卡不刷屏），否则追加到记录区末尾。
+ */
+export function upsertCheckLog(content: string, date: string, key: string, detail: string): string {
+	const lines = content.split("\n");
+	const line = `${logAnchor(date, key)} ${detail}`.trimEnd();
+	const headIdx = lines.findIndex((l) => l.startsWith(LOG_HEADING));
+	if (headIdx === -1) {
+		return insertLogBlock(lines, [LOG_HEADING, "", line, ""]).join("\n");
+	}
+	// 记录区右边界 = 下一个 `##` 标题（或文末）
+	let end = lines.length;
+	for (let i = headIdx + 1; i < lines.length; i++) {
+		if (/^##\s/.test(lines[i])) {
+			end = i;
+			break;
+		}
+	}
+	for (let i = headIdx + 1; i < end; i++) {
+		if (logLineMatches(lines[i], date, key)) {
+			lines[i] = line;
+			return lines.join("\n");
+		}
+	}
+	// 追加到区内最后一条记录之后（跳过尾部空行，保住与下个标题之间的空行）
+	let insert = end;
+	while (insert - 1 > headIdx && lines[insert - 1].trim() === "") insert--;
+	lines.splice(insert, 0, line);
+	return lines.join("\n");
+}
+
+/**
+ * 删除一条打卡记录（取消打卡时调用）；行不存在则原样返回。
+ *
+ * v7.5 真机补修：删完记录行后若区内「一条记录都不剩」，连 `## ⏱ 打卡记录` 标题一起撤掉。
+ * 为什么必须撤：这条路径是**取消打卡**，用完即弃；留着空标题等于在用户笔记里
+ * 留一个空壳（实测留成 `## ⏱ 打卡记录` + 两行空白），且每取消一次就多一层空白。
+ * 注意不能一刀切：区内还可能留着别的日期（今天补打卡昨天），那时只删这一行。
+ */
+export function removeCheckLog(content: string, date: string, key: string): string {
+	const lines = content.split("\n");
+	const headIdx = lines.findIndex((l) => l.startsWith(LOG_HEADING));
+	if (headIdx === -1) return content;
+	const blockEnd = (from: number): number => {
+		for (let i = from + 1; i < lines.length; i++) {
+			if (/^##\s/.test(lines[i])) return i;
+		}
+		return lines.length;
+	};
+
+	for (let i = headIdx + 1, end = blockEnd(headIdx); i < end; i++) {
+		if (!logLineMatches(lines[i], date, key)) continue;
+		lines.splice(i, 1);
+
+		const end2 = blockEnd(headIdx);
+		const hasRecord = lines.slice(headIdx + 1, end2).some((l) => l.trim().startsWith("- "));
+		if (hasRecord) return lines.join("\n");
+
+		// 空壳：标题 + 区内残留行一起移除
+		lines.splice(headIdx, end2 - headIdx);
+		if (headIdx > 0 && headIdx < lines.length && lines[headIdx - 1].trim() === "" && lines[headIdx].trim() === "") {
+			lines.splice(headIdx, 1); // 标题前后各留一个空行 → 收掉一个，别留下双空行
+		} else if (headIdx >= lines.length) {
+			while (lines.length > 1 && lines[lines.length - 1].trim() === "" && lines[lines.length - 2].trim() === "") {
+				lines.pop(); // 区在文末：收掉多余的尾随空行
+			}
+		}
+		return lines.join("\n");
+	}
+	return content;
+}
+
+// ---------------------------------------------------------------------------
 // Note templates
 // ---------------------------------------------------------------------------
 
 export interface BuildCheckLineParams {
 	name: string;
-	duration: string;
 	plan: string;
 	includeReview: boolean;
 	date: string;
+	/** v7.19: 🛫 起始日期；缺省回落到 date（当天）。 */
+	start?: string;
+	/** v7.19: 📅 截止日期；缺省回落到 date（当天）。 */
+	due?: string;
 }
 
-/** Build a task line, e.g. `- [ ] ✍️ 写作 1小时 #计划/写作 🛫 2026-08-11 📅 2026-08-11`. */
-export function buildCheckLine({ name, duration, plan, includeReview, date }: BuildCheckLineParams): string {
+/**
+ * Build a task line, e.g. `- [ ] ✍️ 写作 #计划/写作 🛫 2026-08-11 📅 2026-08-11`.
+ *
+ * v7.6：不再拼 `action`（原「1小时」后缀）。用户口径——打卡记的是**当天行动内容 + 用时**，
+ * 那是打卡那一刻才填的（行内「用时」框），不该由计划定义预先写死进标题。
+ * v7.19：🛫/📅 支持自定义（添加打卡项弹窗的「起止日期」）——量化目标分解到日的人工补充；
+ * 不传则维持原行为（起止都是当天）。
+ */
+export function buildCheckLine({ name, plan, includeReview, date, start, due }: BuildCheckLineParams): string {
 	let content = name;
-	if (duration && duration.trim()) content += " " + duration.trim();
 	if (includeReview) content += ` → [[${date} 复盘]]`;
-	return `- [ ] ${content} #计划/${plan} 🛫 ${date} 📅 ${date}`;
+	return `- [ ] ${content} #计划/${plan} 🛫 ${start || date} 📅 ${due || date}`;
+}
+
+/** `→ [[2026-10-01 复盘]]` 这种复盘链接尾段（由 includeReview 生成，不算标题本体）。 */
+const REVIEW_LINK_RE = / → \[\[[^\]]*\]\]$/;
+
+/**
+ * v7.7：剥掉复盘链接尾段——**界面标题专用**。
+ *
+ * 为什么只剥不改原文：`→ [[{date} 复盘]]` 是 note 行里的真 wikilink（用户在 Obsidian 里
+ * 点是能跳转的），而且是设置项「含复盘链接」的产物；所以笔记原文一字不动，
+ * 只是**打卡卡上不再渲染这一截**（用户 113001 截图：「复盘后面的后缀也没必要」）。
+ *
+ * ⚠️ 打卡记录行的项名（key）走的也是这个值，两处必须一致，否则取消打卡找不到记录行。
+ */
+export function stripReviewLink(text: string): string {
+	return text.replace(REVIEW_LINK_RE, "");
+}
+/** 兜底：只认「数字 + 时长单位」结尾，避免误伤正常标题。 */
+const DURATION_TAIL_RE = / ([\d.]+)\s*(小时|分钟|分|h|H|min|mins)$/;
+
+/**
+ * v7.6：剥掉历史遗留的「时长后缀」——老笔记任务行写着 `✍️ 写作 1小时`（action 由计划定义预写）。
+ * 纯显示层剥离，**不改笔记原文**。
+ *
+ * 判定顺序：
+ *   ① 与计划定义里的 `action` 精确匹配 —— 能吃掉「复盘+次日计划」这类非时长词；
+ *   ② 末尾是「数字 + 时长单位」时，**只有当剥完正好等于该计划的标准打卡项名**
+ *      （`{label} {计划名}`，如 `📖 学习`）才剥。
+ *      这条闸门是必须的：没有它，「阅读 30 分钟」会被削成「阅读」——
+ *      而「名称里自带时长」是合法写法（添加打卡项弹窗的示例就是它）。
+ *
+ * 另一个坑：复盘项的行文是 `📈 复盘 {action} → [[{date} 复盘]]`，action **不在末尾**，
+ * 中间隔着复盘链接。所以先把链接尾段摘下来单独放回，再对剩余部分做剥离。
+ */
+export function stripLegacyDuration(text: string, action?: string, canonicalName?: string): string {
+	const t = text.trimEnd();
+	const linkMatch = REVIEW_LINK_RE.exec(t);
+	const link = linkMatch ? linkMatch[0] : "";
+	let head = linkMatch ? t.slice(0, linkMatch.index).trimEnd() : t;
+
+	const a = (action ?? "").trim();
+	if (a && head.endsWith(" " + a)) {
+		head = head.slice(0, -(a.length + 1)).trimEnd();
+		return head + link;
+	}
+
+	const m = DURATION_TAIL_RE.exec(head);
+	if (m) {
+		const rest = head.slice(0, m.index).trimEnd();
+		const canon = (canonicalName ?? "").trim();
+		if (canon && rest === canon) head = rest;
+	}
+	return head + link;
+}
+
+/**
+ * v7.22 补卡：把打卡项名归一到「可比形态」，用于**回退**匹配（无 `#计划/` 标签的行）。
+ *
+ * 剥两层：复盘链接尾段（`→ [[2026-10-02 复盘]]`）+ 时长后缀（`1小时`）——
+ * 这两类都是显示层早于笔记原文剥掉的，界面侧看不到、笔记里还在。
+ *
+ * ⚠️ 单测实测结论：**它只能当回退，不能当主锚点**。
+ *   `stripLegacyDuration` 的闸门（②）要求「剥完正好等于计划标准名」才剥，
+ *   而这里没有 plan 上下文、传不了 canonicalName → 对 `✍️ 写作 1小时` 不触发。
+ *   所以带历史后缀的老行**归一后仍与界面名不等** —— 主锚点必须是计划名。
+ *   见 findCheckLineByPlan 的说明。
+ */
+export function normalizeCheckName(text: string): string {
+	return stripLegacyDuration(stripReviewLink(text)).replace(/\s+/g, " ").trim();
 }
 
 /** Template for a new daily note (PRD §2.2). */
@@ -350,10 +643,12 @@ export function buildDailyTemplate(date: string, templates: PlanTemplate[]): str
 	const tasks = templates.map((t) =>
 		buildCheckLine({
 			name: t.name,
-			duration: t.duration,
 			plan: t.plan,
 			includeReview: t.includeReview,
 			date,
+			// v7.21: 量化到每日打卡的自定义项带自己的窗口（🛫/📅）；普通项不传 = 当天（原行为）
+			start: t.start,
+			due: t.due,
 		})
 	);
 	return [

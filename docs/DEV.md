@@ -17,7 +17,7 @@ npm run build          # 构建（tsc 检查 + esbuild production）→ main.js
 ```
 
 **部署**：构建产物 `main.js` + `manifest.json` + `styles.css` 复制到 Obsidian 库：
-`E:\文档\workbuddy\Obsidian库\.obsidian\plugins\planboard\`
+`E:\Docs\workbuddy\Obsidian库\.obsidian\plugins\planboard\`
 （开发期间每次 build 后复制；Obsidian 里禁用再启用插件生效，或直接重载）
 
 ## 代码结构约定
@@ -113,7 +113,7 @@ styles.css          — 全部样式（禁止内联 style）
 ## M1 验收（写完必须自查）
 
 1. 命令 `PlanBoard: 打开计划总览` 可用，视图打开显示今日
-2. 今日打卡列表正确显示（读取用户真实库：`E:\文档\workbuddy\Obsidian库\raw\计划\2026\每日\2026-08-11.md`）
+2. 今日打卡列表正确显示（读取用户真实库：`E:\Docs\workbuddy\Obsidian库\raw\计划\2026\每日\2026-08-11.md`）
 3. 勾选打卡 → 文件写回 → 进度条更新（无需手动刷新）
 4. 总结 textarea 编辑 → 失焦保存 → 文件写回正确
 5. 复盘按钮 → 打开/创建当日复盘笔记
@@ -121,7 +121,7 @@ styles.css          — 全部样式（禁止内联 style）
 
 ## 测试用真实数据
 
-用户 Obsidian 库：`E:\文档\workbuddy\Obsidian库\`
+用户 Obsidian 库：`E:\Docs\workbuddy\Obsidian库\`
 - 每日笔记示例：`raw/计划/2026/每日/2026-08-11.md`（已有 4 项打卡 + 空总结）
 - 周笔记：`raw/计划/2026/周/2026-W33.md`
 - 月笔记：`raw/计划/2026/月/2026-08.md`

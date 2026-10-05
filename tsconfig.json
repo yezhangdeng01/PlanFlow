@@ -14,5 +14,6 @@
     "lib": ["DOM", "ES2020"],
     "skipLibCheck": true
   },
-  "include": ["**/*.ts"]
+  "include": ["src/**/*.ts", "*.ts"],
+  "exclude": ["_archive", "_tools"]
 }
