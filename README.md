@@ -46,6 +46,24 @@ Other features:
 - 🎨 Deep-space blue theme + coral action areas + per-plan accent colors (light/dark adapt)
 - 📝 Daily notes auto-generated (built-in template), summaries auto-derived
 
+### 📸 Views
+
+**Today** — check-ins, daily summary, monthly charts and week/month task lists at a glance.
+
+![](docs/screenshots/home.png)
+
+**Plans** — per-plan check-in actions, quantified goals and task lists.
+
+![](docs/screenshots/plans.png)
+
+**Tasks** — kanban grouped by plan, with status & Gantt modes.
+
+![](docs/screenshots/tasks.png)
+
+**Achievements** — badge wall, check-in donut, monthly distribution, cumulative curve and heatmap.
+
+![](docs/screenshots/achievements.png)
+
 ## 🚀 Installation
 
 ### Option 1: Community plugins (recommended)
