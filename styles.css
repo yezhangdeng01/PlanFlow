@@ -1086,12 +1086,21 @@
    `justify-self: end` —— 只占内容宽、贴右缘，不撑满整格（撑满时折行的右对齐看着一样，
    但 hover/选中要量盒子时会差一整个列宽，脚本容易误判）。 */
 .planboard-summary-cheer {
+	/* v1.1.1：鼓励语**恒独占一行**（grid 全宽第二行，右对齐）——原来和标题挤同
+	   一行，字号上调后在中档宽度被压得任意断行（用户截图「从第一项/开始吧」劈成两截）。
+	   nowrap + ellipsis 是极端窄宽的兜底；窄档 container query 原有的 row 2/3 规则
+	   与此一致（≤415 同为 row2，≤330 done 也换行、cheer 落 row3）。 */
+	grid-column: 1 / -1;
+	grid-row: 2;
 	justify-self: end;
 	min-width: 0;
-	font-size: var(--pf-text-md); /* v1.1.1：11→14，用户要求做醒目 */
+	font-size: var(--pf-text-md);
 	font-weight: 700;
 	color: var(--pb-accent-dim);
 	text-align: right;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* 标题（左格）：任何情况下都不折行。

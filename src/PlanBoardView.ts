@@ -2217,7 +2217,7 @@ export class PlanBoardView extends ItemView {
 		else if (pct >= 80) cheer = `已完成 ${pct}%，快完成啦，再坚持一下！`;
 		else if (pct >= 50) cheer = `已完成 ${pct}%，势头不错，继续冲！`;
 		else if (pct > 0) cheer = `已完成 ${pct}%，加油突破，动起来！`;
-		else cheer = "今天还没开始打卡哦，从第一项开始吧";
+		else cheer = "从第一项开始吧"; // v1.1.1 精简（原「今天还没开始打卡哦，从第一项开始吧」鼓励语独占一行后过长）
 		// v7.11: 落到总结卡标题行右端（💪 已在 CSS 里用 ::before 画上）
 		if (this.summaryCheerEl) this.summaryCheerEl.setText(cheer);
 	}
