@@ -135,19 +135,9 @@ export function dayCount(start: string, end: string): number {
 	return Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
 }
 
-/** Number of weekdays (Mon-Fri) in [start, end], inclusive. */
-export function countWorkdays(start: string, end: string): number {
-	const s = parseDateString(start);
-	const e = parseDateString(end);
-	let count = 0;
-	const cur = new Date(s);
-	while (cur <= e) {
-		const day = cur.getDay();
-		if (day !== 0 && day !== 6) count++;
-		cur.setDate(cur.getDate() + 1);
-	}
-	return count;
-}
+// 注：原有的 `countWorkdays()`（工作日计数）已随「复盘按工作日统计」特化一并移除——
+// 它服务的是作者本人那个 A股复盘计划（交易日不含周末），不是通用需求。留着等于在
+// 公共工具里留一个没人用、却暗示着某种领域口径的入口。
 
 // ---------------------------------------------------------------------------
 // Task line parsing
@@ -165,12 +155,45 @@ export function parseTaskLine(line: string): Pick<CheckItem, "text" | "plan" | "
 	};
 }
 
-/** Parse a daily note's content into structured data. */
+/**
+ * 打卡项的**身份键**：同一个打卡项的多次出现必须算出同一个 key，才能去重。
+ *
+ * 为什么这么算（每一处都有踩坑依据）：
+ *   · 用 `plan` 优先——`#计划/` 标签是插件写盘时保证存在的稳定锚点（`buildCheckLine`
+ *     总会写），比标题可靠；
+ *   · 无plan 时退化为「归一后的显示名」——覆盖手写项；
+ *   · 显示名先`normalizeCheckName` 归一：剥掉复盘链接尾段与历史时长后缀，
+ *     否则 `📈 复盘 → [[...]]`、`📈 复盘 复盘+次日计划 → [[...]]`、
+ *     `✍️ 写作` 三种写法会被当成三个不同项（详见 normalizeCheckName 的注释）。
+ */
+function checkItemKey(text: string, plan: string | null): string {
+	if (plan) return `P:${plan}`;
+	return `T:${normalizeCheckName(text)}`;
+}
+
+/**
+ * v1.1.7 解析每日笔记。
+ *
+ * **去重（防御性）**：同一篇笔记里同一个打卡项可能出现多次——实测真库
+ * `2026-10-06.md`里两套完整的 `## ✅ 今日打卡` 区各有一份写作/健康/学习/复盘，
+ * 界面因此显示 8 项、进度算成 3/8（用户实际只打了2 个卡）。
+ * 根因在库外（同步插件把两端改动拼进同一文件），插件改不了那个文件，
+ * 但**可以让它对这种文件自愈**：按`checkItemKey` 合并，界面只显示一条。
+ *
+ * 合并时的状态口径：**只要有一条是勾的就算已打卡**。
+ * 反过来（全是未勾）就不勾——否则用户在 A 端取消打卡、同步到B 端会被顶回来。
+ * 保留 `line` 指向**第一条**（行号用于写盘时定位；同 key 多行时改第一条即可，
+ * 其余是历史残留，见 dedupe 的注释）。
+ */
 export function parseDailyContent(file: TFile, content: string, date: string): DailyData {
 	const lines = content.split("\n");
 	const checkItems: CheckItem[] = [];
 	const tempItems: TempTask[] = [];
 	let inCheckSection = false;
+	// v1.1.7：去重索引——key → 已收录的 checkItem。同一 key 再出现就合并进已有项。
+	// tempItem 只需判「有没有见过」，用单独的值占位（它类型不同，塞进同一个 Map 不干净）。
+	const seenCheck = new Map<string, CheckItem>();
+	const seenTempKeys = new Set<string>();
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
@@ -192,8 +215,21 @@ export function parseDailyContent(file: TFile, content: string, date: string): D
 			raw: line,
 		};
 		if (plan) {
-			checkItems.push({ ...base, line: i, file });
+			const item: CheckItem = { ...base, line: i, file };
+			const key = checkItemKey(item.text, item.plan);
+			const prev = seenCheck.get(key);
+			if (prev) {
+				// 同一项又出现：合并勾选态（任一为 x 即视为已打卡），保留第一条的定位信息
+				if (checked) prev.checked = true;
+				continue;
+			}
+			seenCheck.set(key, item);
+			checkItems.push(item);
 		} else {
+			// 临时项同样去重：键用归一名，避免 `✍️ 写作` 与 `✍️ 写作 1小时` 各算一条
+			const key = checkItemKey(base.text, null);
+			if (seenTempKeys.has(key)) continue;
+			seenTempKeys.add(key);
 			tempItems.push({
 				...base,
 				start: m[4] ?? null,
@@ -233,7 +269,20 @@ export function extractSummary(content: string): string {
 	// Trim trailing callout blocks (e.g. the `> [!tip]` help block in templates).
 	const callout = /\n\n>/.exec(region);
 	if (callout) region = region.slice(0, callout.index);
-	return region.replace(/^\n+/, "").trimEnd();
+	// v1.1.7：损坏文件里可能有第二篇日记紧跟其后（同步拼接，见 parseDailyContent 去重注释），
+	// 那篇的 frontmatter / `# 📅` 标题会被当成总结正文吞进文本框，用户的总结框里
+	// 就会冒出 `---` / `date: 2026-10-06` 这种东西。
+	//
+	// 口径：**找到「行首`---` 或行首 `# `」就整体截断**——总结正文里本来就不该出现
+	// 这两种结构行（`#` 开头的 Markdown 标题会另起一个语义块，`---` 是 frontmatter/
+	// 分隔线），所以遇到就说明后面是另一篇日记的起点。
+	// ⚠️ 早先用正则 `\s*$` / 无 `g` 标志各踩一次（前者匹配不到、后者只去掉第一处），
+	// 最后一行残留 `date: 2026-10-06`。改成「定位首个结构行的行首、切掉之后全部」，
+	// 一行做完、不依赖多次替换。
+	const structural = /(^|\n)(?:-{3,}[ \t]*$|#[^#\n])/m.exec(region);
+	if (structural) region = region.slice(0, structural.index);
+	region = region.replace(/^\n+/, "").trimEnd();
+	return region;
 }
 
 /**
@@ -670,7 +719,8 @@ export function buildDailyTemplate(date: string, templates: PlanTemplate[]): str
 /**
  * Build a review note from the user-configured template.
  * `{date}` placeholders are replaced with the given date.
- * (v1.8: template moved to settings.reviewTemplate — was hard-coded A股复盘 before.)
+ * (v1.8: template moved to settings.reviewTemplate — before that it was hard-coded,
+ *  which meant every vault got the author's personal review format.)
  */
 export function buildReviewTemplate(date: string, template: string): string {
 	return template.replace(/\{date\}/g, date);

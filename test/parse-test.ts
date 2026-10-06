@@ -5,8 +5,9 @@
  * - date-window filtering for week/month
  */
 import { parsePlansFromFrontmatter, filterTasksInRange, summarizeTasks } from "../src/stats";
+import { serializePlans } from "../src/plan-file";
 import { parseTaskPool, buildPoolLine, autoWeekContext, autoQuota, autoTaskNumbers, planCounterUnit, isAutoTask } from "../src/tasks";
-import { toggleTaskLine, moveTaskLine, removeLine, appendCheckItem, upsertCheckLog, removeCheckLog, findCheckLineByPlan } from "../src/daily";
+import { toggleTaskLine, moveTaskLine, removeLine, appendCheckItem, upsertCheckLog, removeCheckLog, findCheckLineByPlan, parseDailyContent, extractSummary } from "../src/daily";
 import { TFile } from "obsidian";
 
 let failed = 0;
@@ -293,6 +294,154 @@ check("findCheckLineByPlan 找不到返回 -1", findCheckLineByPlan(LEGACY, "不
 check("findCheckLineByPlan 计划名优先于显示名", findCheckLineByPlan(LEGACY, "写作", "手写项") === 2, findCheckLineByPlan(LEGACY, "写作", "手写项"));
 check("findCheckLineByPlan 不跨越打卡区（打卡区外同文本不算）",
 	findCheckLineByPlan(["## 📝 今日总结", "", "- [ ] 写作 #计划/写作", "", "## ✅ 今日打卡", "", "- [ ] 阅读 #计划/阅读"].join("\n"), "写作", "写作") === -1);
+
+// --- 10. 新用户骨架：`plans: {}` 必须解析出 0 个计划，且不抛错 ----------------
+// v1.1.6回归：buildYearPlanTemplate 曾硬编码「写作/健康/学习/复盘」四个个人计划名，
+// 随插件分发进每个用户 vault。改为空 plans 后，这条断言守住「骨架不含任何预置计划」。
+const EMPTY_TPL = `---
+type: yearly
+period: 2026
+start: 2026-01-01
+end: 2026-12-31
+plans: {}
+---
+# 🏆 2026 年度计划
+`;
+let emptyDefs: ReturnType<typeof parsePlansFromFrontmatter> | null = null;
+let emptyThrew: unknown = null;
+try {
+	emptyDefs = parsePlansFromFrontmatter(EMPTY_TPL);
+} catch (e) {
+	emptyThrew = e;
+}
+check("空 plans 骨架不抛错", emptyThrew === null, emptyThrew === null ? undefined : String(emptyThrew));
+check("空 plans 骨架解析出 0 个计划", (emptyDefs?.length ?? -1) === 0, emptyDefs?.length);
+
+// 反向锁死：骨架里绝不能再出现作者个人的计划名
+const PSONEAL_PLAN_NAMES = ["写作", "健康", "学习", "复盘"];
+const tplFront = /^---\n([\s\S]*?)\n---/.exec(EMPTY_TPL)?.[1] ?? "";
+for (const name of PSONEAL_PLAN_NAMES) {
+	check(`骨架不含个人计划名「${name}」`, !tplFront.includes(name));
+}
+// 有内容的老用户文件不受影响（别把正常计划也一起拦掉）
+const USER_TPL = `---
+type: yearly
+period: 2026
+plans:
+  写作:
+    label: ✍️
+    daily: true
+---
+`;
+check("老用户含实际计划的文件仍正常解析", parsePlansFromFrontmatter(USER_TPL).length === 1);
+
+// --- 11. 交易复盘特化已彻底移除（反向断言，防复辟）--------------------------
+// v1.1.6：原先有两条交易相关特化——①`plan === "复盘"` 硬编码决定打卡率分母；
+// ②frontmatter 的 `tradingDay: true` 标记 + 设置页「复盘按工作日统计」开关。
+// 两者都服务于作者本人那个 A 股复盘计划（交易日不含周末），不是通用需求。
+// 这里用**反向断言**锁死：旧字段即使还留在用户文件里，插件也不再读它、不再写它。
+const legacyTd = parsePlansFromFrontmatter(`---
+plans:
+  每日复盘:
+    label: 📈
+    daily: true
+    tradingDay: true
+  收盘复盘:
+    label: 📊
+    daily: true
+    tradingDay: true
+---
+`);
+check("旧文件的 tradingDay 不再被识别（字段已移除）", legacyTd.every((d) => !("tradingDay" in d)));
+check("旧字段不影响计划本身解析", legacyTd.length === 2 && legacyTd[0].name === "每日复盘");
+
+// 序列化时不应再写出 tradingDay 行（否则每次保存计划都把它固化进用户文件）
+const NO_TD_WRITE = !serializePlans([
+	{ name: "任意计划", type: "check", target: "", targetCount: 0, goals: [], action: "", label: "🎯", color: "", daily: true },
+]).includes("tradingDay");
+check("序列化不再写 tradingDay", NO_TD_WRITE);
+
+// 分母口径统一：所有计划都用自然天，不再有「按工作日」的旁路
+check("PlanDef 上已无 tradingDay 字段", !("tradingDay" in (legacyTd[0] as unknown as Record<string, unknown>)));
+
+// --- 12. 损坏文件自愈：重复打卡项去重 ------------------------------------
+// v1.1.7 回归：这组样本是**用户真库 `2026-10-06.md` 的逐字节内容**（两套完整日记被
+// 拼进同一文件：同步插件两端都改同一天时各保留双方）。原症状：界面显示 8 项、
+// 进度算成 3/8，而用户实际只打了 2 个卡。
+const CORRUPTED = [
+	"---", "date: 2026-10-06", "type: daily", "---", "# 📅 2026-10-06 星期二", "",
+	"## ✅ 今日打卡",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"- [x] 🏃 健康 #计划/健康 🛫 2026-10-06 📅 2026-10-06",
+	"- [x] 📖 学习 #计划/学习 🛫 2026-10-06 📅 2026-10-06",
+	"- [ ] 📈 复盘 → [[2026-10-06 复盘]] #计划/复盘 🛫 2026-10-06 📅 2026-10-06",
+	"", "## 📝 今日总结",
+	"---", "date: 2026-10-06", "type: daily", "---", "# 📅 2026-10-06 星期二", "",
+	"## ✅ 今日打卡",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"- [ ] 🏃 健康 #计划/健康 🛫 2026-10-06 📅 2026-10-06",
+	"- [x] 📖 学习 #计划/学习 🛫 2026-10-06 📅 2026-10-06",
+	"- [ ] 📈 复盘 → [[2026-10-06 复盘]] #计划/复盘 🛫 2026-10-06 📅 2026-10-06",
+	"", "## ⏱ 打卡记录", "",
+	"- 2026-10-06 · 📖 学习 · 用时 30 分钟",
+	"- 2026-10-06 · 🏃 健康 · 用时 30 分钟",
+	"", "## 📝 今日总结", "",
+].join("\n");
+const parsedCorrupt = parseDailyContent(file, CORRUPTED, "2026-10-06");
+check("损坏文件去重后只剩 4 项（原 8 项）", parsedCorrupt.checkItems.length === 4, parsedCorrupt.checkItems.length);
+check("去重后全是带计划标签的正常项", parsedCorrupt.checkItems.every((c) => c.plan !== null),
+	parsedCorrupt.checkItems.map((c) => c.plan));
+// 用户当天实际打了「健康 + 学习」两个卡 → 合并后应恰好是这两项为已打卡
+const corruptChecked = parsedCorrupt.checkItems.filter((c) => c.checked).map((c) => c.plan).sort();
+check("勾选态合并正确：只有 健康/学习 为已打卡（任一为 x 即算打）",
+	JSON.stringify(corruptChecked) === JSON.stringify(["健康", "学习"]), corruptChecked);
+check("写作/复盘 保持未勾（没打过就是没打过）",
+	parsedCorrupt.checkItems.filter((c) => !c.checked).map((c) => c.plan).sort().join(",") === "写作,复盘");
+
+// 正常文件（单套打卡区）不能被去重误伤——这是最关键的反向断言
+const CLEAN = [
+	"---", "date: 2026-10-06", "type: daily", "---", "# 📅 2026-10-06 星期二", "",
+	"## ✅ 今日打卡",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"- [x] 🏃 健康 #计划/健康 🛫 2026-10-06 📅 2026-10-06",
+	"- [x] 📖 学习 #计划/学习 🛫 2026-10-06 📅 2026-10-06",
+	"- [ ] 📈 复盘 → [[2026-10-06 复盘]] #计划/复盘 🛫 2026-10-06 📅 2026-10-06",
+	"", "## ⏱ 打卡记录", "",
+	"- 2026-10-06 · 📖 学习 · 用时 30 分钟",
+	"- 2026-10-06 · 🏃 健康 · 用时 30 分钟",
+	"", "## 📝 今日总结", "",
+].join("\n");
+const parsedClean = parseDailyContent(file, CLEAN, "2026-10-06");
+check("正常文件仍是 4 项（去重不误伤）", parsedClean.checkItems.length === 4, parsedClean.checkItems.length);
+check("正常文件勾选态不变（2 项已打卡）",
+	parsedClean.checkItems.filter((c) => c.checked).length === 2,
+	parsedClean.checkItems.map((c) => `${c.plan}:${c.checked}`));
+
+// 同 key 但形态不同（复盘链接 / 历史时长后缀）必须视作同一项
+const VARIANTS = [
+	"## ✅ 今日打卡",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06", // 完全重复
+	"", "## 📝 今日总结", "",
+].join("\n");
+check("逐字相同的重复行被合并成 1 项", parseDailyContent(file, VARIANTS, "2026-10-06").checkItems.length === 1);
+
+// 总结区不能把第二篇的 frontmatter/标题吞进文本框（否则用户总结框里冒出 --- 和日期标题）
+const corruptSummary = extractSummary(CORRUPTED);
+check("总结区不吞第二篇的 frontmatter/标题（应为空）",
+	corruptSummary === "", JSON.stringify(corruptSummary.slice(0, 60)));
+check("正常文件的总结照常取到", extractSummary(CLEAN) === "");
+// 真有总结正文时必须保住（别把去重/截断做成清空）
+const WITH_SUMMARY = ["## ✅ 今日打卡", "- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"", "## 📝 今日总结", "今天写了两段。", "", "第二段。", ""].join("\n");
+check("有总结正文时原样保留", extractSummary(WITH_SUMMARY) === "今天写了两段。\n\n第二段。",
+	JSON.stringify(extractSummary(WITH_SUMMARY)));
+// 总结正文之后若跟了第二篇日记（损坏形态），第一篇的正文仍要拿到
+const SUMMARY_THEN_DUP = ["## ✅ 今日打卡", "- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-06 📅 2026-10-06",
+	"", "## 📝 今日总结", "今天写了点东西。", "",
+	"---", "date: 2026-10-06", "type: daily", "---", "# 📅 2026-10-06 星期二", ""].join("\n");
+check("总结后接第二篇日记时，保留第一篇正文",
+	extractSummary(SUMMARY_THEN_DUP) === "今天写了点东西。", JSON.stringify(extractSummary(SUMMARY_THEN_DUP)));
 
 console.log(failed === 0 ? "\nALL PASSED" : `\n${failed} FAILED`);
 // 用抛错而非 process.exit 汇报失败：process.exit 会掐断 runner，后面的套件就跑不到了。

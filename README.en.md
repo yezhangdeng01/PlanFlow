@@ -114,7 +114,7 @@ plans:
 ---
 ```
 
-Tasks are assigned to a plan via the `#计划/写作` tag or frontmatter; date windows (week = ISO week, month = calendar month) aggregate into the matching views automatically.
+Tasks are assigned to a plan via the `#计划/{plan}` tag or frontmatter; date windows (week = ISO week, month = calendar month) aggregate into the matching views automatically.
 
 ## 🛠 Development
 

@@ -2,13 +2,17 @@ import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab,
 import type PlanFlowPlugin from "../main";
 import { reviewTemplatePath } from "./paths";
 
-/** Default plan accent colors (PRD §5). Keys are plan tag names. */
-export const DEFAULT_PLAN_COLORS: Record<string, string> = {
-	写作: "#f59e0b",
-	健康: "#10b981",
-	学习: "#3b82f6",
-	复盘: "#ef4444",
-};
+/**
+ * 预置计划配色（PRD §5）。键为计划标签名。
+ *
+ * ⚠️ 这里**刻意留空**——早期版本预置过「写作/健康/学习/复盘」四项，那是插件作者
+ * 个人库里的计划名，不该随插件分发到每个用户 vault。留着等于给所有新用户凭空
+ * 造出四个他不存在的计划，还会在计划下拉里多出四个候选。
+ *
+ * 配色改由`rotatePlanColor()` 按序发散生成（见 colors.ts），用户自建计划时
+ * 自动取色；已建计划想改色走设置页。所以这里保持空表即可。
+ */
+export const DEFAULT_PLAN_COLORS: Record<string, string> = {};
 
 /**
  * One row of the daily check-in template (PRD §6).
@@ -31,8 +35,6 @@ export interface PlanTemplate {
 export interface PlanFlowSettings {
 	/** Root folder for plan notes, relative to vault root (PRD §2.1). */
 	rootPath: string;
-	/** If true, the 复盘 check-in rate denominator uses workdays. */
-	reviewWorkdays: boolean;
 	/** Review-note template (写复盘按钮生成); `{date}` is replaced with the current date. */
 	reviewTemplate: string;
 	/** Open the PlanFlow view automatically on startup. */
@@ -77,8 +79,9 @@ export interface PlanFlowSettings {
 
 export const DEFAULT_SETTINGS: PlanFlowSettings = {
 	rootPath: "raw/计划",
-	reviewWorkdays: true,
-	// v1.8: 通用复盘模板（用户可在设置页自定义，如自己的 A 股复盘格式）
+	// v1.1.6：通用复盘模板（用户在设置页直接编辑 `{rootPath}/复盘模板.md`，
+	// 内容完全自定——插件不预置任何领域模板，原先注释里「如自己的 A 股复盘格式」
+	// 那类示例已删，免得把作者个人的交易习惯当成通用默认）
 	reviewTemplate: `---
 type: review
 date: {date}
@@ -175,11 +178,6 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				desc: "笔记存放根路径（相对库根目录）；输入时弹库内文件夹下拉，或点「浏览…」选择",
 				aliases: ["rootPath", "根目录", "路径"],
 				render: (setting) => this.renderRootPath(setting),
-			},
-			{
-				name: "复盘按工作日统计",
-				desc: "复盘打卡率分母使用工作日（周一至周五），否则与其它计划一致",
-				control: { type: "toggle", key: "reviewWorkdays" },
 			},
 			{
 				name: "复盘笔记模板",

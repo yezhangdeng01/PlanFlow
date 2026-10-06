@@ -1,6 +1,5 @@
 import { App, TFile, parseYaml } from "obsidian";
 import {
-	countWorkdays,
 	dayCount,
 	daysInMonth,
 	getISOWeek,
@@ -13,10 +12,9 @@ import type { PoolTask } from "./tasks";
 import { listTasks } from "./tasks";
 
 /**
- * Statistics (PRD §2.4, 口径 must match the user's legacy system):
+ * Statistics (PRD §2.4):
  * - 计划打卡率 = days the plan was checked in ÷ expected days in the period
- *   - 写作/健康/学习: expected = total days (week=7, month=month days, year=days since Jan 1)
- *   - 复盘: expected = workdays in the period (unless reviewWorkdays is off)
+ *   （所有计划统一口径：周=7 天，月=自然月天数，年=窗口内天数；week/month 用「至今」口径）
  * - 临时任务完成率 = completed ÷ total (filtered by period)
  * - 今日进度 = today's checked items ÷ today's total (computed in the view)
  * - M2: 周/月任务统计 = tasks in the period window (from the task pool) done ÷ total
@@ -86,8 +84,6 @@ export interface PlanDef {
 	label: string;
 	/** Plan color (settings override), e.g. "#f59e0b". */
 	color: string;
-	/** Trading-day-only check-in (复盘). */
-	tradingDay: boolean;
 	/** Whether this plan appears in the daily check-in (default true; `daily: false` excludes it). */
 	daily: boolean;
 }
@@ -130,8 +126,6 @@ export interface PlanProgress {
 	label: string;
 	/** Plan color (settings override), e.g. "#f59e0b". */
 	color: string;
-	/** Trading-day-only check-in (复盘). */
-	tradingDay: boolean;
 	/** v7.6: 是否每日打卡计划（决定今日打卡标题是否按「图标 + 计划名」硬裁历史后缀）。 */
 	daily: boolean;
 }
@@ -182,7 +176,7 @@ export async function readPlanPeriod(app: App, rootPath: string, year: string): 
 }
 
 // ---------------------------------------------------------------------------
-// v1.0.5：按 (app, root, today, type, reviewWorkdays) 加键的统计缓存
+// v1.0.5：按 (app, root, today, type) 加键的统计缓存
 //
 // 为什么需要（实测数据，不是猜测）：
 //   回顾页一次刷新连算 3 个周期（`renderReview` 里 year + week + month），
@@ -212,16 +206,16 @@ interface StatsCacheEntry {
 let statsCaches = new WeakMap<App, Map<string, StatsCacheEntry>>();
 
 /** 取缓存键：所有影响结果的输入都进键里。 */
-function statsCacheKey(rootPath: string, today: string, type: PeriodType, reviewWorkdays: boolean): string {
+function statsCacheKey(rootPath: string, today: string, type: PeriodType): string {
 	// 分隔符用 \u0000 —— 路径/日期里不可能出现它，避免 "a|b" + "c" 与 "a" + "b|c" 撞键
-	return `${rootPath}\u0000${today}\u0000${type}\u0000${reviewWorkdays ? 1 : 0}`;
+	return `${rootPath}\u0000${today}\u0000${type}`;
 }
 
 /**
  * 作废某 app 的全部统计缓存。
  *
  * 必须在任何「文件可能变了」之后调用：vault modify / create / delete / rename，
- * 以及设置变更（rootPath、reviewWorkdays 变了键自然不同，但清空更省心）。
+ * 以及设置变更（rootPath 变了键自然不同，但清空更省心）。
  */
 export function invalidateStatsCache(app: App): void {
 	statsCaches.get(app)?.clear();
@@ -257,11 +251,10 @@ export async function computePeriodStats(
 	rootPath: string,
 	today: string,
 	type: PeriodType,
-	reviewWorkdays: boolean,
 	/** 绕过缓存强制重算（自写写盘后、或调用方明确知道库变了时用）。 */
 	force = false
 ): Promise<PeriodStats> {
-	const cacheKey = statsCacheKey(rootPath, today, type, reviewWorkdays);
+	const cacheKey = statsCacheKey(rootPath, today, type);
 	if (!force) {
 		const hit = readStatsCache(app, cacheKey);
 		if (hit) return hit;
@@ -278,7 +271,7 @@ export async function computePeriodStats(
 		}
 	}
 
-	// --- Plan check-in rates -------------------------------------------------
+// --- Plan check-in rates -------------------------------------------------
 	const prefix = `${dailyDir(rootPath, yearDir)}/`;
 	const dailyFiles = app.vault
 		.getFiles()
@@ -304,15 +297,19 @@ export async function computePeriodStats(
 	let rateEnd = end;
 	if ((type === "week" || type === "month") && today < end) rateEnd = today;
 	const totalDays = dayCount(start, rateEnd);
-	const workdays = countWorkdays(start, rateEnd);
 
+	// v1.1.6：所有计划统一用自然天分母。
+	// 原先有一层「复盘计划按工作日算分母」的特化（reviewWorkdays + tradingDay）——
+	// 它服务的是作者本人那个 A 股复盘计划：交易日不含周末，用自然天当分母会让打卡率
+	// 永远到不了 100%。但「交易日/工作日」是**那个用户的领域概念**，不是通用需求：
+	// 别的用户没有交易日，复盘也不必按工作日算。留在插件里等于给所有人塞一个
+	// 用不上的开关 + 一份交易相关的设置项，故整体移除。需要这个口径的用户可以
+	// 在自己的库里用量化目标/自定义周期表达。
 	const planRates: PlanRate[] = Array.from(planSeen)
 		.sort()
 		.map((plan) => {
-			const isReview = plan === "复盘";
-			const total = isReview && reviewWorkdays ? workdays : totalDays;
 			const done = planDays.get(plan) ?? 0;
-			return { plan, done, total, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+			return { plan, done, total: totalDays, percent: totalDays === 0 ? 0 : Math.round((done / totalDays) * 100) };
 		});
 
 	// --- Temp task completion ------------------------------------------------
@@ -438,7 +435,6 @@ export function parsePlansFromFrontmatter(content: string): PlanDef[] {
 			action: readPlanString(obj, ["action", "动作", "时长", "duration"]),
 			label: readPlanString(obj, ["label", "icon", "图标", "emoji"]),
 			color: readPlanString(obj, ["color", "colour", "颜色"]),
-			tradingDay: !!obj?.tradingDay || !!obj?.tradingday || !!obj?.["交易日"],
 			// v2.7: 每日打卡计划标志（daily: false 显式排除；缺省视为每日打卡）
 			daily: obj?.daily !== false,
 		});
@@ -620,7 +616,6 @@ export async function computeAnnualPlanProgress(
 			action: def.action,
 			label: def.label,
 			color: def.color,
-			tradingDay: def.tradingDay,
 			daily: def.daily,
 			goals: goalProgress,
 			tasks: planTasks,

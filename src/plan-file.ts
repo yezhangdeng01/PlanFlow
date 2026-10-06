@@ -96,7 +96,6 @@ export function serializePlans(plans: PlanDef[], dailyByPlan?: Record<string, bo
 		// 剥老笔记标题里的「1小时」用；这里一旦重写 plans 块，旧 `action:` 行随之消失。
 		lines.push(`    daily: ${dailyByPlan?.[p.name] ?? (p.type === "check")}`);
 		if (p.target) lines.push(`    target: ${yamlScalar(p.target)}`);
-		if (p.tradingDay) lines.push("    tradingDay: true");
 		if (p.color) lines.push(`    color: ${yamlScalar(p.color)}`);
 		if (p.goals.length > 0) {
 			lines.push("    goals:");
@@ -163,7 +162,6 @@ export function toPlanDef(prog: PlanProgress): PlanDef {
 		action: prog.action,
 		label: prog.label,
 		color: prog.color,
-		tradingDay: prog.tradingDay,
 		daily: true,
 	};
 }

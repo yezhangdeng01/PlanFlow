@@ -40,3 +40,7 @@ docs/UI-AUDIT-2026-09-30.md
 docs/UI-REDESIGN-PROPOSAL-2026-09-09.md
 docs/UI-REVIEW-2026-09-30.md
 docs/UI-SKIN-PROPOSAL-2026-09-30.md
+
+# 会话记忆与进度快照（内部，不进公开仓库）
+.workbuddy/
+PROGRESS.md

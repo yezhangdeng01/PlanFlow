@@ -57,9 +57,9 @@ function makeApp(days: string[], dailyContent = DAILY_ALL_DONE): { app: App; rea
 invalidateAllStatsCaches();
 {
 	const { app, readCount } = makeApp(DAYS);
-	const a = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const a = await computePeriodStats(app, ROOT, TODAY, "year");
 	const afterFirst = readCount();
-	const b = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const b = await computePeriodStats(app, ROOT, TODAY, "year");
 	const afterSecond = readCount();
 
 	check("首次计算读了文件", afterFirst > 0, { 首读: afterFirst });
@@ -73,31 +73,37 @@ invalidateAllStatsCaches();
 invalidateAllStatsCaches();
 {
 	const { app, readCount } = makeApp(DAYS);
-	await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const firstYear = await computePeriodStats(app, ROOT, TODAY, "year");
 
 
 	// 换 rootPath：过滤前缀变了 → dailyFiles 为空 → 读到 0 次文件，但**确实重算了**
 	//（结果里 planRates 会变空）。所以判据不能是 read 次数，要看返回的引用是否不同。
-	const prevRoot = await computePeriodStats(app, ROOT, TODAY, "year", true);
-	const otherRoot = await computePeriodStats(app, "别的根", TODAY, "year", true);
+	const prevRoot = await computePeriodStats(app, ROOT, TODAY, "year");
+	const otherRoot = await computePeriodStats(app, "别的根", TODAY, "year");
 	check("rootPath 变化 → 重算（引用不同）", prevRoot !== otherRoot, { 同一引用: prevRoot === otherRoot });
 	check("rootPath 变化 → 结果随之改变（前缀过滤生效）", otherRoot.planRates.length === 0,
 		{ 别的根的计划数: otherRoot.planRates.length });
 	const afterRoot = readCount();
 
-	await computePeriodStats(app, ROOT, "2026-10-05", "year", true);
+	await computePeriodStats(app, ROOT, "2026-10-05", "year");
 	check("today 变化 → 重算", readCount() > afterRoot, { 增量: readCount() - afterRoot });
 	const afterToday = readCount();
 
-	await computePeriodStats(app, ROOT, TODAY, "month", true);
+	await computePeriodStats(app, ROOT, TODAY, "month");
 	check("type 变化 → 重算", readCount() > afterToday, { 增量: readCount() - afterToday });
 	const afterType = readCount();
 
-	await computePeriodStats(app, ROOT, TODAY, "year", false);
-	check("reviewWorkdays 变化 → 重算（复盘分母口径不同）", readCount() > afterType, { 增量: readCount() - afterType });
+	// v1.1.6：原先这里断言「reviewWorkdays 变化 → 重算」（复盘按工作日算分母）。
+	// 该特化已随作者的 A股复盘计划整体移除，缓存键不再含此维度。
+	// 改测「键里已没有这一维」：同一 (root, today, type) 重复调用应命中缓存——
+	// 这正是 reviewWorkdays 从键里移除后应有的行为（此前靠改这个参数才能强制重算）。
+	const repeatSame = await computePeriodStats(app, ROOT, TODAY, "year");
+	check("同参数重复调用 → 命中缓存（键里已无 reviewWorkdays 维度）", readCount() === afterType,
+		{ 增量: readCount() - afterType });
+	check("命中缓存返回同一引用", repeatSame === firstYear);
 	const afterRw = readCount();
 
-	await computePeriodStats(app, ROOT, TODAY, "year", false);
+	await computePeriodStats(app, ROOT, TODAY, "year");
 	check("参数不变 → 命中缓存", readCount() === afterRw, { 读取: readCount() });
 }
 
@@ -105,11 +111,11 @@ invalidateAllStatsCaches();
 invalidateAllStatsCaches();
 {
 	const { app, readCount } = makeApp(DAYS);
-	const a = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const a = await computePeriodStats(app, ROOT, TODAY, "year");
 	const before = readCount();
 
 	invalidateStatsCache(app);
-	const b = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const b = await computePeriodStats(app, ROOT, TODAY, "year");
 	check("invalidateStatsCache 后重算（引用不同）", a !== b, { 同一引用: a === b });
 	check("invalidateStatsCache 后确实重读文件", readCount() > before, { 增量: readCount() - before });
 	check("重算结果与原结果内容一致（缓存对调用方透明）", JSON.stringify(a) === JSON.stringify(b));
@@ -119,12 +125,13 @@ invalidateAllStatsCaches();
 invalidateAllStatsCaches();
 {
 	const { app, readCount } = makeApp(DAYS);
-	await computePeriodStats(app, ROOT, TODAY, "year", true);
+	await computePeriodStats(app, ROOT, TODAY, "year");
 	const before = readCount();
-	await computePeriodStats(app, ROOT, TODAY, "year", true, true);
+	// force 现在是第 5 个参数（reviewWorkdays 已随交易特化移除）
+	await computePeriodStats(app, ROOT, TODAY, "year", true);
 	check("force=true 绕过缓存重算", readCount() > before, { 增量: readCount() - before });
 	const afterForce = readCount();
-	await computePeriodStats(app, ROOT, TODAY, "year", true);
+	await computePeriodStats(app, ROOT, TODAY, "year");
 	check("force 重算结果也存入缓存（下次命中）", readCount() === afterForce, { 读取: readCount() });
 }
 
@@ -133,8 +140,8 @@ invalidateAllStatsCaches();
 {
 	const a1 = makeApp(DAYS);
 	const a2 = makeApp(DAYS);
-	const r1 = await computePeriodStats(a1.app, ROOT, TODAY, "year", true);
-	const r2 = await computePeriodStats(a2.app, ROOT, TODAY, "year", true);
+	const r1 = await computePeriodStats(a1.app, ROOT, TODAY, "year");
+	const r2 = await computePeriodStats(a2.app, ROOT, TODAY, "year");
 	check("不同 app 不共享缓存（各自都读了文件）", a1.readCount() > 0 && a2.readCount() > 0,
 		{ app1读: a1.readCount(), app2读: a2.readCount() });
 	check("两 app 拿到各自对象（未串味）", r1 !== r2, { 同一引用: r1 === r2 });
@@ -142,8 +149,8 @@ invalidateAllStatsCaches();
 	const b1 = a1.readCount();
 	const b2 = a2.readCount();
 	invalidateStatsCache(a1.app);
-	await computePeriodStats(a1.app, ROOT, TODAY, "year", true);
-	await computePeriodStats(a2.app, ROOT, TODAY, "year", true);
+	await computePeriodStats(a1.app, ROOT, TODAY, "year");
+	await computePeriodStats(a2.app, ROOT, TODAY, "year");
 	check("失效 app1 不影响 app2 的缓存", a1.readCount() > b1 && a2.readCount() === b2,
 		{ app1: a1.readCount(), app2: a2.readCount() });
 }
@@ -153,13 +160,13 @@ invalidateAllStatsCaches();
 {
 	const NOTHING_DONE = "## ✅ 今日打卡\n- [ ] ✍️ 写作 #计划/写作\n";
 	const { app, setDaily } = makeApp(DAYS, NOTHING_DONE);
-	const before = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const before = await computePeriodStats(app, ROOT, TODAY, "year");
 	check("初始：写作 0 天", before.planRates.find((r) => r.plan === "写作")?.done === 0, before.planRates);
 
 	// 模拟「用户勾了 checkbox」→ vault 事件触发 invalidate → 重算
 	setDaily(DAILY_ALL_DONE);
 	invalidateStatsCache(app);
-	const after = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const after = await computePeriodStats(app, ROOT, TODAY, "year");
 	check("库变化 + invalidate 后拿到新值（写作 4 天）",
 		after.planRates.find((r) => r.plan === "写作")?.done === 4, after.planRates);
 	check("缓存没有返回陈旧值", before !== after, { 同一引用: before === after });
@@ -172,21 +179,21 @@ invalidateAllStatsCaches();
 	// 13 个不同键（today 每天挪一天）
 	for (let i = 0; i < 13; i++) {
 		const iso = new Date(Date.parse("2026-09-25T00:00:00Z") + i * 86400000).toISOString().slice(0, 10);
-		await computePeriodStats(app, ROOT, iso, "year", true);
+		await computePeriodStats(app, ROOT, iso, "year");
 	}
 	const after13 = readCount();
 	const fresh = "2026-12-25";
-	const s1 = await computePeriodStats(app, ROOT, fresh, "year", true);
+	const s1 = await computePeriodStats(app, ROOT, fresh, "year");
 	check("未进过缓存的键 → 必然重算", readCount() > after13, { 增量: readCount() - after13 });
 	check("超出容量后仍返回正确结果", s1.planRates.length > 0, { 计划数: s1.planRates.length });
 
 	const afterFresh = readCount();
-	await computePeriodStats(app, ROOT, fresh, "year", true);
+	await computePeriodStats(app, ROOT, fresh, "year");
 	check("新键已入缓存，第二次命中", readCount() === afterFresh, { 读取: readCount() });
 
 	// 最早的 2026-09-25 超过 12 条上限应已被淘汰 → 再算会重读
 	const beforeOld = readCount();
-	await computePeriodStats(app, ROOT, "2026-09-25", "year", true);
+	await computePeriodStats(app, ROOT, "2026-09-25", "year");
 	check("超出容量的最早键已被淘汰（会重算）", readCount() > beforeOld, { 增量: readCount() - beforeOld });
 }
 
@@ -194,7 +201,7 @@ invalidateAllStatsCaches();
 invalidateAllStatsCaches();
 {
 	const { app } = makeApp([]);
-	const s = await computePeriodStats(app, ROOT, TODAY, "year", true);
+	const s = await computePeriodStats(app, ROOT, TODAY, "year");
 	check("空库（无每日笔记）不崩且返回零值", s.planRates.length === 0 && s.taskTotal === 0,
 		{ planRates: s.planRates.length, taskTotal: s.taskTotal });
 	const s2 = await computePeriodStats(app, ROOT, TODAY, "week", true);

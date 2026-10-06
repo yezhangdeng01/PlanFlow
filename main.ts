@@ -1,4 +1,4 @@
-import { ButtonComponent, Modal, Notice, Plugin, TFile, TFolder, setIcon } from "obsidian";
+import { ButtonComponent, Modal, Notice, Plugin, TFolder, setIcon } from "obsidian";
 import { PlanBoardView, VIEW_TYPE_PLANFLOW } from "./src/PlanBoardView";
 import type { PlanFlowSettings } from "./src/settings";
 import { DEFAULT_PLAN_COLORS, DEFAULT_SETTINGS, PlanFlowSettingTab } from "./src/settings";
@@ -19,7 +19,7 @@ class WelcomeModal extends Modal {
 			text: "已为你在库中创建好计划目录，四步开始使用：",
 		});
 		const steps = [
-			["🎯", "新建计划", "打开年度视图 →「＋ 新增计划」，先建写作 / 健康 / 学习 / 复盘等分类"],
+			["🎯", "新建计划", "打开年度视图 →「＋ 新增计划」，按你自己的分类建（写作 / 健康 / 学习 / 复盘只是例子，想建什么都行）"],
 			["📐", "量化目标", "给计划添加量化目标（如 12 篇 / 10 本书），自动拆解到月和周"],
 			["✅", "每日打卡", "在「今日打卡」勾选完成项，数据自动汇总到周 / 月 / 年度视图"],
 			["📊", "追踪进度", "看板 / 甘特视图 + 铜银金徽章，随时查看目标进度"],
@@ -112,27 +112,41 @@ export default class PlanFlowPlugin extends Plugin {
 	/**
 	 * 首次启动确保计划目录骨架存在：{rootPath}/{年}/每日|周|月 + 年度计划.md + 任务.md。
 	 * 已有年度目录则只补建缺失的年度计划.md；全部已存在返回 false（不弹引导）。
+	 *
+	 * v1.1.6 加固「升级不得重复添加」：这函数每次启动都跑，所以判断必须**只增不改**——
+	 * 绝不能因为「文件读不到」就当成新装库、把骨架连同默认计划一起重建（那会覆盖用户
+	 * 数据，且在同步延迟 / iPad 冷启动时高发）。
+	 *
+	 * 关键：`getAbstractFileByPath` 对「路径不存在」和「索引尚未就绪」**都**返回 null，
+	 * 拿它当存在性判断会把老用户误判成新装库。因此存在性一律走
+	 * `adapter.exists()`（真实文件系统，异步），只有确认「根目录确实不存在」才建骨架。
 	 */
 	private async ensurePlanRoot(): Promise<boolean> {
 		const year = String(new Date().getFullYear());
 		const root = this.settings.rootPath.replace(/\/+$/, "");
 		const base = `${root}/${year}`;
-		const yearFolder = this.app.vault.getAbstractFileByPath(base);
-		if (yearFolder instanceof TFolder) {
-			// 已有年度目录（老用户）：只补建年度计划.md
-			const planFile = this.app.vault.getAbstractFileByPath(`${base}/年度计划.md`);
-			if (!(planFile instanceof TFile)) {
-				await this.app.vault.create(`${base}/年度计划.md`, this.buildYearPlanTemplate(year));
-			}
+		const planPath = `${base}/年度计划.md`;
+
+		// 正常老用户：计划文件在 → 什么都不做（这条占绝大多数启动）
+		if (await this.app.vault.adapter.exists(planPath)) return false;
+
+		// 目录已存在但计划文件读不到 → 老用户（含同步中/索引未就绪）。
+		// 绝不逐级重建目录、绝不覆盖已有文件，只跳过本次（下次启动重试）。
+		if (await this.app.vault.adapter.exists(root)) {
+			console.warn(`PlanFlow: ${planPath} 暂不存在，跳过本次补建（下次启动重试）`);
 			return false;
 		}
-		// 全新：逐级创建目录 + 骨架文件
+
+		// 根目录确实不存在 → 真·全新安装
 		await this.ensureFolder(root);
 		await this.ensureFolder(`${base}/每日`);
 		await this.ensureFolder(`${base}/周`);
 		await this.ensureFolder(`${base}/月`);
-		await this.app.vault.create(`${base}/年度计划.md`, this.buildYearPlanTemplate(year));
-		if (!this.app.vault.getAbstractFileByPath(`${base}/任务.md`)) {
+		await this.app.vault.create(planPath, this.buildYearPlanTemplate(year));
+		// ⚠️ 这里原来漏了 await：`if (adapter.exists(...))` 拿一个**恒为真的 Promise**
+		// 当条件 → 取反为 false → 任务.md 永远不创建（lint 的 no-misused-promises
+		// 正是社区扫描器的 error 级规则，1.1.2栽过一次，不能放过）。
+		if (!(await this.app.vault.adapter.exists(`${base}/任务.md`))) {
 			await this.app.vault.create(`${base}/任务.md`, "");
 		}
 		return true;
@@ -154,7 +168,17 @@ export default class PlanFlowPlugin extends Plugin {
 		}
 	}
 
-	/** 新用户年度计划.md 骨架：4 个默认计划（与默认打卡模板对齐）。 */
+	/**
+	 * 新用户年度计划.md 骨架：**只建结构，不预置任何计划**。
+	 *
+	 * ⚠️ 早期版本在这里硬编码了「写作/健康/学习/复盘」四个计划（连`target:
+	 * 每日写作` 这类文案都是作者个人库的），随插件分发进了每个用户 vault——
+	 * 等于替所有人凭空造了四个他并不存在的计划，还让计划下拉多出四个候选。
+	 * 现改为空`plans:`，由用户在「年度视图 → ＋ 新增计划」自己建。
+	 *
+	 * `plans: {}` 显式给空字典而非留空：YAML 里裸`plans:` 会解析成 null，
+	 * `parsePlansFromFrontmatter` 拿到 null 再遍历会炸（见 plan-file.ts）。
+	 */
 	private buildYearPlanTemplate(year: string): string {
 		const end = `${year}-12-31`;
 		return `---
@@ -162,28 +186,24 @@ type: yearly
 period: ${year}
 start: ${year}-01-01
 end: ${end}
-plans:
-  写作:
-    label: ✍️
-    action: 1小时
-    daily: true
-    target: 每日写作
-  健康:
-    label: 🏃
-    action: 1小时
-    daily: true
-    target: 每日运动
-  学习:
-    label: 📖
-    action: 1小时
-    daily: true
-    target: 每日学习
-  复盘:
-    label: 📈
-    action: 复盘+次日计划
-    daily: true
-    target: 每日复盘
+plans: {}
 ---
+# 🏆 ${year} 年度计划
+
+> 本文件是打卡体系的**唯一配置源**：在 frontmatter 的 \`plans\` 里增删计划、改图标，
+> 每日打卡项自动跟着变。或在插件「年度视图 → ＋ 新增计划」里点着建。
+
+## 我的计划
+
+（还没有计划。点上方「＋ 新增计划」，或直接在下面的 \`plans:\` 里照这个格式写：
+\`\`\`yaml
+plans:
+  示例:
+    label: 🎯
+    daily: true
+    target: 填一句目标
+\`\`\`
+）
 `;
 	}
 

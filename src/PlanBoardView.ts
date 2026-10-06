@@ -48,7 +48,7 @@ import {
 import type { AutoTaskPlan, PoolTask } from "./tasks";
 import { DAY_MS, deleteTask, ensureAutoTasks, listTasks, planCounterUnit, toggleTask } from "./tasks";
 import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
-import { DEFAULT_PLAN_COLORS, type PlanTemplate } from "./settings";
+import type { PlanTemplate } from "./settings";
 import { AddCheckItemModal, PlanEditModal, GoalEditModal, CheckItemManageModal } from "./modals";
 import { readRawPlans, writePlansToFile, rotatePlanColor, toPlanDef } from "./plan-file";
 import { summarize, taskStatus, sortTasksByDue } from "./tasks";
@@ -944,8 +944,7 @@ export class PlanBoardView extends ItemView {
 			this.app,
 			this.plugin.settings.rootPath,
 			this.today,
-			"year",
-			this.plugin.settings.reviewWorkdays
+			"year"
 		);
 		this.planRates = yearStats.planRates; // v6.5: 缓存给 banner 用（看板/甘特页也读它）
 		this.planProgress = await computeAnnualPlanProgress(
@@ -968,8 +967,7 @@ export class PlanBoardView extends ItemView {
 				this.app,
 				this.plugin.settings.rootPath,
 				this.today,
-				"year",
-				this.plugin.settings.reviewWorkdays
+				"year"
 			);
 			this.planRates = ys.planRates;
 		}
@@ -1005,9 +1003,15 @@ export class PlanBoardView extends ItemView {
 			if (d.daily) {
 				items.push({
 					// v7.6：不再带 duration —— 标题就是「图标 + 计划名」，行动内容/用时打卡时现填
-					name: `${d.label ?? ""} ${d.name}`.trim(),
-					plan: d.name,
-					includeReview: d.name === "复盘" || d.tradingDay,
+name: `${d.label ?? ""} ${d.name}`.trim(),
+				plan: d.name,
+				// 自动生成的打卡项**一律不挂复盘链接**。
+				// 原先这里认计划名「复盘」—— 那是作者个人库里的 A 股复盘计划，
+				// 换个名字功能就静默失效（上一版改认 tradingDay 标记，但 tradingDay
+				// 本身是交易特化，已整体移除）。既然特化源头去掉了，就不该由插件替
+				// 用户决定哪个计划配复盘：需要的人用「添加打卡项」弹窗里那个通用的
+				// 「含复盘链接」开关自己加（该开关与计划无关，本来就是通用能力）。
+				includeReview: false,
 				});
 			}
 			for (const g of d.goals) {
@@ -2048,8 +2052,18 @@ export class PlanBoardView extends ItemView {
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const dir = dailyDir(root, date.slice(0, 4));
 		const path = `${dir}/${date}.md`;
+		// v1.1.7：存在性判断用 `adapter.exists()`（真实文件系统）而不是
+		// `getAbstractFileByPath` —— 后者对「索引尚未就绪」也返回 null，
+		// 在同步刚拉完文件的瞬间会误判「不存在」→ 又建一篇 → 文件被写成两篇。
+		// 这正是实测库里 `2026-10-06.md` 的成因之一。
 		const existing = this.app.vault.getAbstractFileByPath(path);
 		if (existing instanceof TFile) return existing;
+		if (await this.app.vault.adapter.exists(path)) {
+			// 文件在磁盘上，只是索引还没认出来；重新拿一次仍拿不到就等下一轮
+			const retry = this.app.vault.getAbstractFileByPath(path);
+			if (retry instanceof TFile) return retry;
+			return null;
+		}
 		try {
 			await this.ensureFolder(dir);
 			const items = await this.buildDefaultCheckItems();
@@ -2260,8 +2274,16 @@ export class PlanBoardView extends ItemView {
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const dir = dailyDir(root, this.today.slice(0, 4));
 		const path = `${dir}/${this.today}.md`;
+		// v1.1.7：三道闸门防「重复建档」。这条路径是**自动**触发的（打开视图后两个定时器），
+		// 一旦误判就会在用户库里凭空多出一篇日记 —— 实测库 `2026-10-06.md` 被写成
+		// 两篇（两套 frontmatter + 两套打卡区）就是这么来的。
+		//   ① getTodayFile 已在上面查过；② adapter.exists 兜「索引未就绪」窗口；
+		//   ③ create 前再查一次——两个定时器（1200ms/3500ms）可能都通过了前两道闸，
+		//      第一个已建好、第二个还在路上。
+		if (await this.app.vault.adapter.exists(path)) return;
 		try {
 			await this.ensureFolder(dir);
+			if (await this.app.vault.adapter.exists(path)) return; // ③ 并发窗口兜底
 			const items = await this.buildDefaultCheckItems();
 			await this.app.vault.create(path, buildDailyTemplate(this.today, items));
 			await this.refresh();
@@ -2274,8 +2296,14 @@ export class PlanBoardView extends ItemView {
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const dir = dailyDir(root, this.today.slice(0, 4));
 		const path = `${dir}/${this.today}.md`;
+		// v1.1.7：同 ensureDateNote —— 用 adapter.exists 兜住「索引未就绪」窗口，
+		// 否则这里会判「今日笔记已存在」落空、又建一篇，把用户的日记写成两篇。
 		if (this.app.vault.getAbstractFileByPath(path) instanceof TFile) {
 			new Notice("今日笔记已存在");
+			await this.refreshToday();
+			return;
+		}
+		if (await this.app.vault.adapter.exists(path)) {
 			await this.refreshToday();
 			return;
 		}
@@ -2378,7 +2406,11 @@ export class PlanBoardView extends ItemView {
 		//（原先只有 4 个内置名，选了不在年度计划里的名 → 打卡统计对不上号）。
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const defs = (await this.readAnnualPlanDefs(root, todayStr().slice(0, 4))) ?? [];
-		const options = Array.from(new Set([...defs.map((d) => d.name), ...Object.keys(DEFAULT_PLAN_COLORS)]));
+		// v1.1.6：候选只取年度计划里的真实计划。早先还并了 DEFAULT_PLAN_COLORS 的键
+		// （写作/健康/学习/复盘）——那既把作者个人的计划名塞进了别人vault，
+		// 又让「选的计划不在年度计划里」成为可能（打卡统计会对不上号，正是本段注释
+		// 想避免的事）。该表现已清空，这里同步收敛为纯真实计划。
+		const options = Array.from(new Set(defs.map((d) => d.name)));
 		new AddCheckItemModal(this.app, this.plugin, todayStr(), options, (line) => void this.addCheckItem(line)).open();
 	}
 
@@ -2980,10 +3012,9 @@ export class PlanBoardView extends ItemView {
 		this.panelEl?.empty();
 		this.currentPanel = "review";
 		const root = this.plugin.settings.rootPath;
-		const rw = this.plugin.settings.reviewWorkdays;
-		const yearStats = await computePeriodStats(this.app, root, this.today, "year", rw);
-		const weekStats = await computePeriodStats(this.app, root, this.today, "week", rw);
-		const monthStats = await computePeriodStats(this.app, root, this.today, "month", rw);
+		const yearStats = await computePeriodStats(this.app, root, this.today, "year");
+		const weekStats = await computePeriodStats(this.app, root, this.today, "week");
+		const monthStats = await computePeriodStats(this.app, root, this.today, "month");
 		await this.settleIfNeeded(weekStats);
 		await this.settleIfNeeded(monthStats);
 		if (!this.panelEl) return;
@@ -3258,8 +3289,7 @@ export class PlanBoardView extends ItemView {
 			this.app,
 			this.plugin.settings.rootPath,
 			this.today,
-			"year",
-			this.plugin.settings.reviewWorkdays
+			"year"
 		);
 		if (!this.panelEl) return;
 		const panel = this.panelEl;
@@ -3622,11 +3652,12 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private async openGoalModal(planName: string, goal: PlanGoal | null): Promise<void> {
-		// v7.21: 每日打卡段加了「计划」下拉——选项 = 当前计划排最前 + 真实计划 + 内置名
+		// v7.21: 每日打卡段加了「计划」下拉——选项 = 当前计划排最前 + 真实计划
 		//（与 openAddItemModal 同口径；标签对不上计划的打卡项统计会漏计）。
+		// v1.1.6：同上，去掉并入的 DEFAULT_PLAN_COLORS 键（作者个人计划名）。
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const defs = (await this.readAnnualPlanDefs(root, todayStr().slice(0, 4))) ?? [];
-		const options = Array.from(new Set([planName, ...defs.map((d) => d.name), ...Object.keys(DEFAULT_PLAN_COLORS)]));
+		const options = Array.from(new Set([planName, ...defs.map((d) => d.name)]));
 		new GoalEditModal(this.app, planName, goal, options, (input) => this.saveGoal(planName, goal, input)).open();
 	}
 
@@ -3674,7 +3705,6 @@ export class PlanBoardView extends ItemView {
 				action: "",
 				label: input.label,
 				color: input.color || rotatePlanColor(defs),
-				tradingDay: false,
 				daily: input.daily,
 			});
 			dailyMap[input.name] = input.daily;
