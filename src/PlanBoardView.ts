@@ -25,6 +25,9 @@ import {
 	removeLine,
 	replaceLine,
 	replaceSummary,
+	autoCheckItemName,
+	collapseAutoSuffix,
+	renameAutoCheckLines,
 	setCheckLineChecked,
 	stripLegacyDuration,
 	stripReviewLink,
@@ -49,7 +52,7 @@ import type { AutoTaskPlan, PoolTask } from "./tasks";
 import { DAY_MS, deleteTask, ensureAutoTasks, listTasks, planCounterUnit, toggleTask } from "./tasks";
 import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
 import type { PlanTemplate } from "./settings";
-import { AddCheckItemModal, PlanEditModal, GoalEditModal, CheckItemManageModal } from "./modals";
+import { PlanEditModal, GoalEditModal, CheckItemManageModal } from "./modals";
 import { readRawPlans, writePlansToFile, rotatePlanColor, toPlanDef } from "./plan-file";
 import { summarize, taskStatus, sortTasksByDue } from "./tasks";
 import type { GoalInput, PlanEditInput } from "./modals";
@@ -788,6 +791,20 @@ export class PlanBoardView extends ItemView {
 			return await fn();
 		} finally {
 			this.selfWriteDepth--;
+			// v1.2.1 修复：自写结束后必须让统计缓存失效——**这里才是唯一可靠的时机**。
+			//
+			// 症状（用户实测）：新建 / 删除 / 编辑计划后，计划列表与进度不刷新，
+			// 要重启 Obsidian 才更新（「新建和删除不能实时显示，都需要重启才行」）。
+			// 根因是缓存失效只挂在 vault 事件上（见 onVaultModify 里的
+			// `invalidateStatsCache`），而本方法**专门用来屏蔽那些事件** ——
+			// 于是插件自己改完年度计划文件，随后 savePlan/deletePlan 末尾那次
+			// refresh() 走 computePeriodStats 仍命中旧缓存（refreshPlans 直接吃
+			// `stats.planProgress`），列表自然还是旧的。
+			//
+			// 为什么放 selfWriteDepth===0 这一道：嵌套自写（如 savePlan 里再调
+			// saveGoal）时，内层结束时外层可能还有写盘；等计数归零再清，避免
+			// 「清了缓存 → 外层又写 → 缓存里留下半截数据」。
+			if (this.selfWriteDepth === 0) invalidateStatsCache(this.app);
 		}
 	}
 
@@ -921,6 +938,20 @@ export class PlanBoardView extends ItemView {
 		return f instanceof TFile ? f : null;
 	}
 
+	/**
+	 * v1.2.2: 重读今日笔记到 this.dailyData。
+	 *
+	 * 为什么需要单独补这一刀：`refresh()` 是**按当前页签分发**的 —— 停在「计划」页时
+	 * 它只跑 `refreshPlans()`，**不会重读每日笔记**。而编辑计划（改图标 / 改名）会联动
+	 * 重写今日笔记里的自动行、新建计划或目标还会往里补项；写完不重读，接着点开
+	 * 「✅ 打卡行动」的 ✏️，弹窗里显示的就是**改前的旧行文本**（真机复验实测到）。
+	 */
+	private async reloadTodayData(): Promise<void> {
+		const file = this.getTodayFile();
+		if (!file) return;
+		this.dailyData = parseDailyContent(file, await this.app.vault.read(file), this.today);
+	}
+
 	/** Build the home page data: year goals + month/week task windows. */
 	private async buildHomeData(): Promise<void> {
 		const root = pfRoot(this.plugin.settings.rootPath);
@@ -1003,7 +1034,7 @@ export class PlanBoardView extends ItemView {
 			if (d.daily) {
 				items.push({
 					// v7.6：不再带 duration —— 标题就是「图标 + 计划名」，行动内容/用时打卡时现填
-name: `${d.label ?? ""} ${d.name}`.trim(),
+				name: autoCheckItemName(d.label, d.name),
 				plan: d.name,
 				// 自动生成的打卡项**一律不挂复盘链接**。
 				// 原先这里认计划名「复盘」—— 那是作者个人库里的 A 股复盘计划，
@@ -1179,8 +1210,10 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		// v3.7: 连击提示移至总结卡标题行（原在此处，随 KPI 行移除一并归位）
 		// 今日打卡分档徽章（即时显示，不结算进徽章墙）
 		this.todayBadgeEl = checkTitle.createSpan({ cls: "planboard-badge planboard-today-badge planboard-hidden" });
-		const addBtn = checkHeader.createEl("button", { cls: "planboard-btn planboard-btn-outline planboard-add-btn", text: "+ 添加" });
-		addBtn.addEventListener("click", () => void this.openAddItemModal());
+		// v1.2.2（用户 2026-10-10）：「+ 添加」从今日打卡卡撤除。
+		// 理由：打卡项是计划的投影，临时项不进统计、也没有归属，随手加只会让打卡率
+		// 越来越不可信。增删改统一收到**计划卡「✅ 打卡行动」的 ✏️** 管理弹窗
+		// （新增表单 + 逐项编辑/删除，计划已锁定），入口唯一、口径一致。
 		const bar = checkCard.createDiv({ cls: "planboard-progress-bar" });
 		this.progressFillEl = bar.createDiv({ cls: "planboard-progress-fill" });
 		this.checklistEl = checkCard.createEl("ul", { cls: "planboard-checklist" });
@@ -1789,21 +1822,16 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 	private checkDisplayText(item: CheckItem): string {
 		const prog = this.planProgress.find((p) => p.plan === item.plan);
 		// 标准打卡项名 = 「图标 + 计划名」，新建行就是这个名字（见 buildDefaultCheckItems）
-		const canon = prog ? `${prog.label} ${prog.plan}`.trim() : "";
+		const canon = prog ? autoCheckItemName(prog.label, prog.plan) : "";
 
 		// ① 精确匹配年度计划里的历史 action —— 能吃掉「复盘+次日计划」这类非时长词
 		let t = stripLegacyDuration(item.text, prog?.action ?? "", canon);
 
-		// ② 兜底（v7.6）：自动推导的每日打卡项，标题必为「{图标} {计划名}」，
-		//    所以以标准名开头的部分可以硬裁到标准名 + 复盘链接。
-		//    为什么要这一条：`action` 已从年度计划 frontmatter 里退役，用户把它删掉之后
-		//    ① 就认不出「复盘+次日计划」了（它不含时长单位），后缀会在界面上复活。
-		//    影响面很小：只有「daily 计划」且「标题以标准名开头」的行会被裁，
-		//    用户自己用「+ 添加」起的名字（如「阅读 30 分钟」）不受影响。
-		if (prog?.daily && canon && t.startsWith(canon)) {
-			const link = / → \[\[[^\]]*\]\]$/.exec(t)?.[0] ?? "";
-			t = canon + link;
-		}
+		// ② 兜底（v7.6；v1.2.3 收窄）：老笔记的自动行可能还带着当年由计划 `action`
+		//    写进去的后缀（`✍️ 写作 1小时`、`📈 复盘 复盘+次日计划`）。`action` 退役后
+		//    ① 认不全，这条把「标准名 + 空格 + 后缀」裁回标准名。
+		//    ⚠️ 判据为什么必须是「带空格分段」、踩过什么坑，见 collapseAutoSuffix 的注释。
+		if (prog?.daily) t = collapseAutoSuffix(t, canon);
 
 		// ③ v7.7（用户 113001 截图）：界面上**不再显示复盘链接尾段** `→ [[2026-10-01 复盘]]`。
 		//    它只是笔记行里的一个 wikilink + 设置项「含复盘链接」的产物，在打卡卡里既点不动
@@ -2398,22 +2426,6 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		}
 	}
 
-	// --- Add item modal -------------------------------------------------------
-
-	private async openAddItemModal(): Promise<void> {
-		// v7.20: ①today 打开弹窗时现取（视图的 this.today 只在构造时取一次，隔天不刷新，
-		// 弹窗默认日期会停在旧日期——用户 1958 实测「不是今天」）；②计划下拉列真实计划
-		//（原先只有 4 个内置名，选了不在年度计划里的名 → 打卡统计对不上号）。
-		const root = pfRoot(this.plugin.settings.rootPath);
-		const defs = (await this.readAnnualPlanDefs(root, todayStr().slice(0, 4))) ?? [];
-		// v1.1.6：候选只取年度计划里的真实计划。早先还并了 DEFAULT_PLAN_COLORS 的键
-		// （写作/健康/学习/复盘）——那既把作者个人的计划名塞进了别人vault，
-		// 又让「选的计划不在年度计划里」成为可能（打卡统计会对不上号，正是本段注释
-		// 想避免的事）。该表现已清空，这里同步收敛为纯真实计划。
-		const options = Array.from(new Set(defs.map((d) => d.name)));
-		new AddCheckItemModal(this.app, this.plugin, todayStr(), options, (line) => void this.addCheckItem(line)).open();
-	}
-
 	/**
 	 * v1.0.5.2: 打卡项管理弹窗（计划管理页入口）——按计划过滤今日打卡项，
 	 * 列表逐项删 + 添加表单。今日打卡卡只留打卡与顺序微调（行内 ✕ 已移除）。
@@ -2421,18 +2433,36 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 	private openCheckItemManager(plan: string): void {
 		// 自动项名单：buildDefaultCheckItems 生成的「daily 型计划/目标」当日项——不可删除。
 		// 匹配口径 = item.text 精确等于模板 name（自动项当天才生成，今日笔记里的即当日窗口项）。
-		void this.buildDefaultCheckItems().then((templates) => {
-			const autoNames = new Set(templates.map((t) => t.name));
+		void (async () => {
+			const templates = await this.buildDefaultCheckItems();
+			// v1.2.2: 判据从「文本精确等于模板名」升级为 **(计划, 文本) 二元组** ——
+			// 同名不同计划不再互相冒充；并补一条**历史口径容错**：旧版 savePlan 给带图标的
+			// 计划补项时写的是 `label || name`（只剩一个图标），这类行文本 = 计划的 label，
+			// 也认作自动项 —— 用户库里已有的坏行不必等下次编辑计划才自愈。
+			const autoKeys = new Set<string>();
+			for (const t of templates) {
+				autoKeys.add(`${t.plan}\u0000${t.name}`);
+				// 从「{图标} {计划名}」里劈出图标；无图标时劈不出（name === plan），不额外登记
+				const icon = t.name.endsWith(" " + t.plan)
+					? t.name.slice(0, t.name.length - t.plan.length - 1).trim()
+					: "";
+				if (icon) autoKeys.add(`${t.plan}\u0000${icon}`);
+			}
+			// v1.2.3: 手动新增的打卡项也要带同款图标 —— 从年度计划定义里取本计划的 label。
+			// 不从 templates 取：非 daily 型计划没有模板项，但它照样有图标。
+			const defs = await this.readAnnualPlanDefs(pfRoot(this.plugin.settings.rootPath), this.today.slice(0, 4));
+			const planLabel = defs?.find((d) => d.name === plan)?.label ?? "";
 			new CheckItemManageModal(this.app, {
 				plan,
+				icon: planLabel,
 				today: this.today,
 				getItems: () => (this.dailyData?.checkItems ?? []).filter((c) => c.plan === plan),
-				isAuto: (item) => autoNames.has(item.text),
+				isAuto: (item) => autoKeys.has(`${item.plan ?? ""}\u0000${item.text}`),
 				onAdd: (line) => this.addCheckItem(line),
 				onDeleteItem: (item) => this.deleteCheckItem(item),
 				onEditItem: (item, name, start, due) => this.editCheckItem(item, name, start, due),
 			}).open();
-		});
+		})();
 	}
 
 	/** v1.0.5.2: 编辑手动打卡项（名称/起止窗口）——checkbox 状态与 #计划/ 标签原样保留。 */
@@ -3373,23 +3403,23 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		const metric = card.createDiv({ cls: "planboard-plan-metric" });
 		// v7.17: 度量框加「打卡行动」标题。
 		// v1.0.5.2: **与量化目标区同构的两行制**（用户截图反馈「这跟量化目标的一样吗」）——
-		// 标题行（title + hover ✏️）+ 进度行（target + bar + count）。此前按钮混在一行制里位置不明。
+		// 标题行（title）+ 进度行（target + bar + count + ✏️）。
+		// v1.2.4: ✏️ 由标题行移入进度行的操作列（见下），标题行只剩标题。
 		// ✏️ = 打开该计划今日打卡项的管理弹窗（自动项不可删，手动项可编辑/删除）。
 		// 🗑️ 清空按钮已移除：跟随计划自动创建的打卡项不可删除，只有删除计划才连带删除。
 		const metricHead = metric.createDiv({ cls: "planboard-plan-metric-head" });
 		metricHead.createDiv({ cls: "planboard-plan-metric-title", text: "✅ 打卡行动" });
-		const metricActions = metricHead.createDiv({ cls: "planboard-item-actions planboard-goal-actions" });
-		const metricEditBtn = metricActions.createEl("button", {
-			cls: "planboard-icon-btn",
-			attr: { "aria-label": "管理今日打卡项", title: "管理今日打卡项" },
-		});
-		metricEditBtn.setText("✏️"); // 彩色 emoji（用户拍板保留原样；Lucide 铅笔是灰色描边）
-		metricEditBtn.addEventListener("click", () => void this.openCheckItemManager(prog.plan));
+		// v1.2.4：进度行与「🎯 量化目标」同构为「名称 | 条 | 计数 | 操作」四列
+		//（布局见 styles.css 末段 v1.2.4 块）。
+		// v1.2.5：名称一律取**计划名**。此前取 `prog.target`（计划的「目标描述」），
+		// 但那栏 v7.18 就已退役（PlanEditInput 里没有它 → 用户改不了），旧值却一直
+		// 留在年度计划 frontmatter 里被这里显示成「交易日复盘打…」这种**改不掉的截断长名**
+		//（用户 2026-10-10 截图反馈）。target 仍参与老数据的类型/单位推导
+		//（stats.readPlanType / tasks.planCounterUnit），故字段保留，只是不再上屏。
 		const metricRow = metric.createDiv({ cls: "planboard-plan-metric-row" });
-		if (prog.target) {
-			const targetEl = metricRow.createDiv({ cls: "planboard-plan-target-line", text: prog.target });
-			targetEl.setAttribute("title", prog.target); // 窄档下会省略号截断，hover 看全文
-		}
+		const metricName = prog.plan;
+		const targetEl = metricRow.createDiv({ cls: "planboard-plan-target-line", text: metricName });
+		targetEl.setAttribute("title", metricName); // 名称列定宽，超出省略号截断
 
 		// v7.4: 顶条改为打卡进度条——数字型计划的顶条原来显示任务进度，
 		// 与下方量化目标行完全重复（用户 012810 截图）。打卡数据（checkDone/checkTotal）
@@ -3398,7 +3428,7 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		// 无打卡数据（checkTotal=0）的计划回退旧口径，避免 0/0 空条。
 		const useCheck = prog.checkTotal > 0;
 		const barPercent = useCheck ? prog.checkPercent : prog.percent;
-		const bar = metric.createDiv({ cls: "planboard-progress-bar" });
+		const bar = metricRow.createDiv({ cls: "planboard-progress-bar" });
 		const fill = bar.createDiv({ cls: "planboard-progress-fill" });
 		fill.style.width = `${barPercent}%`;
 		setTier(fill, barPercent);
@@ -3414,7 +3444,7 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		);
 		bar.createDiv({ cls: "planboard-progress-pct", text: `${barPercent}%` });
 
-		metric.createDiv({
+		metricRow.createDiv({
 			cls: "planboard-progress-count",
 			text: useCheck
 				? `${prog.checkDone}/${prog.checkTotal} 天`
@@ -3423,9 +3453,20 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 					: `${prog.checkDone}/${prog.checkTotal} 天`,
 		});
 
+		// v1.2.4：✏️（管理今日打卡项）从标题行挪进操作列——两处操作列同宽，条的长度
+		// 才不会因「有按钮 / 没按钮」而变；图标与量化目标的按钮同列对齐。
+		const metricActions = metricRow.createDiv({ cls: "planboard-item-actions planboard-goal-actions" });
+		const metricEditBtn = metricActions.createEl("button", {
+			cls: "planboard-icon-btn",
+			attr: { "aria-label": "管理今日打卡项", title: "管理今日打卡项" },
+		});
+		metricEditBtn.setText("✏️"); // 彩色 emoji（用户拍板保留原样；Lucide 铅笔是灰色描边）
+		metricEditBtn.addEventListener("click", () => void this.openCheckItemManager(prog.plan));
+
 		// 量化目标区（仅数量型且有 goals 的计划；打卡型不显示）。
-		// v7.4b: 目标行的 ✏️🗑️ 落「🎯 量化目标」标题行，hover 标题行浮现（v7.4c 用户 020852）——
-		// 单目标计划直接落标题行；多目标时标题行按钮无法定位是哪个目标，回退行内按钮。
+		// v7.4b: 目标行的 ✏️🗑️ 曾落「🎯 量化目标」标题行（单目标）或行内（多目标）。
+		// v1.2.4: 一律改行内操作列——标题行按钮无法定位是哪个目标；且两种摆法让条的
+		// 可用宽度不同（多目标行被按钮挤窄），同卡两个盒子对不齐。见 renderYearGoalRow。
 		if (prog.isNumeric && prog.goals.length === 0) {
 			// v1.0.5: 空状态引导——建了计划但还没拆量化目标，这是流程的下一步，
 			// 指到「编辑计划」表单（v7.16 起新增/补目标都走这一段，入口唯一）。
@@ -3438,24 +3479,10 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 			const goalsBox = card.createDiv({ cls: "planboard-goals-box" });
 			const goalsHead = goalsBox.createDiv({ cls: "planboard-goals-head" });
 			goalsHead.createDiv({ cls: "planboard-goals-title", text: "🎯 量化目标" });
-			const single = prog.goals.length === 1 ? prog.goals[0] : null;
-			if (single) {
-				const actions = goalsHead.createDiv({ cls: "planboard-item-actions planboard-goal-actions is-static" });
-				const gEditBtn = actions.createEl("button", {
-					cls: "planboard-icon-btn",
-					attr: { "aria-label": "编辑目标", title: "编辑目标" },
-				});
-				gEditBtn.setText("✏️"); // 编辑按钮统一为彩色 emoji
-				gEditBtn.addEventListener("click", () => void this.openGoalModal(prog.plan, single));
-				const gDelBtn = actions.createEl("button", {
-					cls: "planboard-icon-btn planboard-del-btn",
-					attr: { "aria-label": "删除目标", title: "删除目标" },
-				});
-				setIcon(gDelBtn, "lucide-trash-2");
-				gDelBtn.addEventListener("click", () => void this.deleteGoal(prog, single));
-			}
+			// v1.2.4：单目标的 ✏️🗑️ 也从标题行挪进行内操作列——单/多目标同构，
+			// 「打卡行动」与「量化目标」两个盒子的行结构完全一致，条宽才对得齐。
 			for (const goal of prog.goals) {
-				goalsBox.appendChild(this.renderYearGoalRow(goal, prog, !single));
+				goalsBox.appendChild(this.renderYearGoalRow(goal, prog));
 			}
 		}
 
@@ -3473,8 +3500,8 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		return card;
 	}
 
-	/** One quantified-goal row: name + mini bar + count；多目标计划附带行内 [✏️][🗑️]（单目标时按钮在标题行）。 */
-	private renderYearGoalRow(goal: PlanGoalProgress, prog: PlanProgress, withActions: boolean): HTMLElement {
+	/** One quantified-goal row: name + mini bar + count + [✏️][🗑️]（v1.2.4 起单/多目标同构，按钮一律在操作列）。 */
+	private renderYearGoalRow(goal: PlanGoalProgress, prog: PlanProgress): HTMLElement {
 		const row = createDiv({ cls: "planboard-goal-row planboard-goal-row--mini" });
 		row.createDiv({ cls: "planboard-goal-name", text: goal.name });
 		// v7.4: 计数挪到条尾、百分比压到条上（原来「1/8 篇」挤在条前、无百分比）
@@ -3485,29 +3512,27 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 		bar.setAttribute("title", `已完成 ${goal.done}/${goal.total} ${goal.unit || "个"} · ${goal.percent}%`);
 		bar.createDiv({ cls: "planboard-progress-pct", text: `${goal.percent}%` });
 		row.createDiv({ cls: "planboard-goal-count", text: `${goal.done}/${goal.total} ${goal.unit || "个"}` });
-		if (withActions) {
-			const actions = row.createDiv({ cls: "planboard-item-actions planboard-goal-actions" });
-			const editBtn = actions.createEl("button", {
-				cls: "planboard-icon-btn",
-				attr: { "aria-label": "编辑目标", title: "编辑目标" },
-			});
-			editBtn.setText("✏️"); // 编辑按钮统一为彩色 emoji
-			editBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				void this.openGoalModal(prog.plan, goal);
-			});
-			const delBtn = actions.createEl("button", {
-				cls: "planboard-icon-btn planboard-del-btn",
-				attr: { "aria-label": "删除目标", title: "删除目标" },
-			});
-			setIcon(delBtn, "lucide-trash-2");
-			delBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				void this.deleteGoal(prog, goal);
-			});
-		}
+		const actions = row.createDiv({ cls: "planboard-item-actions planboard-goal-actions" });
+		const editBtn = actions.createEl("button", {
+			cls: "planboard-icon-btn",
+			attr: { "aria-label": "编辑目标", title: "编辑目标" },
+		});
+		editBtn.setText("✏️"); // 编辑按钮统一为彩色 emoji
+		editBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			void this.openGoalModal(prog.plan, goal);
+		});
+		const delBtn = actions.createEl("button", {
+			cls: "planboard-icon-btn planboard-del-btn",
+			attr: { "aria-label": "删除目标", title: "删除目标" },
+		});
+		setIcon(delBtn, "lucide-trash-2");
+		delBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			void this.deleteGoal(prog, goal);
+		});
 		return row;
 	}
 
@@ -3653,7 +3678,7 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 
 	private async openGoalModal(planName: string, goal: PlanGoal | null): Promise<void> {
 		// v7.21: 每日打卡段加了「计划」下拉——选项 = 当前计划排最前 + 真实计划
-		//（与 openAddItemModal 同口径；标签对不上计划的打卡项统计会漏计）。
+		//（与计划管理弹窗的添加表单同口径；标签对不上计划的打卡项统计会漏计）。
 		// v1.1.6：同上，去掉并入的 DEFAULT_PLAN_COLORS 键（作者个人计划名）。
 		const root = pfRoot(this.plugin.settings.rootPath);
 		const defs = (await this.readAnnualPlanDefs(root, todayStr().slice(0, 4))) ?? [];
@@ -3712,20 +3737,44 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 
 		await this.withSelfWrite(async () => {
 			await writePlansToFile(this.app, file, defs, dailyMap);
-			// 大类改名联动：任务池 + 每日笔记的 #计划/{旧名} → #计划/{新名}（防前缀误伤，跨年一致）
-			if (existing && input.name !== existing.name) {
-				const root = pfRoot(this.plugin.settings.rootPath);
+			// v1.2.2: 计划改动 → **每日笔记里的自动打卡行**联动。
+			//
+			// 原先这里只有「改名时换 `#计划/` 标签」一条，改图标（label）或改名字都
+			// **不碰行文本** —— 今天那行还写着旧名字（用户实测：「编辑计划后自动生成的
+			// 打卡项没有联动更改」）。而且旧版新建计划当天补项用的是 `label || name`
+			// （有图标时只剩图标），那行既认不出是自动项、名字也不对。
+			//
+			// 现在一次遍历做两件事：
+			//   ① 改名：`#计划/{旧名}` → `#计划/{新名}`（含任务池，原行为不变）；
+			//   ② 自动行文本：重写为 autoCheckItemName 的新口径，顺手把历史 `label || name`
+			//      那种坏行一并自愈。
+			// 只动每日笔记里的**自动行**（文本命中旧口径才改）：用户手工起名的打卡项、
+			// 勾选态、🛫/📅 窗口、复盘链接一律原样保留。
+			if (existing) {
+				const renamed = input.name !== existing.name;
+				const newAuto = autoCheckItemName(input.label, input.name);
+				const oldAuto = autoCheckItemName(existing.label, existing.name);
+				const oldBuggy = existing.label || existing.name; // 旧 savePlan 的写法
 				const oldTag = `#计划/${existing.name}`;
 				const newTag = `#计划/${input.name}`;
 				const re = new RegExp(`${escapeRegExp(oldTag)}(?=\\s|$)`, "g");
+				// 改名时标签可能还没换；新旧两名都收，最终逐行精确比对标签
+				const planNames = renamed ? [existing.name, input.name] : [input.name];
+				const root = pfRoot(this.plugin.settings.rootPath);
 				for (const tf of this.app.vault.getFiles()) {
 					if (!tf.path.startsWith(root)) continue;
 					const isPool = /(^|\/)任务\.md$/.test(tf.path);
 					const isDaily = /\/每日\/\d{4}-\d{2}-\d{2}\.md$/.test(tf.path);
 					if (!isPool && !isDaily) continue;
 					const c = await this.app.vault.cachedRead(tf);
-					if (!c.includes(oldTag)) continue;
-					await this.app.vault.process(tf, (data) => data.replace(re, newTag));
+					const tagHit = renamed && c.includes(oldTag);
+					const autoHit = isDaily && (c.includes(oldAuto) || c.includes(oldBuggy));
+					if (!tagHit && !autoHit) continue; // 预筛：绝大多数文件直接跳过写盘
+					await this.app.vault.process(tf, (data) => {
+						let out = renamed ? data.replace(re, newTag) : data;
+						if (isDaily) out = renameAutoCheckLines(out, planNames, [oldAuto, oldBuggy], newAuto);
+						return out;
+					});
 				}
 			}
 			// 新增大类(每日打卡)：今日笔记补打卡项（模板只影响新建笔记，已有今日笔记需补）
@@ -3735,9 +3784,12 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 				const todayFile = this.app.vault.getAbstractFileByPath(todayPath);
 				if (todayFile instanceof TFile) {
 					const todayContent = await this.app.vault.cachedRead(todayFile);
-					if (!todayContent.includes(`#计划/${input.name}`)) {
+					// v1.2.2: 判据从「字符串包含」升级为「逐行解析后比对计划标签」——
+					// `#计划/写作` 是 `#计划/写作2` 的子串，旧的 includes 写法会误判成「已有」。
+					const parsed = parseDailyContent(todayFile, todayContent, this.today);
+					if (!parsed.checkItems.some((c) => c.plan === input.name)) {
 						const line = buildCheckLine({
-							name: input.label || input.name,
+							name: autoCheckItemName(input.label, input.name),
 							plan: input.name,
 							includeReview: false,
 							date: this.today,
@@ -3747,6 +3799,9 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 				}
 			}
 		});
+		// v1.2.2: 上面联动改过今日笔记（自动行文本 / 新建补项），显式重读一次，
+		// 否则停在计划页时 dailyData 还是旧的，管理弹窗会显示改前的行文本。
+		await this.reloadTodayData();
 		new Notice("计划已保存");
 		await this.refresh();
 		return true;
@@ -3876,6 +3931,8 @@ name: `${d.label ?? ""} ${d.name}`.trim(),
 			await this.ensureAutoTasksForToday(root, year);
 			new Notice("目标已保存，分解任务已生成");
 		}
+		// v1.2.2: 保存目标也可能往今日笔记补过打卡项 —— 与 savePlan 同理，显式重读
+		await this.reloadTodayData();
 		await this.refresh();
 		return true;
 	}

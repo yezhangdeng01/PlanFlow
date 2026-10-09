@@ -7,7 +7,7 @@
 import { parsePlansFromFrontmatter, filterTasksInRange, summarizeTasks } from "../src/stats";
 import { serializePlans } from "../src/plan-file";
 import { parseTaskPool, buildPoolLine, autoWeekContext, autoQuota, autoTaskNumbers, planCounterUnit, isAutoTask } from "../src/tasks";
-import { toggleTaskLine, moveTaskLine, removeLine, appendCheckItem, upsertCheckLog, removeCheckLog, findCheckLineByPlan, parseDailyContent, extractSummary } from "../src/daily";
+import { toggleTaskLine, moveTaskLine, removeLine, appendCheckItem, upsertCheckLog, removeCheckLog, findCheckLineByPlan, parseDailyContent, extractSummary, autoCheckItemName, renameAutoCheckLines, withPlanIcon, collapseAutoSuffix } from "../src/daily";
 import { TFile } from "obsidian";
 
 let failed = 0;
@@ -426,6 +426,39 @@ const VARIANTS = [
 ].join("\n");
 check("逐字相同的重复行被合并成 1 项", parseDailyContent(file, VARIANTS, "2026-10-06").checkItems.length === 1);
 
+// v1.2.1 回归：**同一计划下的不同打卡项必须各自保留**。
+// 旧键是 `P:{plan}`（只认计划名），等价于「同一计划每天只能有一条打卡项」——
+// 用户给已有计划的计划再加一条打卡项，文件写得进去但界面永远不显示
+// （实测反馈：「新建打卡项也没有显示」）。这里钉死修复后的行为。
+const SAME_PLAN = [
+	"## ✅ 今日打卡",
+	"- [ ] 布置并发送作业 #计划/学习 🛫 2026-10-09 📅 2026-10-09",
+	"- [ ] 阅读 30 分钟 #计划/学习 🛫 2026-10-09 📅 2026-10-09",
+	"", "## 📝 今日总结", "",
+].join("\n");
+const parsedSamePlan = parseDailyContent(file, SAME_PLAN, "2026-10-09");
+check("同计划两条不同打卡项都要保留", parsedSamePlan.checkItems.length === 2, parsedSamePlan.checkItems.map((c) => c.text));
+check("同计划两条项名各自正确（顺序不乱）",
+	JSON.stringify(parsedSamePlan.checkItems.map((c) => c.text)) === JSON.stringify(["布置并发送作业", "阅读 30 分钟"]),
+	parsedSamePlan.checkItems.map((c) => c.text));
+// 对照组：同计划下的**逐字重复**仍必须合并 —— 防止把去重整个改没了。
+// 混合样本：同计划 2 个不同项，其中一项再重复一次 → 结果应恰好 2 项（不是 3、也不是 1）。
+//
+// 注：**不追求**「✍️ 写作 1小时」与「✍️ 写作」这类历史时长后缀的跨形态合并 ——
+// 剥时长后缀需要一个「标准打卡项名」做闸门（见 stripLegacyDuration 注释：没有闸门
+// 会把「阅读 30 分钟」误削成「阅读」，也会让「阅读 30 分钟」「阅读 60 分钟」互相吞掉）。
+// parseDailyContent 这一层拿不到计划定义，宁可不合也不能误合。
+const SAME_PLAN_MIXED = [
+	"## ✅ 今日打卡",
+	"- [ ] 布置并发送作业 #计划/学习 🛫 2026-10-09 📅 2026-10-09",
+	"- [ ] 阅读 30 分钟 #计划/学习 🛫 2026-10-09 📅 2026-10-09",
+	"- [ ] 布置并发送作业 #计划/学习 🛫 2026-10-09 📅 2026-10-09", // 与第一条逐字重复
+	"", "## 📝 今日总结", "",
+].join("\n");
+check("同计划：不同项各自保留、逐字重复仍合并（3 行 → 2 项）",
+	parseDailyContent(file, SAME_PLAN_MIXED, "2026-10-09").checkItems.length === 2,
+	parseDailyContent(file, SAME_PLAN_MIXED, "2026-10-09").checkItems.map((c) => c.text));
+
 // 总结区不能把第二篇的 frontmatter/标题吞进文本框（否则用户总结框里冒出 --- 和日期标题）
 const corruptSummary = extractSummary(CORRUPTED);
 check("总结区不吞第二篇的 frontmatter/标题（应为空）",
@@ -442,6 +475,113 @@ const SUMMARY_THEN_DUP = ["## ✅ 今日打卡", "- [ ] ✍️ 写作 #计划/�
 	"---", "date: 2026-10-06", "type: daily", "---", "# 📅 2026-10-06 星期二", ""].join("\n");
 check("总结后接第二篇日记时，保留第一篇正文",
 	extractSummary(SUMMARY_THEN_DUP) === "今天写了点东西。", JSON.stringify(extractSummary(SUMMARY_THEN_DUP)));
+
+// --- v1.2.2 回归：自动打卡项的命名口径 + 编辑计划后的联动 -------------------
+// 背景（用户 2026-10-10 实测三条）：
+//   ① 编辑计划后，自动生成的打卡项不跟着改；
+//   ② 新建计划的自动打卡项**可删除**，与「计划自动生成的项不可删」的既有行为不一致；
+//   ③ 今日打卡卡的「+ 添加」入口撤除（打卡项统一在计划里增删）。
+// ①② 的根因是**两套命名口径**：建新日记的模板写 `{图标} {计划名}`，而新建计划当天补
+// 那一条写的是 `label || name`（有图标时只剩图标）。两侧对不上 → 管理弹窗的
+// 「自动项白名单」认不出当天那行 → 它被当成手工项，配上了 ✏️🗑️。
+
+// ① 口径函数：四种输入形态都要落到「图标 + 空格 + 计划名」
+check("autoCheckItemName：图标+名 → 「图标 空格 名」", autoCheckItemName("🏃", "晨跑") === "🏃 晨跑", autoCheckItemName("🏃", "晨跑"));
+check("autoCheckItemName：空图标 → 只有计划名", autoCheckItemName("", "晨跑") === "晨跑", autoCheckItemName("", "晨跑"));
+check("autoCheckItemName：undefined → 只有计划名", autoCheckItemName(undefined, "晨跑") === "晨跑", autoCheckItemName(undefined, "晨跑"));
+check("autoCheckItemName：null → 只有计划名", autoCheckItemName(null, "晨跑") === "晨跑", autoCheckItemName(null, "晨跑"));
+
+// ② 联动：旧口径文本 → 新口径
+const RENAME_OLD = [
+	"## ✅ 今日打卡",
+	"- [ ] ✍️ 写作 #计划/写作 🛫 2026-10-10 📅 2026-10-10",
+	"", "## 📝 今日总结", "",
+].join("\n");
+const renamed1 = renameAutoCheckLines(RENAME_OLD, ["写作"], ["✍️ 写作"], "📖 写作");
+check("① 联动：旧口径文本被改成新口径", renamed1.includes("- [ ] 📖 写作 #计划/写作"), renamed1);
+check("① 联动：🛫/📅 窗口原样保留", renamed1.includes("🛫 2026-10-10 📅 2026-10-10"), renamed1);
+
+// ③ 自愈：旧 savePlan 的 `label || name` 形态（有图标时只剩图标）
+const BUGGY = ["## ✅ 今日打卡", "- [ ] 🏃 #计划/晨跑 🛫 2026-10-10 📅 2026-10-10", "", "## 📝 今日总结", ""].join("\n");
+check("② 自愈：只剩图标的历史坏行被补全", renameAutoCheckLines(BUGGY, ["晨跑"], ["🏃 晨跑", "🏃"], "🏃 晨跑").includes("- [ ] 🏃 晨跑 #计划/晨跑"),
+	renameAutoCheckLines(BUGGY, ["晨跑"], ["🏃 晨跑", "🏃"], "🏃 晨跑"));
+
+// ④ 勾选态为 [x] 的坏行同样要自愈，且勾选态不能丢
+const CHECKED = ["## ✅ 今日打卡", "- [x] 🏃 #计划/晨跑 🛫 2026-10-10 📅 2026-10-10", "", "## 📝 今日总结", ""].join("\n");
+check("② 自愈：已勾选的坏行同样补全，勾选态保留",
+	renameAutoCheckLines(CHECKED, ["晨跑"], ["🏃"], "🏃 晨跑").includes("- [x] 🏃 晨跑 #计划/晨跑"),
+	renameAutoCheckLines(CHECKED, ["晨跑"], ["🏃"], "🏃 晨跑"));
+
+// ⑤ 对照组（**必须有**，否则「一律重写文本」这种错实现也能全绿）：
+//    手工项名不动、前缀相似的另一个计划不被误伤、不在白名单的行原样保留。
+const MIXED2 = [
+	"## ✅ 今日打卡",
+	"- [ ] 🏃 #计划/晨跑 🛫 2026-10-10 📅 2026-10-10",              // 坏行 → 应自愈
+	"- [ ] 阅读 30 分钟 #计划/晨跑 🛫 2026-10-10 📅 2026-10-10",     // 手工项 → 不动
+	"- [ ] 🏃 晨跑 #计划/晨跑2 🛫 2026-10-10 📅 2026-10-10",         // 标签不同 → 不动（防前缀误伤）
+	"- [ ] ✍️ 写作 → [[2026-10-10 复盘]] #计划/写作 🛫 2026-10-10 📅 2026-10-10", // 不在白名单 → 不动
+	"", "## 📝 今日总结", "",
+].join("\n");
+const mixed2 = renameAutoCheckLines(MIXED2, ["晨跑", "写作"], ["🏃 晨跑", "🏃"], "🏃 晨跑");
+check("⑤ 对照组：手工项名不受影响", mixed2.includes("阅读 30 分钟 #计划/晨跑"), mixed2);
+check("⑤ 对照组：前缀相似的另一个计划不被误伤（#计划/晨跑2）", mixed2.includes("- [ ] 🏃 晨跑 #计划/晨跑2 "), mixed2);
+check("⑤ 对照组：不在白名单的其它文本原样保留", mixed2.includes("✍️ 写作 → [[2026-10-10 复盘]]"), mixed2);
+check("⑤ 同一份样本里：坏行被自愈、手工项没动（两件事同时成立）",
+	mixed2.includes("- [ ] 🏃 晨跑 #计划/晨跑 ") && mixed2.includes("阅读 30 分钟 #计划/晨跑"), mixed2);
+
+// ⑥ 改名联动：savePlan 是「先换 #计划/ 标签、再校正文本」两步串联 —— 串起来也要对
+const TAGGED = ["## ✅ 今日打卡", "- [ ] 🏃 #计划/晨跑 🛫 2026-10-10 📅 2026-10-10", "", "## 📝 今日总结", ""].join("\n");
+const afterTag = TAGGED.replace(/#计划\/晨跑(?=\s|$)/g, "#计划/晨跑A");
+const afterRename = renameAutoCheckLines(afterTag, ["晨跑", "晨跑A"], ["🏃", "🏃 晨跑"], "🏃 晨跑A");
+check("⑥ 改名联动：标签换成新名后文本同步到新口径",
+	afterRename.includes("- [ ] 🏃 晨跑A #计划/晨跑A"), afterRename);
+
+// ---------------------------------------------------------------------------
+// v1.2.3：手动新增的打卡项自动带计划图标（withPlanIcon）
+// 用户反馈：「在同一个计划下新增的打卡项应该自动带相同的计划图标」
+// ---------------------------------------------------------------------------
+check("⑦ 图标：名字不带图标时补上计划图标", withPlanIcon("喝水 500ml", "🏃") === "🏃 喝水 500ml", withPlanIcon("喝水 500ml", "🏃"));
+check("⑦ 图标：已带同图标不重复补（不会变成 `🏃 🏃 喝水`）", withPlanIcon("🏃 喝水", "🏃") === "🏃 喝水", withPlanIcon("🏃 喝水", "🏃"));
+check("⑦ 图标：计划没图标（空串）→ 原样返回，不塞空格", withPlanIcon("喝水", "") === "喝水", withPlanIcon("喝水", ""));
+check("⑦ 图标：计划没图标（null / undefined）→ 原样返回",
+	withPlanIcon("喝水", null) === "喝水" && withPlanIcon("喝水", undefined) === "喝水");
+check("⑦ 图标：名字首尾空白被 trim", withPlanIcon("  喝水  ", "🏃") === "🏃 喝水", withPlanIcon("  喝水  ", "🏃"));
+check("⑦ 图标：图标自身带空白也能正常判重", withPlanIcon("🏃 喝水", " 🏃 ") === "🏃 喝水", withPlanIcon("🏃 喝水", " 🏃 "));
+check("⑦ 图标：名字恰好就是该图标 → 原样", withPlanIcon("🏃", "🏃") === "🏃", withPlanIcon("🏃", "🏃"));
+
+// 对照组（必须有）：否则「一律加前缀」这种错实现也能全绿。
+check("⑦ 对照组：用户执意用别的图标时仍补计划图标（同计划同图标是硬规则）",
+	withPlanIcon("💧 喝水", "🏃") === "🏃 💧 喝水", withPlanIcon("💧 喝水", "🏃"));
+check("⑦ 对照组：带图标的手工项 ≠ 自动项名 —— 带图标不会让它变成「不可删」",
+	withPlanIcon("喝水", "🏃") !== autoCheckItemName("🏃", "晨跑"), withPlanIcon("喝水", "🏃"));
+check("⑦ 对照组：不同计划的图标不会混淆（🏃 计划的项不会带成 📖）",
+	withPlanIcon("喝水", "🏃") !== withPlanIcon("喝水", "📖"), withPlanIcon("喝水", "🏃"));
+
+// ---------------------------------------------------------------------------
+// v1.2.3：显示层裁后缀（collapseAutoSuffix）—— checkDisplayText 的 ② 兜底
+// ⚠️ 它同时是**打卡记录行的键**：裁错了不只是显示变短，还会让手工项与自动项**撞键**。
+// ---------------------------------------------------------------------------
+check("⑧ 裁后缀：标准名 + 空格 + 历史时长后缀 → 裁回标准名",
+	collapseAutoSuffix("✍️ 写作 1小时", "✍️ 写作") === "✍️ 写作", collapseAutoSuffix("✍️ 写作 1小时", "✍️ 写作"));
+check("⑧ 裁后缀：非时长后缀（复盘+次日计划）同样裁掉",
+	collapseAutoSuffix("📈 复盘 复盘+次日计划", "📈 复盘") === "📈 复盘");
+check("⑧ 裁后缀：复盘链接原样保留",
+	collapseAutoSuffix("📈 复盘 复盘+次日计划 → [[2026-10-02 复盘]]", "📈 复盘") === "📈 复盘 → [[2026-10-02 复盘]]");
+check("⑧ 裁后缀：已等于标准名 → 原样", collapseAutoSuffix("✍️ 写作", "✍️ 写作") === "✍️ 写作");
+check("⑧ 裁后缀：不以标准名开头 → 原样", collapseAutoSuffix("阅读 30 分钟", "🚶 晨跑") === "阅读 30 分钟");
+check("⑧ 裁后缀：canon 为空 / null → 原样",
+	collapseAutoSuffix("🚶 晨跑 1小时", "") === "🚶 晨跑 1小时" && collapseAutoSuffix("x", null) === "x");
+
+// 🔴 v1.2.3 真机回归（本组是核心）：手工项带上了图标前缀后，
+//    「计划名紧连词」的命名（晨跑热身 / 写作素材）**绝不能**被裁 ——
+//    真机实测过：裁掉后打卡卡上出现两行「🚶 晨跑」，且两行打卡记录撞同一个键。
+check("⑧ 关键回归：手工项「🚶 晨跑热身」不被裁（紧连词）",
+	collapseAutoSuffix("🚶 晨跑热身", "🚶 晨跑") === "🚶 晨跑热身", collapseAutoSuffix("🚶 晨跑热身", "🚶 晨跑"));
+check("⑧ 关键回归：手工项「🚶 喝水 500ml」不受影响（前缀不同）",
+	collapseAutoSuffix("🚶 喝水 500ml", "🚶 晨跑") === "🚶 喝水 500ml");
+// 已知残留（写进断言是为了将来改规则时必须显式改这里）：带空格的补充命名仍会被裁。
+check("⑧ 已知残留：`{计划名} {补充词}` 仍会被裁（真库 50 篇日记无此类数据）",
+	collapseAutoSuffix("🚶 晨跑 加强版", "🚶 晨跑") === "🚶 晨跑", collapseAutoSuffix("🚶 晨跑 加强版", "🚶 晨跑"));
 
 console.log(failed === 0 ? "\nALL PASSED" : `\n${failed} FAILED`);
 // 用抛错而非 process.exit 汇报失败：process.exit 会掐断 runner，后面的套件就跑不到了。

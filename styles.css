@@ -426,6 +426,20 @@
 	background: color-mix(in srgb, var(--pf-danger) 12%, transparent);
 }
 
+/* v1.2.1 修复：图标按钮的透明底被 Obsidian 主题盖掉了。
+   ---------------------------------------------------------------------------
+   Obsidian 主题里有 `button:not(.clickable-icon) { background-color: var(--interactive-normal) }`，
+   它的特异度是 (0,1,1)（元素 + :not 里的类），**压过**上面 `.planboard-icon-btn` 的
+   `background: transparent`（(0,1,0)）。于是所有「图标按钮」在实机上都不是透明图标，
+   而是一个个灰底圆角方块 —— 平板端今日打卡行因为触屏兜底而常显的两个 ↑↓ 就是用户
+   报的「两个空框」（框里那道 15px 箭头压在 --interactive-normal 上，远看就是个空框）。
+   这里用 `button.planboard-icon-btn` 把特异度提到 (0,1,1)，与主题打平，再靠插件样式
+   后加载取胜；同时**故意不限定在 .planboard-root 内** —— modal 里也有图标按钮。 */
+button.planboard-icon-btn {
+	background-color: transparent;
+	box-shadow: none;
+}
+
 /* v1.7.4: 旧 margin-bottom:8px 已删——add-btn 现在用于卡头（header 内 flex row 垂直居中，
    margin 会使按钮 margin-box 撑满 header 导致按钮偏上 4px，与标题中心错位） */
 
@@ -2422,18 +2436,13 @@
 	outline-offset: 2px;
 }
 
-/* ---- 3) 触屏：hover-only 操作改为常显（C3）---- */
+/* ---- 3) 触屏：热区扩大（C3 的「常显」部分已移到文件末尾）----
+   ⚠️ 原先把「hover 浮现的按钮在触屏上常显」写在这里，但它位于文件**中段**，
+   特异度与后面新增的 hover 隐藏规则相同 → 同特异度后写覆盖，被 4403/4419/5042
+   那几条压回去，触屏上按钮照样隐身（v1.2.1 用户实测：平板上删除按钮看不见）。
+   该兜底现已挪到 styles.css **末尾**的「v1.2.1 触屏兜底」块 —— 那里是唯一权威，
+   本块只保留与层叠无关的热区尺寸。 */
 @media (hover: none), (pointer: coarse) {
-	.planboard-item-actions,
-	.planboard-goal-actions {
-		opacity: 1;
-	}
-	/* v7.4c: hover 浮现的按钮在触屏上没有 hover，恢复常显（须压过新规则的高特异度） */
-	.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn,
-	.planboard-root .planboard-goals-head .planboard-goal-actions {
-		opacity: 1;
-		pointer-events: auto;
-	}
 	/* 触屏热区扩大（桌面保持 24px 紧凑） */
 	.planboard-icon-btn {
 		width: 32px;
@@ -5084,4 +5093,152 @@
 }
 .planboard-manage-editing input[type="date"] {
 	flex: 0 0 auto;
+}
+
+/* ==========================================================================
+   v1.2.4 计划卡：两处进度行统一为「名称 | 进度条 | 计数 | 操作」四列网格
+   --------------------------------------------------------------------------
+   用户 2026-10-10 三点反馈：
+     ① 打卡行动的进度条另起一行 —— 应与目标文案同行；文案为空时默认显示计划名。
+        （TS 侧：条与计数移回 .planboard-plan-metric-row。v1.0.5.2b 把度量框改纵向
+        两行制时，条/计数被留在了 metric 列容器里，进度行里只剩文案。）
+     ② 打卡行动的条比下方量化目标的条宽 —— 两处各写各的宽度，栏位也没对齐。
+     ③ 量化目标多行时条长短不一 —— 名称列宽度由各自文字决定（"公众号文章" vs "剧本"），
+        且 ✏️🗑️ 只出现在多目标行，按钮占不占位又改一次条宽。
+   处理：两处共用同一套四列网格。除「条」占满剩余（1fr）外，其余三列**全部定宽**，
+   于是同一张卡里所有条等长、左右缘都对齐，「✅ 打卡行动」与「🎯 量化目标」两个框
+   也逐列对齐。操作列常驻定宽（按钮透明时照样占位），所以「有按钮 / 没按钮」不再
+   改变条宽 —— 为了这一点，打卡行动的 ✏️ 也从标题行挪进了操作列（图标与量化目标的
+   按钮同列）。名称列用 minmax 而非纯定宽：窄卡上允许收缩到 56px 防溢出。
+   ========================================================================== */
+.planboard-root {
+	--pb-line-name: minmax(56px, 84px); /* 名称列：12px 字号下约 4~6 个汉字，超出省略号 */
+	--pb-line-count: 56px;              /* 计数列：定宽 + 右对齐（"1/8 篇" / "0/83 天"） */
+	--pb-line-act: 50px;                /* 操作列：两个 24px 图标按钮 + 2px 间距 */
+}
+
+.planboard-root .planboard-plan-metric-row,
+.planboard-root .planboard-goal-row--mini {
+	display: grid;
+	grid-template-columns:
+		var(--pb-line-name)
+		minmax(40px, 1fr)
+		var(--pb-line-count)
+		var(--pb-line-act);
+	align-items: center;
+	column-gap: 8px;
+	row-gap: 4px;
+}
+
+/* 量化目标行原是 4px/2px 内边距 —— 横向那 2px 会让它的条比度量行的条右移 2px，归零 */
+.planboard-root .planboard-goal-row--mini {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* 名称列：一律单行省略号（长目标文案的全文走 TS 挂的 title） */
+.planboard-root .planboard-plan-metric-row .planboard-plan-target-line,
+.planboard-root .planboard-goal-row--mini .planboard-goal-name {
+	margin: 0;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 进度条：吃掉中间整列；两条同高（原来度量条 16px、目标条 14px，同一张卡里粗细不一） */
+.planboard-root .planboard-plan-metric-row .planboard-progress-bar,
+.planboard-root .planboard-goal-row--mini .planboard-goal-bar {
+	width: 100%;
+	min-width: 0;
+	height: 14px;
+	margin: 0;
+	position: relative;
+}
+
+/* 计数列：定宽右对齐 → 各行计数的右缘成一条竖线 */
+.planboard-root .planboard-plan-metric-row .planboard-progress-count,
+.planboard-root .planboard-goal-row--mini .planboard-goal-count {
+	text-align: right;
+	font-size: var(--pf-text-xs);
+	color: var(--pfs-sub, var(--text-muted));
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* 操作列：定宽常驻（透明时也占位），图标贴右缘 */
+.planboard-root .planboard-plan-metric-row .planboard-item-actions,
+.planboard-root .planboard-goal-row--mini .planboard-item-actions {
+	justify-content: flex-end;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+/* hover / 键盘聚焦浮现。⚠️ 特异度必须 ≥ 上面的 opacity:0，否则隐藏规则反杀
+   （`.planboard-goal-row:hover .planboard-item-actions` 只有 (0,2,0)，压不过 (0,3,0)）。 */
+.planboard-root .planboard-plan-metric-row:hover .planboard-item-actions,
+.planboard-root .planboard-plan-metric-row:focus-within .planboard-item-actions,
+.planboard-root .planboard-goal-row--mini:hover .planboard-item-actions,
+.planboard-root .planboard-goal-row--mini:focus-within .planboard-item-actions {
+	opacity: 1;
+}
+
+/* 窄档 / 极小档：四列硬并排会把条挤成一根短棍
+   （实测：1024px 窗口、is-narrow 时年度卡只有 301px，行宽 242px，
+   56+58+66 固定列吃完只剩 40px 给条 —— 比改之前还糟）。
+   回退成两行：名称独占首行，条 + 计数 + 操作占第二行；两个盒子同样处理，条宽依旧一致。 */
+.planboard-root.is-narrow .planboard-plan-metric-row,
+.planboard-root.is-narrow .planboard-goal-row--mini,
+.planboard-root.is-tiny .planboard-plan-metric-row,
+.planboard-root.is-tiny .planboard-goal-row--mini {
+	grid-template-columns: minmax(48px, 1fr) var(--pb-line-count) var(--pb-line-act);
+}
+
+.planboard-root.is-narrow .planboard-plan-metric-row .planboard-plan-target-line,
+.planboard-root.is-narrow .planboard-goal-row--mini .planboard-goal-name,
+.planboard-root.is-tiny .planboard-plan-metric-row .planboard-plan-target-line,
+.planboard-root.is-tiny .planboard-goal-row--mini .planboard-goal-name {
+	grid-column: 1 / -1;
+}
+
+/* 触屏：图标按钮放大到 32px（与下方 v1.2.1 兜底同口径），操作列跟着加宽 */
+@media (hover: none), (pointer: coarse) {
+	.planboard-root {
+		--pb-line-act: 66px;
+	}
+}
+
+/* ==========================================================================
+   v1.2.1 触屏兜底：hover 浮现的按钮必须常显
+   ⚠️ 本块**必须留在文件最末尾**（以后新增的 hover 规则一律加在它前面）。
+   --------------------------------------------------------------------------
+   上面各处的「hover 才浮现」按钮都写着 `opacity: 0`（桌面靠 :hover 提亮）。
+   触屏没有 hover ⇒ 按钮永久隐身，删除/编辑入口等于消失。
+
+   v1.0.5 曾在文件**中段**（约 2426 行）写过同样意图的兜底，但它的特异度与
+   后面新增的隐藏规则**相同**（例如
+   `.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn`
+   与之逐字相同），而 CSS 判同特异度的胜负看「谁在后面」—— 中段那条必输。
+   结果：iPad / 手机上计划卡头的 ✏️🗑️、量化目标的 ✏️🗑️、打卡行动的 ✏️ 全部看不见，
+   唯独今日打卡行的 ↑↓ 常显（那条兜底运气好，比隐藏规则靠后，所以只露出两个方块）。
+
+   这里把兜底挪到末尾并显式列出全部目标选择器，一次覆盖：
+   · 今日打卡行 ↑↓       —— .planboard-check-item .planboard-item-actions
+   · 计划卡头 ✏️🗑️       —— .planboard-plan-head .planboard-head-actions .planboard-icon-btn
+   · 量化目标（标题行）  —— .planboard-goals-head .planboard-goal-actions（v1.2.4 起不再有按钮，留作保险）
+   · 打卡行动 / 量化目标 —— .planboard-plan-metric-row / .planboard-goal-row--mini 的 .planboard-item-actions
+     ⚠️ v1.2.4 两处按钮的下沉规则是 (0,3,0) 的 `.planboard-root .planboard-… .planboard-item-actions`，
+     光靠上面第 1 条 (0,1,0) 的 `.planboard-item-actions` **压不住**，必须照样列全。
+   ⚠️ 以后新增 hover 浮现的按钮，记得同步在这里补一条，否则触屏上又是「隐身」。
+   ========================================================================== */
+@media (hover: none), (pointer: coarse) {
+	.planboard-item-actions,
+	.planboard-goal-actions,
+	.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn,
+	.planboard-root .planboard-goals-head .planboard-goal-actions,
+	.planboard-root .planboard-plan-metric-row .planboard-item-actions,
+	.planboard-root .planboard-goal-row--mini .planboard-item-actions {
+		opacity: 1;
+		pointer-events: auto;
+	}
 }

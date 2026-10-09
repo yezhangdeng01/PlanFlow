@@ -167,8 +167,23 @@ export function parseTaskLine(line: string): Pick<CheckItem, "text" | "plan" | "
  *     `✍️ 写作` 三种写法会被当成三个不同项（详见 normalizeCheckName 的注释）。
  */
 function checkItemKey(text: string, plan: string | null): string {
-	if (plan) return `P:${plan}`;
-	return `T:${normalizeCheckName(text)}`;
+	// v1.2.1 修复：键里必须**并入项名**。
+	//
+	// 此前带计划标签的项只按 `P:{plan}` 去重 —— 等价于「同一计划每天只能有一条
+	// 打卡项」。后果：给已有计划的计划再加一条打卡项（或量化目标勾「每日打卡」
+	// 生成的补项），新项会被当成重复项**静默合并掉**，文件里写得进去、界面永远
+	// 不显示（用户实测：「新建打卡项也没有显示」；添加弹窗的计划下拉默认就选中
+	// 第一个计划，所以这是一步就能踩中的坑）。
+	//
+	// 去重的本意只针对「同步插件把两端改动拼进同一文件」造成的**逐字重复**
+	// （见下方 parseDailyContent 注释），所以键 = 计划 + 归一名：
+	//   · 逐字重复的行 → 键相同 → 仍会合并（原自愈能力不丢）；
+	//   · 同计划下的**不同**项 → 键不同 → 各自保留（本次修复点）。
+	// 归一（normalizeCheckName）会吃掉复盘链接与历史时长后缀，所以
+	// 「✍️ 写作 1小时」与「✍️ 写作」仍视作同一项 —— 与 v1.1.7 的口径一致。
+	const name = normalizeCheckName(text);
+	if (plan) return `P:${plan}\u0000${name}`;
+	return `T:${name}`;
 }
 
 /**
@@ -672,6 +687,25 @@ export function stripLegacyDuration(text: string, action?: string, canonicalName
 }
 
 /**
+ * v1.2.3：把「标准名 + **空格** + 历史后缀」的自动行裁回「标准名 + 复盘链接」。
+ *
+ * 这是 v7.6 那条显示层兜底（`checkDisplayText` 的 ②）抽出来的纯函数 ——
+ * 它同时决定**打卡记录行的键**，所以规则必须能单测，不能只活在视图类里。
+ *
+ * ⚠️ 判据是 `canon + " "`（**必须有空格分段**），不是 `startsWith(canon)`。
+ * v1.2.3 起手动新增的打卡项也会带「{图标} {计划名}」前缀：用户在「晨跑」计划里输入
+ * `晨跑热身`，行文本是 `🚶 晨跑热身` —— 用 `startsWith(canon)` 会把它裁成 `🚶 晨跑`，
+ * 与真正的自动项**撞键**（真机实测：打卡卡上出现两行「🚶 晨跑」）。
+ * 收窄后「计划名紧连词」的命名安全；`{计划名} {补充词}` 仍会被裁，属已知残留。
+ */
+export function collapseAutoSuffix(text: string, canon: string | null | undefined): string {
+	const c = (canon ?? "").trim();
+	if (!c || !text.startsWith(c + " ")) return text;
+	const link = / → \[\[[^\]]*\]\]$/.exec(text)?.[0] ?? "";
+	return c + link;
+}
+
+/**
  * v7.22 补卡：把打卡项名归一到「可比形态」，用于**回退**匹配（无 `#计划/` 标签的行）。
  *
  * 剥两层：复盘链接尾段（`→ [[2026-10-02 复盘]]`）+ 时长后缀（`1小时`）——
@@ -685,6 +719,96 @@ export function stripLegacyDuration(text: string, action?: string, canonicalName
  */
 export function normalizeCheckName(text: string): string {
 	return stripLegacyDuration(stripReviewLink(text)).replace(/\s+/g, " ").trim();
+}
+
+// ---------------------------------------------------------------------------
+// 自动打卡项的命名口径（v1.2.2）
+// ---------------------------------------------------------------------------
+
+/**
+ * 计划 / 目标**自动派生**的打卡项，其名称的**唯一**生成口径：`{图标} {计划名}`。
+ *
+ * 为什么必须收敛成一个函数（v1.2.2 用户实测：「新增的计划自动生成的打卡项可删除，
+ * 和原来的不一致」）：
+ * 先前有两套写法各写各的——
+ *   · `buildDefaultCheckItems()` 建新日记走模板，写的是 `✍️ 写作`；
+ *   · `savePlan()` 新建计划当天补那条，写的是 `label || name` —— 有图标时**只剩图标**。
+ * 于是带图标的新计划当天补出来的行是 `🏃`，第二天模板给的是 `🏃 晨跑`。两侧对不上，
+ * 「自动项白名单」认不出当天那行（`CheckItemManageModal` 于是给它配了 ✏️🗑️），
+ * 而次日生成的同类项却没有按钮 —— 用户看到的正是「新能删、老不能删」。
+ *
+ * 而且这条口径还决定 `checkDisplayText()` 里剥历史时长后缀用的 `canon`：三处同源，
+ * 想改命名规则只改这里一处即可。
+ */
+export function autoCheckItemName(label: string | null | undefined, planName: string): string {
+	return `${label ?? ""} ${planName}`.trim();
+}
+
+/**
+ * v1.2.3：给**手动新建**的打卡项名补上所属计划的图标 —— 同计划下图标统一。
+ *
+ * 用户实测反馈：「在同一个计划下新增的打卡项应该自动带相同的计划图标」。
+ * 自动推导的项本来就是 `🏃 晨跑`，手动加的那条却只有 `喝水 500ml`，
+ * 同一张卡里两行图标不一致。
+ *
+ * 三条边界：
+ *   ① 计划没图标 → 原样返回（不塞多余空格）；
+ *   ② 名字已以该图标开头 → 原样返回（用户自己打了图标，不会变成 `🏃 🏃 喝水`）；
+ *   ③ 名字里带**别的**图标（如用户执意用 💧）→ 仍补计划图标：
+ *      「同计划同图标」是硬规则，否则这条反馈就没法满足。
+ */
+export function withPlanIcon(name: string, icon: string | null | undefined): string {
+	const n = name.trim();
+	const ic = (icon ?? "").trim();
+	if (!ic) return n;
+	return n.startsWith(ic) ? n : `${ic} ${n}`;
+}
+
+/**
+ * v1.2.2：把日记里某计划的**自动打卡行**文本校正为新口径（编辑计划后的联动）。
+ *
+ * 只重写「`- [ ]` 与 `#计划/` 之间」那一段文本，其余字节原样保留 —— 勾选态、🛫/📅 窗口、
+ * 复盘链接、行尾空白都不动。而且只在旧文本**命中白名单**时才改：用户手工起名的打卡项
+ * （如「阅读 30 分钟」）不受影响。
+ *
+ * 「旧文本」要传多个形态，因为历史上有三种写法都可能落在库里：
+ *   ① 现行口径 `✍️ 写作`；② 旧 savePlan 的 `✍️`（有图标时只剩图标）；
+ *   ③ 无图标计划的 `写作`（与 ① 同形时去重即可）。
+ *
+ * ⚠️ 判「标签属于该计划」不能只比字符串包含 —— 那会让 `#计划/写作2` 被 `#计划/写作`
+ * 误伤。这里逐行用 `TASK_LINE_RE` 取出标签**逐字比对**。
+ *
+ * @param planNames 该行 `#计划/` 标签取其中之一时才算目标行（改名场景传新旧两名）
+ * @param oldTexts  可能的历史文本；命中则替换
+ * @param newText   校正后的文本
+ */
+export function renameAutoCheckLines(
+	content: string,
+	planNames: string[],
+	oldTexts: string[],
+	newText: string
+): string {
+	if (!newText) return content;
+	const want = new Set(planNames.filter(Boolean));
+	const olds = new Set(oldTexts.filter(Boolean));
+	if (want.size === 0 || olds.size === 0) return content;
+	const lines = content.split("\n");
+	let changed = false;
+	for (let i = 0; i < lines.length; i++) {
+		const raw = lines[i];
+		const m = TASK_LINE_RE.exec(raw);
+		if (!m) continue;
+		if (!m[3] || !want.has(m[3])) continue;
+		const seg = m[2];
+		const lead = /^\s*/.exec(seg)?.[0] ?? "";
+		const trail = /\s*$/.exec(seg)?.[0] ?? "";
+		const body = seg.slice(lead.length, seg.length - trail.length);
+		if (!olds.has(body) || body === newText) continue;
+		// `- [ ] ` 恒为 6 字符：TASK_LINE_RE 的 `^- \[([ x])\] ` 已经吃掉它，m[2] 必从下标 6 起
+		lines[i] = raw.slice(0, 6) + lead + newText + trail + raw.slice(6 + seg.length);
+		changed = true;
+	}
+	return changed ? lines.join("\n") : content;
 }
 
 /** Template for a new daily note (PRD §2.2). */

@@ -1,13 +1,12 @@
 /**
  * 交互模态框（v1.0.5 从 PlanBoardView.ts 类外搬入，字节级切割未改逻辑）。
  *
- * 三个 Modal（添加打卡项 / 计划编辑 / 量化目标编辑）此前住在视图文件尾部，
+ * 几个 Modal（计划编辑 / 量化目标编辑 / 管理打卡项）此前住在视图文件尾部，
  * 与视图类唯一的耦合是构造参数（app / plugin / 回调），本就自包含 ——
  * 拆出来后 PlanBoardView.ts 瘦身约 590 行，Modal 的改动不再需要滚动 4000 行找位置。
  */
 import { App, Modal, Notice, Setting, ToggleComponent, setIcon } from "obsidian";
-import type PlanBoardPlugin from "../main";
-import { buildCheckLine, CheckItem } from "./daily";
+import { buildCheckLine, CheckItem, withPlanIcon } from "./daily";
 import { PLAN_COLOR_OPTIONS } from "./plan-file";
 import type { PlanDef, PlanGoal, GoalDailyItem } from "./stats";
 /**
@@ -73,117 +72,6 @@ export function attachFieldError(input: HTMLInputElement | HTMLTextAreaElement):
 	return { show, clear };
 }
 
-export class AddCheckItemModal extends Modal {
-	private plugin: PlanBoardPlugin;
-	private today: string;
-	// v7.20: 计划下拉选项改由调用方传入（真实计划 + 内置名）——原先弹窗里只读 4 个
-	// 内置名，选了不在年度计划里的名，打卡项的 #计划/ 标签对不上任何计划，统计漏计
-	private planOptions: string[];
-	private onSubmit: (line: string) => void;
-	private nameEl!: HTMLInputElement;
-	private planEl!: HTMLSelectElement;
-	// v7.20: 含复盘链接（onChange 记账，不读 input.checked）
-	private reviewVal = false;
-	// v7.19: 起止日期（默认当天；写入行内 🛫/📅）
-	private startEl!: HTMLInputElement;
-	private endEl!: HTMLInputElement;
-
-	constructor(app: App, plugin: PlanBoardPlugin, today: string, planOptions: string[], onSubmit: (line: string) => void) {
-		super(app);
-		this.plugin = plugin;
-		this.today = today;
-		this.planOptions = planOptions;
-		this.onSubmit = onSubmit;
-	}
-
-	onOpen(): void {
-		const { contentEl } = this;
-		contentEl.empty();
-		contentEl.addClass("planboard-modal");
-		contentEl.createEl("h2", { text: "添加打卡项" });
-
-		new Setting(contentEl).setName("名称").addText((text) => {
-			this.nameEl = text.inputEl;
-			text.setPlaceholder("例如：阅读 30 分钟");
-		});
-		const nameErr = attachFieldError(this.nameEl);
-
-		new Setting(contentEl).setName("计划").addDropdown((dropdown) => {
-			this.planEl = dropdown.selectEl;
-			for (const plan of this.planOptions) dropdown.addOption(plan, plan);
-			dropdown.setValue(this.planOptions[0] ?? "");
-		});
-
-		// v7.6：删除「时长」栏（原值形如「1小时」，会拼进标题）。名称里想带时长可直接写，
-		// 例如「阅读 30 分钟」——那是标题的一部分，不再由插件另行拼接。
-		// v7.19: 起止日期（可选）——量化目标分解到日的人工补充：分解任务有 🛫/📅 窗口，
-		// 手动加的打卡项原来钉死在当天；现在可给窗口（写入行内 🛫/📅，与任务池同语法）。
-		// 默认都是当天（= 原行为），清空也回落当天。
-		const periodSetting = new Setting(contentEl).setName("起止日期").setDesc("默认今天；跨多天的打卡项在这里给窗口");
-		periodSetting.addText((text) => {
-			this.startEl = text.inputEl;
-			this.startEl.type = "date";
-			this.startEl.addClass("planboard-date-btn");
-			this.startEl.setAttribute("aria-label", "开始日期");
-		});
-		periodSetting.addText((text) => {
-			this.endEl = text.inputEl;
-			this.endEl.type = "date";
-			this.endEl.addClass("planboard-date-btn");
-			this.endEl.setAttribute("aria-label", "结束日期");
-		});
-		periodSetting.controlEl.addClass("planboard-period-range");
-		this.startEl.value = this.today;
-		this.endEl.value = this.today;
-		const periodErr = attachFieldError(this.startEl);
-
-		new Setting(contentEl).setName("含复盘链接").addToggle((toggle) => {
-			// v7.20: 状态走 onChange 记账——input.checked 与视觉状态相反（见 GoalEditModal 注）
-			toggle.setValue(false);
-			toggle.onChange((v) => {
-				this.reviewVal = v;
-			});
-		});
-
-		const buttons = contentEl.createDiv({ cls: "planboard-modal-buttons" });
-		const cancel = buttons.createEl("button", { cls: "planboard-btn", text: "取消" });
-		cancel.addEventListener("click", () => this.close());
-
-		const ok = buttons.createEl("button", { cls: "planboard-btn planboard-btn-primary", text: "添加" });
-		ok.addEventListener("click", () => {
-			const name = this.nameEl.value.trim();
-			if (!name) {
-				nameErr.show("请输入打卡名称");
-				return;
-			}
-			// v7.19: 起止日期——都空回落当天；半填或倒挂拦在表单里
-			const ps = this.startEl.value || this.today;
-			const pe = this.endEl.value || this.today;
-			if ((this.startEl.value && !this.endEl.value) || (!this.startEl.value && this.endEl.value)) {
-				periodErr.show("开始和结束日期请一起填，或都清空（默认今天）");
-				return;
-			}
-			if (ps > pe) {
-				periodErr.show("开始日期不能晚于结束日期");
-				return;
-			}
-			const line = buildCheckLine({
-				name,
-				plan: this.planEl.value,
-				includeReview: this.reviewVal,
-				date: this.today,
-				start: ps,
-				due: pe,
-			});
-			this.onSubmit(line);
-			this.close();
-		});
-	}
-
-	onClose(): void {
-		this.contentEl.empty();
-	}
-}
 
 /** Modal for creating / editing a plan category (v1.2, spec #4). */
 export class PlanEditModal extends Modal {
@@ -547,7 +435,7 @@ export class GoalEditModal extends Modal {
 			this.endEl.addClass("planboard-date-btn");
 		});
 		// v7.21: 「量化到每日打卡」从开关改为可编辑段（用户指令：不是一个开关，要和
-		// 「添加打卡项」一样的几个可编辑内容）。字段与 AddCheckItemModal 一致：
+		// 「添加打卡项」一样的几个可编辑内容）。字段与「管理打卡项」弹窗的添加段一致：
 		// 名称 / 计划 / 起止日期 / 含复盘链接。启用判据 = 打卡名称非空，留空 = 不生成。
 		// 窗口内每天自动加一条该打卡项，勾选计入计划打卡率/打卡统计；目标本身的
 		// 量化进度仍走分解任务，两条线不混。
@@ -679,6 +567,8 @@ export class GoalEditModal extends Modal {
  */
 export class CheckItemManageModal extends Modal {
 	private plan: string;
+	/** v1.2.3：本计划的图标（label）——新增/编辑手动项时统一补为前缀。 */
+	private icon: string;
 	private today: string;
 	private getItems: () => CheckItem[];
 	private isAuto: (item: CheckItem) => boolean;
@@ -691,11 +581,16 @@ export class CheckItemManageModal extends Modal {
 	private endEl!: HTMLInputElement;
 	private busy = false;
 	private editing: CheckItem | null = null; // 当前处于 inline 编辑态的项
+	/** v1.2.2：新增打卡项时的「含复盘链接」开关。走 onChange 记账 —— Obsidian 的
+	 * checkbox 与视觉状态相反，读 input.checked 会拿到反值（见 GoalEditModal 注）。 */
+	private reviewVal = false;
 
 	constructor(
 		app: App,
 		opts: {
 			plan: string;
+			/** v1.2.3：计划图标；空串 = 该计划没图标（不补前缀）。 */
+			icon: string;
 			today: string;
 			getItems: () => CheckItem[];
 			isAuto: (item: CheckItem) => boolean;
@@ -706,6 +601,7 @@ export class CheckItemManageModal extends Modal {
 	) {
 		super(app);
 		this.plan = opts.plan;
+		this.icon = opts.icon ?? "";
 		this.today = opts.today;
 		this.getItems = opts.getItems;
 		this.isAuto = opts.isAuto;
@@ -724,7 +620,10 @@ export class CheckItemManageModal extends Modal {
 		this.renderList();
 
 		// 添加表单：名称 + 起止日期（计划已由本弹窗锁定，不再选）
-		const period = new Setting(contentEl).setName("新增打卡项").setDesc("默认今天；跨多天在这里给窗口");
+		// v1.2.3：同计划下的打卡项统一带计划图标——这里明示，免得用户以为要自己打图标。
+		const period = new Setting(contentEl)
+			.setName("新增打卡项")
+			.setDesc(this.icon ? `自动带图标「${this.icon}」；默认今天，跨多天在这里给窗口` : "默认今天；跨多天在这里给窗口");
 		period.addText((text) => {
 			this.nameEl = text.inputEl;
 			text.setPlaceholder("例如：阅读 30 分钟");
@@ -742,6 +641,18 @@ export class CheckItemManageModal extends Modal {
 			this.endEl.setAttribute("aria-label", "结束日期");
 		});
 		period.controlEl.addClass("planboard-period-range");
+
+		// v1.2.2：原「今日打卡 → + 添加」弹窗退役，能力并入这里 —— 它的「含复盘链接」
+		// 开关一并搬过来，否则删掉入口会悄悄丢掉一个能力。
+		new Setting(contentEl)
+			.setName("含复盘链接")
+			.setDesc("勾选后任务行末尾追加 → [[{日期} 复盘]]")
+			.addToggle((toggle) => {
+				toggle.setValue(false);
+				toggle.onChange((v) => {
+					this.reviewVal = v;
+				});
+			});
 
 		const buttons = contentEl.createDiv({ cls: "planboard-modal-buttons" });
 		const cancel = buttons.createEl("button", { cls: "planboard-btn", text: "完成" });
@@ -764,7 +675,16 @@ export class CheckItemManageModal extends Modal {
 			this.busy = true;
 			void (async () => {
 				try {
-					await this.onAdd(buildCheckLine({ name, plan: this.plan, includeReview: false, date: this.today, start: ps, due: pe }));
+					await this.onAdd(
+						buildCheckLine({
+							name: withPlanIcon(name, this.icon),
+							plan: this.plan,
+							includeReview: this.reviewVal,
+							date: this.today,
+							start: ps,
+							due: pe,
+						})
+					);
 					this.nameEl.value = "";
 					this.renderList();
 				} finally {
@@ -848,7 +768,8 @@ export class CheckItemManageModal extends Modal {
 			this.busy = true;
 			void (async () => {
 				try {
-					await this.onEditItem(item, newName, start.value || null, due.value || null);
+					// v1.2.3：改名后同样保证带计划图标（用户把前缀删了也能自愈）
+					await this.onEditItem(item, withPlanIcon(newName, this.icon), start.value || null, due.value || null);
 					this.editing = null;
 					this.renderList();
 				} finally {
