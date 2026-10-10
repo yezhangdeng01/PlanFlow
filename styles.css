@@ -231,7 +231,7 @@
 	transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 奖励分档（奖励机制 v1.2）：≥60 铜 / ≥80 银 / 100 金
+/* 奖励分档（奖励机制 v1.2）：≥50 铜 / ≥75 银 / 100 金
    v3.9.10: 分档色收敛为 --pf-tier-* token（与徽章 --pf-badge-* 同语义家族） */
 .planboard-progress-fill.is-bronze {
 	background: var(--pf-tier-bronze);
@@ -1444,6 +1444,14 @@ button.planboard-icon-btn {
 	padding: 3px 12px; /* 字大了，内距同步 2/10→3/12 */
 	margin-left: 8px;
 	vertical-align: middle;
+}
+
+/* v1.2.x: 连击天数里**只有数字**参与跳跃（火焰 emoji 与药丸底不动）。
+   `display: inline-block` 是必须的 —— transform 对非替换行内元素无效；
+   `tabular-nums` 让「9 → 10」这类位数变化时数字宽度不再抖动。 */
+.planboard-streak-num {
+	display: inline-block;
+	font-variant-numeric: tabular-nums;
 }
 
 /* 今日打卡标题徽章（与 streak 并列） */
@@ -5242,3 +5250,40 @@ button.planboard-icon-btn {
 		pointer-events: auto;
 	}
 }
+
+/* ========== 鼓励语 / 连击天数：跳跃反馈（v1.2.x，放文末以免被上方布局规则压掉） ==========
+   用户要求：鼓励语、🔥 连续打卡天数 变化时「跳一下」。
+   触发在 TS 侧（playJump 函数）——只在**文本真的变了**时加类，700ms 后移除；
+   重触发靠「removeClass → offsetWidth 强制重排 → addClass」（不做重排则连播两次无效）。
+   ⚠️ 只动 transform，不碰 margin/height ⇒ 不引起布局抖动，也不会把 header 撑高。 */
+@keyframes planboard-jump {
+	0% {
+		transform: translateY(0) scale(1);
+	}
+	20% {
+		transform: translateY(-6px) scale(1.05);
+	}
+	42% {
+		transform: translateY(0) scale(0.97, 1.03);
+	}
+	58% {
+		transform: translateY(-3px) scale(1.03);
+	}
+	76% {
+		transform: translateY(0) scale(1);
+	}
+	100% {
+		transform: translateY(0) scale(1);
+	}
+}
+
+.planboard-jump {
+	animation: planboard-jump 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ⚠️ v1.2.x 真机实测（2026-10-10）：本机 `prefers-reduced-motion: reduce` 为 **true**
+   （系统关了窗口动画）。若照搬 a11y 惯例加一条
+   `@media (prefers-reduced-motion: reduce) { .planboard-jump { animation: none } }`，
+   这条跳跃就**永远看不到** —— 与用户明确要求「加个跳跃效果」直接相悖，
+   也与项目既有的 .planboard-badge-pop / .planboard-done-pop 处理不一致（它们都无此保护）。
+   ⇒ 故**不加**该保护，保证效果可见。若日后要恢复 a11y，需先确认用户的系统设置。 */

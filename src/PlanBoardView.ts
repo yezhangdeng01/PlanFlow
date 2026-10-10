@@ -548,12 +548,22 @@ function confirmDialog(app: App, message: string, opts: { confirmText?: string; 
 	});
 }
 
-/** 完成率分档（奖励机制）：≥100 金 / ≥80 银 / ≥60 铜 / 其余默认 */
+/** 完成率分档（奖励机制）：≥100 金 / ≥75 银 / ≥50 铜 / 其余默认 */
 function tierClass(percent: number): string {
 	if (percent >= 100) return "is-gold";
-	if (percent >= 80) return "is-silver";
-	if (percent >= 60) return "is-bronze";
+	if (percent >= 75) return "is-silver";
+	if (percent >= 50) return "is-bronze";
 	return "";
+}
+
+/** v1.2.x: 数值变化时的「跳跃」反馈 —— 加类播动画，700ms 后移除。
+ *  重触发靠「移除 → 强制重排 → 再加」；不做重排则连续两次不会重播（与徽章弹跳同款）。 */
+function playJump(el: HTMLElement | null): void {
+	if (!el) return;
+	el.removeClass("planboard-jump");
+	void el.offsetWidth;
+	el.addClass("planboard-jump");
+	window.setTimeout(() => el.removeClass("planboard-jump"), 700);
 }
 
 /** 设置进度条分档 class（换档时清理旧档） */
@@ -646,6 +656,8 @@ export class PlanBoardView extends ItemView {
 	 * v7.12 起与 summaryDoneEl 同处标题行：标题左 · 已完成中 · 鼓励语右。
 	 */
 	private summaryCheerEl: HTMLElement | null = null;
+	/** v1.2.x: 上一次的鼓励语文本 —— 只在**真的换档**时触发跳跃，避免每次刷新都抖。 */
+	private lastCheer: string | null = null;
 	private progressNumberEl: HTMLElement | null = null;
 	private todayBadgeEl: HTMLElement | null = null;
 	private progressFillEl: HTMLElement | null = null;
@@ -662,6 +674,10 @@ export class PlanBoardView extends ItemView {
 	private weekPreviewEl: HTMLElement | null = null;
 	private weekPreviewEmptyEl: HTMLElement | null = null;
 	private streakEl: HTMLElement | null = null;
+	/** v1.2.x: 连击天数里**只有数字**这一段参与跳跃（火焰与药丸底不动）。 */
+	private streakNumEl: HTMLElement | null = null;
+	/** v1.2.x: 上一次算出的连击天数 —— 同上，只在变化时跳跃。 */
+	private lastStreak: number | null = null;
 	private monthTaskBadgeEl: HTMLElement | null = null;
 	private weekTaskBadgeEl: HTMLElement | null = null;
 
@@ -1273,6 +1289,12 @@ export class PlanBoardView extends ItemView {
 		   挂在这条 header 右端（header 是 space-between，标题左、徽章右）。
 		   原来它在总结卡标题行是 absolute 居中定位的，那条 CSS 已随本次搬家删除。 */
 		this.streakEl = weekChartHeader.createSpan({ cls: "planboard-streak planboard-hidden" });
+		/* v1.2.x（用户：「连续打卡那个只跳数字是不是更好？」）：拆成「标签 / 数字 / 单位」三段，
+		   跳跃只加在**数字**上 —— 火焰 emoji 和药丸底不动，视线自然落到变化的那一位。
+		   ⚠️ 三段都是 inline-flex 的子项（容器有 gap:5px），**别再往文字里塞空格**，否则间距翻倍。 */
+		this.streakEl.createSpan({ cls: "planboard-streak-label", text: "🔥 连续打卡" });
+		this.streakNumEl = this.streakEl.createSpan({ cls: "planboard-streak-num" });
+		this.streakEl.createSpan({ cls: "planboard-streak-unit", text: "天" });
 		this.chartWeekEl = weekChartCard.createDiv({ cls: "planboard-chart-body" });
 		if (this.plugin.settings.weekChartHeight > 0) weekChartCard.style.height = `${this.plugin.settings.weekChartHeight}px`;
 		// v3.9: 两卡高度联动——拖任一个，另一个同步（与打卡/总结卡同款交互）
@@ -1521,8 +1543,14 @@ export class PlanBoardView extends ItemView {
 		const year = this.today.slice(0, 4);
 		const streak = await computeStreak(this.app, root, year, this.today);
 		// v3.8: 常态显示——没有连击就显示 0 天（不再隐藏）
-		this.streakEl.setText(`🔥 连续打卡 ${streak} 天`);
+		// v1.2.x: 文本已拆成「标签 / 数字 / 单位」三段，这里**只更新数字那一段**
+		//（对 streakEl 调 setText 会把三个子节点一起清空 —— 别改回去）
+		this.streakNumEl?.setText(String(streak));
 		this.streakEl.removeClass("planboard-hidden");
+		// v1.2.x: 天数变化时跳一下（首次渲染/首次算出不跳）——勾卡让连击 +1 时最明显；
+		// 跳跃只加在**数字**上，火焰与药丸底保持不动
+		if (this.lastStreak !== null && streak !== this.lastStreak) playJump(this.streakNumEl);
+		this.lastStreak = streak;
 	}
 
 	/** v1.4: 顶部日期 + 时段问候（时间锚点）。 */
@@ -1545,7 +1573,7 @@ export class PlanBoardView extends ItemView {
 		this.homeDateSubEl.setText(greet);
 	}
 
-	/** 任务卡进度数字旁的完成率徽章（≥60 铜 / ≥80 银 / 100 金）。 */
+	/** 任务卡进度数字旁的完成率徽章（≥50 铜 / ≥75 银 / 100 金）。 */
 	private updateTaskBadge(el: HTMLElement | null, done: number, total: number): void {
 		if (!el) return;
 		el.removeClass("is-gold", "is-silver", "is-bronze", "planboard-hidden");
@@ -2258,12 +2286,19 @@ export class PlanBoardView extends ItemView {
 		let cheer: string;
 		if (total === 0) cheer = "去添加一个打卡项吧";
 		else if (pct === 100) cheer = "全勤达成！闪闪发光";
-		else if (pct >= 80) cheer = "快完成啦，坚持住！";
+		// 鼓励语分界与徽章档位对齐（100 金 / 75 银 / 50 铜，同源 achievements.ts tierFor）——
+		// 否则会出现「银章已到手、鼓励语还停在铜档」的观感错位。
+		else if (pct >= 75) cheer = "快完成啦，坚持住！";
 		else if (pct >= 50) cheer = "势头不错，继续冲！";
 		else if (pct > 0) cheer = "加油突破，动起来！";
 		else cheer = "从第一项开始吧";
 		// v7.11: 落到总结卡标题行右端（💪 已在 CSS 里用 ::before 画上）
-		if (this.summaryCheerEl) this.summaryCheerEl.setText(cheer);
+		// v1.2.x: 鼓励语换档时跳一下（首次渲染 lastCheer 为空 → 不跳，避免刚打开视图就抖）
+		if (this.summaryCheerEl) {
+			if (this.lastCheer !== null && cheer !== this.lastCheer) playJump(this.summaryCheerEl);
+			this.lastCheer = cheer;
+			this.summaryCheerEl.setText(cheer);
+		}
 	}
 
 	/** v1.0.5: 保存中标记——blur 可在 await 完成前再次触发，防重复写盘 */
@@ -3152,7 +3187,7 @@ export class PlanBoardView extends ItemView {
 					setBadgeContent(b, "🥉", `合格 ×${counts.bronze}`);
 				}
 			} else {
-				wall.createDiv({ cls: "planboard-badge-wall-empty", text: "暂无徽章 · 周/月任务完成 60%+ 即可获得" });
+				wall.createDiv({ cls: "planboard-badge-wall-empty", text: "暂无徽章 · 周/月任务完成 50%+ 即可获得" });
 			}
 		}
 

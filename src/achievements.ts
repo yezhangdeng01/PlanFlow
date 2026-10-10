@@ -33,15 +33,15 @@ const SILVER: BadgeTier = { cls: "is-silver", emoji: "🥈", tierName: "银徽�
 const BRONZE: BadgeTier = { cls: "is-bronze", emoji: "🥉", tierName: "铜徽章", qualifier: "合格" };
 
 /**
- * Completion-rate tier: ≥100 gold / ≥80 silver / ≥60 bronze.
+ * Completion-rate tier: ≥100 gold / ≥75 silver / ≥50 bronze.
  * Null below bronze or when there is no data (done ≤ 0 or total ≤ 0).
  */
 export function tierFor(done: number, total: number): BadgeTier | null {
 	if (total <= 0 || done <= 0) return null;
 	const ratio = done / total;
 	if (ratio >= 1) return GOLD;
-	if (ratio >= 0.8) return SILVER;
-	if (ratio >= 0.6) return BRONZE;
+	if (ratio >= 0.75) return SILVER;
+	if (ratio >= 0.5) return BRONZE;
 	return null;
 }
 
@@ -52,7 +52,7 @@ function achievementPath(rootPath: string, year: string): string {
 
 /**
  * Idempotent: appends one period record to 成就.md unless that period's
- * section already exists. Only settles when completion rate ≥ 60% (>0).
+ * section already exists. Only settles when completion rate ≥ 50% (>0).
  */
 async function settleRecord(
 	app: App,
