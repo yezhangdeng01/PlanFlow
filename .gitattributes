@@ -1,0 +1,21 @@
+# ===== 行尾统一：仓库与工作区一律 LF（2026-10-10 立）=====
+#
+# 背景：本仓库此前没有任何行尾声明，行为完全取决于各人本地的 core.autocrlf。
+# 本机 core.autocrlf=true ⇒ checkout 时会把仓库里的 LF 文本整体翻成 CRLF：
+# 2026-10-10 发版 rebase 时 styles.css 就这样被重写成 CRLF（5289 行全变），
+# 事后只能靠 `git cat-file blob :styles.css` 取回真值；更危险的是，
+# 从被翻过的工作区复制文件去部署，会把 CRLF 悄悄带进产物。
+#
+# 原则：仓库与工作区都是 LF，不再依赖本地配置。
+# 经盘点（2026-10-10），仓库内 52 个文本文件**全部已是 LF**、无 CRLF、无混合行尾，
+# 因此本声明只是把既有事实固化，不产生任何内容变更。
+* text=auto eol=lf
+
+# 二进制：显式禁止任何行尾/编码转换。
+# 注意 docs/screenshots/*.png 是被跟踪的（.gitignore 里对它们做了例外），别让 git 碰它们。
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.zip  binary
