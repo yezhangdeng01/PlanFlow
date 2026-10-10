@@ -10,7 +10,7 @@
 - **数据自动流转：统一数据源，纯 Markdown，告别杂乱**
 
 📖 **完整图文使用说明（设计理念 / 功能性 / 易用性）：[docs/USAGE.md](docs/USAGE.md)**
-
+个人自用小工具，分享给有需求的小伙伴。项目地址：https://github.com/yezhangdeng01/PlanFlow，有任何正负向的反馈都欢迎去项目提issue或点star。
 ## 设计理念
 
 ### 1. 计划是一条流，不是一堆表
