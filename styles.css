@@ -355,12 +355,14 @@
 	flex-shrink: 0;
 	gap: 2px;
 	opacity: 0;
+	pointer-events: none; /* 隐藏态不可点；显形（hover / focus-within / 触屏点行）才恢复 */
 	transition: opacity 0.15s ease;
 }
 
 .planboard-check-item:hover .planboard-item-actions,
 .planboard-pool-item:hover .planboard-item-actions {
 	opacity: 1;
+	pointer-events: auto;
 }
 
 /* ========== 按钮 ========== */
@@ -5179,6 +5181,7 @@ button.planboard-icon-btn {
 .planboard-root .planboard-goal-row--mini .planboard-item-actions {
 	justify-content: flex-end;
 	opacity: 0;
+	pointer-events: none;
 	transition: opacity 0.15s ease;
 }
 
@@ -5189,6 +5192,7 @@ button.planboard-icon-btn {
 .planboard-root .planboard-goal-row--mini:hover .planboard-item-actions,
 .planboard-root .planboard-goal-row--mini:focus-within .planboard-item-actions {
 	opacity: 1;
+	pointer-events: auto;
 }
 
 /* 窄档 / 极小档：四列硬并排会把条挤成一根短棍
@@ -5217,38 +5221,29 @@ button.planboard-icon-btn {
 }
 
 /* ==========================================================================
-   v1.2.1 触屏兜底：hover 浮现的按钮必须常显
-   ⚠️ 本块**必须留在文件最末尾**（以后新增的 hover 规则一律加在它前面）。
+   历史注释（v1.2.1 触屏兜底，已于 v1.2.3 撤除）
    --------------------------------------------------------------------------
-   上面各处的「hover 才浮现」按钮都写着 `opacity: 0`（桌面靠 :hover 提亮）。
-   触屏没有 hover ⇒ 按钮永久隐身，删除/编辑入口等于消失。
-
-   v1.0.5 曾在文件**中段**（约 2426 行）写过同样意图的兜底，但它的特异度与
-   后面新增的隐藏规则**相同**（例如
-   `.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn`
-   与之逐字相同），而 CSS 判同特异度的胜负看「谁在后面」—— 中段那条必输。
-   结果：iPad / 手机上计划卡头的 ✏️🗑️、量化目标的 ✏️🗑️、打卡行动的 ✏️ 全部看不见，
-   唯独今日打卡行的 ↑↓ 常显（那条兜底运气好，比隐藏规则靠后，所以只露出两个方块）。
-
-   这里把兜底挪到末尾并显式列出全部目标选择器，一次覆盖：
-   · 今日打卡行 ↑↓       —— .planboard-check-item .planboard-item-actions
-   · 计划卡头 ✏️🗑️       —— .planboard-plan-head .planboard-head-actions .planboard-icon-btn
-   · 量化目标（标题行）  —— .planboard-goals-head .planboard-goal-actions（v1.2.4 起不再有按钮，留作保险）
-   · 打卡行动 / 量化目标 —— .planboard-plan-metric-row / .planboard-goal-row--mini 的 .planboard-item-actions
-     ⚠️ v1.2.4 两处按钮的下沉规则是 (0,3,0) 的 `.planboard-root .planboard-… .planboard-item-actions`，
-     光靠上面第 1 条 (0,1,0) 的 `.planboard-item-actions` **压不住**，必须照样列全。
-   ⚠️ 以后新增 hover 浮现的按钮，记得同步在这里补一条，否则触屏上又是「隐身」。
+   旧逻辑：触屏 @media (hover:none),(pointer:coarse) 强制 opacity:1 常显。但它在 iPad 上会
+   把所有 hover 按钮永久展开，且因 lucide SVG 在 iPad 不渲染，只会露出空方块。
+   现改为：默认隐藏，桌面靠 :hover、触屏靠「点行」(is-actions-open，TS registerDomEvent
+   切换) 显形。对应规则见下方 v1.2.3 块。
+   原注释提及的「中段兜底被同特异度后写规则反杀」教训仍有效：新增 hover 按钮的隐藏/显形
+   规则要算清特异度，见 v1.2.3 块的前缀处理。
    ========================================================================== */
-@media (hover: none), (pointer: coarse) {
-	.planboard-item-actions,
-	.planboard-goal-actions,
-	.planboard-root .planboard-plan-head .planboard-head-actions .planboard-icon-btn,
-	.planboard-root .planboard-goals-head .planboard-goal-actions,
-	.planboard-root .planboard-plan-metric-row .planboard-item-actions,
-	.planboard-root .planboard-goal-row--mini .planboard-item-actions {
-		opacity: 1;
-		pointer-events: auto;
-	}
+/* ==========================================================================
+   v1.2.3 触屏显隐：不再「常显」，改为点行（is-actions-open，TS 侧切换）显形。
+   --------------------------------------------------------------------------
+   原 v1.2.1「@media (hover:none),(pointer:coarse){opacity:1}」强制常显已撤掉——
+   它让触屏上所有 hover 按钮永久展开，且因 lucide SVG 在 iPad 不渲染，只会露出空方块。
+   现与桌面统一：默认隐藏，hover（桌面）/ 点行（触屏）才显形。TS 在 pointer:coarse
+   设备给被点中的行加 is-actions-open，并只保留一行展开（点行外区域则收起）。
+   特异度需 ≥ 各自隐藏规则（基础 (0,1,0)、四列网格 (0,3,0)），故加 .planboard-root 前缀。 */
+.planboard-check-item.is-actions-open .planboard-item-actions,
+.planboard-root .planboard-plan-metric-row.is-actions-open .planboard-item-actions,
+.planboard-root .planboard-goal-row--mini.is-actions-open .planboard-item-actions,
+.planboard-root .planboard-plan-head.is-actions-open .planboard-head-actions .planboard-icon-btn {
+	opacity: 1;
+	pointer-events: auto;
 }
 
 /* ========== 鼓励语 / 连击天数：跳跃反馈（v1.2.x，放文末以免被上方布局规则压掉） ==========

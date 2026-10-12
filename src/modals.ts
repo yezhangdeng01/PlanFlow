@@ -5,7 +5,7 @@
  * 与视图类唯一的耦合是构造参数（app / plugin / 回调），本就自包含 ——
  * 拆出来后 PlanBoardView.ts 瘦身约 590 行，Modal 的改动不再需要滚动 4000 行找位置。
  */
-import { App, Modal, Notice, Setting, ToggleComponent, setIcon } from "obsidian";
+import { App, Modal, Notice, Setting, ToggleComponent } from "obsidian";
 import { buildCheckLine, CheckItem, withPlanIcon } from "./daily";
 import { PLAN_COLOR_OPTIONS } from "./plan-file";
 import type { PlanDef, PlanGoal, GoalDailyItem } from "./stats";
@@ -618,6 +618,23 @@ export class CheckItemManageModal extends Modal {
 
 		this.listEl = contentEl.createEl("ul", { cls: "planboard-checklist planboard-manage-list" });
 		this.renderList();
+		// v1.2.3：触屏（pointer:coarse）点「行」开/收操作按钮；桌面有真 hover 不干预
+		contentEl.addEventListener("click", (e) => {
+			if (!window.matchMedia("(pointer: coarse)").matches) return;
+			const t = e.target as HTMLElement | null;
+			if (!t) return;
+			if (t.closest(".planboard-icon-btn")) return; // 点按钮本身：让按钮自己处理
+			if (t.closest("button, input, select, textarea, a, [contenteditable='true']")) return;
+			const row = t.closest(".planboard-check-item");
+			const openEls = contentEl.querySelectorAll(".is-actions-open");
+			if (row) {
+				const wasOpen = row.classList.contains("is-actions-open");
+				openEls.forEach((el) => el.removeClass("is-actions-open"));
+				if (!wasOpen) row.addClass("is-actions-open");
+			} else {
+				openEls.forEach((el) => el.removeClass("is-actions-open"));
+			}
+		});
 
 		// 添加表单：名称 + 起止日期（计划已由本弹窗锁定，不再选）
 		// v1.2.3：同计划下的打卡项统一带计划图标——这里明示，免得用户以为要自己打图标。
@@ -730,7 +747,7 @@ export class CheckItemManageModal extends Modal {
 				cls: "planboard-icon-btn planboard-del-btn",
 				attr: { "aria-label": "删除这项", title: "删除这项" },
 			});
-			setIcon(del, "lucide-trash-2");
+			del.setText("🗑️"); // v1.2.3：lucide SVG 在 iPad 不渲染，改 emoji
 			del.addEventListener("click", () => {
 				if (del.disabled) return;
 				del.disabled = true;

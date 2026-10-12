@@ -1,4 +1,4 @@
-import { App, ButtonComponent, ItemView, MarkdownView, Menu, Modal, Notice, TAbstractFile, TFile, TFolder, WorkspaceLeaf, setIcon } from "obsidian";
+import { App, ButtonComponent, ItemView, MarkdownView, Menu, Modal, Notice, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import type PlanBoardPlugin from "../main";
 import type { CheckItem, DailyData } from "./daily";
 import {
@@ -730,6 +730,8 @@ export class PlanBoardView extends ItemView {
 		this.tabsEl = this.headerEl.createDiv({ cls: "planboard-tabs" });
 		this.renderTabs();
 		this.panelEl = root.createDiv({ cls: "planboard-content" });
+		// v1.2.3：触屏点按行显隐操作按钮（见 onPlanboardClick；仅 pointer:coarse 生效，桌面仍靠 :hover）
+		this.registerDomEvent(this.panelEl, "click", (e) => this.onPlanboardClick(e));
 		// v4.0：按「窗格宽度」而不是「视口宽度」切布局（见 observePaneWidth 注释）。
 		this.observePaneWidth(root);
 		this.registerEvent(this.app.vault.on("modify", this.onVaultModify));
@@ -1660,6 +1662,32 @@ export class PlanBoardView extends ItemView {
 		}
 	}
 
+	/**
+	 * v1.2.3：触屏（pointer:coarse）上点「行」开/收操作按钮。
+	 * 点到行内任意位置即显形（不必精准点中图标）；点图标本身由按钮自带 handler 处理
+	 * （已 stopPropagation，不会触发本 toggle）；点行内原生控件（打卡按钮/下拉/输入/链接）
+	 * 也不 toggle，避免误触。桌面端有真 hover，本方法直接 return，按钮仍靠 :hover 浮现。
+	 */
+	private onPlanboardClick(e: MouseEvent): void {
+		if (!window.matchMedia("(pointer: coarse)").matches) return;
+		const target = e.target as HTMLElement | null;
+		if (!target || !this.panelEl) return;
+		if (target.closest(".planboard-icon-btn")) return; // 点操作按钮本身：让按钮自己处理
+		if (target.closest("button, input, select, textarea, a, [contenteditable='true']")) return; // 行内原生控件：不 toggle
+		const row = target.closest(
+			".planboard-check-item, .planboard-plan-metric-row, .planboard-goal-row--mini, .planboard-plan-head"
+		);
+		const openEls = this.panelEl.querySelectorAll(".is-actions-open");
+		if (row) {
+			const wasOpen = row.classList.contains("is-actions-open");
+			openEls.forEach((el) => el.removeClass("is-actions-open"));
+			if (!wasOpen) row.addClass("is-actions-open");
+		} else {
+			// 点到行外（卡片空白等）→ 全部收起
+			openEls.forEach((el) => el.removeClass("is-actions-open"));
+		}
+	}
+
 	private renderCheckItem(item: CheckItem, keepDate?: string): HTMLElement {
 		const li = createEl("li", { cls: "planboard-check-item" + (item.checked ? " is-checked" : "") });
 		li.setAttribute("data-line", String(item.line));
@@ -1692,14 +1720,15 @@ export class PlanBoardView extends ItemView {
 
 		const actions = tail.createDiv({ cls: "planboard-item-actions" });
 		const upBtn = actions.createEl("button", { cls: "planboard-icon-btn planboard-move-btn", attr: { "aria-label": "上移", title: "上移" } });
-		setIcon(upBtn, "lucide-arrow-up");
+		// v1.2.3：lucide SVG 在 iPad 上不渲染（只显出 hover 底色方块），改用文本箭头（系统字体必显）
+		upBtn.setText("↑");
 		upBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
 			void this.moveCheckItem(item, -1);
 		});
 		const downBtn = actions.createEl("button", { cls: "planboard-icon-btn planboard-move-btn", attr: { "aria-label": "下移", title: "下移" } });
-		setIcon(downBtn, "lucide-arrow-down");
+		downBtn.setText("↓");
 		downBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -3430,7 +3459,8 @@ export class PlanBoardView extends ItemView {
 			cls: "planboard-icon-btn planboard-del-btn",
 			attr: { "aria-label": "删除计划", title: "删除计划" },
 		});
-		setIcon(planDelBtn, "lucide-trash-2");
+		// v1.2.3：lucide SVG 在 iPad 上不渲染，改 emoji（与上方编辑按钮同路径）
+		planDelBtn.setText("🗑️");
 		planDelBtn.addEventListener("click", () => void this.deletePlan(prog));
 
 		// v6.7（#9）：目标文案 / 进度条 / 打卡率 三行并成一行。
@@ -3562,7 +3592,7 @@ export class PlanBoardView extends ItemView {
 			cls: "planboard-icon-btn planboard-del-btn",
 			attr: { "aria-label": "删除目标", title: "删除目标" },
 		});
-		setIcon(delBtn, "lucide-trash-2");
+		delBtn.setText("🗑️"); // v1.2.3：lucide SVG 在 iPad 不渲染，改 emoji
 		delBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
