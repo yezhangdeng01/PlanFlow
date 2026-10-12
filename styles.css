@@ -3323,19 +3323,28 @@ button.planboard-icon-btn {
 .planboard-root .planboard-header .planboard-tab {
 	flex: 1 1 0;
 	min-width: 0;
-	padding: 7px 8px;
+	padding: 9px 8px;
 	text-align: center;
-	color: #2c5b86;
-	background: transparent;
-	border-color: transparent;
-	border-radius: 8px;
+	/* v7.19（平板/iPad 可点击性）：inactive 标签各自成磨砂药丸 + 白边 + 白字，
+	   解决 v7.14 撤框后「蓝底上几行字、看不出可点」的问题。active 的「开口」机关不动。 */
+	color: #ffffff;
+	background: rgba(255, 255, 255, 0.18);
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	border-radius: 9px;
 	box-shadow: none;
+	transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .planboard-root .planboard-header .planboard-tab:hover {
-	color: #1c4569;
-	background: rgba(255, 255, 255, 0.6);
-	border-color: transparent;
+	color: #ffffff;
+	background: rgba(255, 255, 255, 0.32);
+	border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* 触屏点按反馈（无 hover：iOS 点中只触发 :active） */
+.planboard-root .planboard-header .planboard-tab:active {
+	background: rgba(255, 255, 255, 0.45);
+	border-color: rgba(255, 255, 255, 0.75);
 }
 
 .planboard-root .planboard-header .planboard-tab.is-active {
@@ -3355,12 +3364,16 @@ button.planboard-icon-btn {
 }
 
 .theme-dark .planboard-root .planboard-header .planboard-tab {
-	color: rgba(226, 238, 248, 0.72);
+	/* v7.19：深色下 inactive 也成磨砂药丸（白边 + 浅白底），与浅色同读法 */
+	color: #eaf4fd;
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.32);
 }
 
 .theme-dark .planboard-root .planboard-header .planboard-tab:hover {
-	color: #eaf4fd;
-	background: rgba(255, 255, 255, 0.14);
+	color: #ffffff;
+	background: rgba(255, 255, 255, 0.22);
+	border-color: rgba(255, 255, 255, 0.45);
 }
 
 .theme-dark .planboard-root .planboard-header .planboard-tab.is-active {
@@ -4953,7 +4966,7 @@ button.planboard-icon-btn {
 		min-height: 40px;
 	}
 	.planboard-tab {
-		min-height: 40px;
+		min-height: 44px; /* 门禁 44px：触屏命中区达标 */
 	}
 	.planboard-check-btn {
 		min-height: 40px;
