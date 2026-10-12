@@ -3325,26 +3325,27 @@ button.planboard-icon-btn {
 	min-width: 0;
 	padding: 9px 8px;
 	text-align: center;
-	/* v7.19（平板/iPad 可点击性）：inactive 标签各自成磨砂药丸 + 白边 + 白字，
-	   解决 v7.14 撤框后「蓝底上几行字、看不出可点」的问题。active 的「开口」机关不动。 */
-	color: #ffffff;
-	background: rgba(255, 255, 255, 0.18);
-	border: 1px solid rgba(255, 255, 255, 0.45);
+	/* v7.19b（用户 180520 截图）：banner 是**浅**蓝渐变，v7.19 的白字/白磨砂在浅底上
+	   反而更看不见——改回深字，药丸轮廓改用「比 banner 深一档」的幽灵底 + 深边框。
+	   与 active 的分工：深色描边药丸 = 可点的其他页；浅画布色开口 = 当前页。 */
+	color: #2c5b86;
+	background: rgba(28, 69, 105, 0.08);
+	border: 1px solid rgba(28, 69, 105, 0.2);
 	border-radius: 9px;
 	box-shadow: none;
 	transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .planboard-root .planboard-header .planboard-tab:hover {
-	color: #ffffff;
-	background: rgba(255, 255, 255, 0.32);
-	border-color: rgba(255, 255, 255, 0.6);
+	color: #1c4569;
+	background: rgba(28, 69, 105, 0.14);
+	border-color: rgba(28, 69, 105, 0.32);
 }
 
 /* 触屏点按反馈（无 hover：iOS 点中只触发 :active） */
 .planboard-root .planboard-header .planboard-tab:active {
-	background: rgba(255, 255, 255, 0.45);
-	border-color: rgba(255, 255, 255, 0.75);
+	background: rgba(28, 69, 105, 0.18);
+	border-color: rgba(28, 69, 105, 0.4);
 }
 
 .planboard-root .planboard-header .planboard-tab.is-active {
@@ -5295,3 +5296,282 @@ button.planboard-icon-btn {
    这条跳跃就**永远看不到** —— 与用户明确要求「加个跳跃效果」直接相悖，
    也与项目既有的 .planboard-badge-pop / .planboard-done-pop 处理不一致（它们都无此保护）。
    ⇒ 故**不加**该保护，保证效果可见。若日后要恢复 a11y，需先确认用户的系统设置。 */
+
+/* ==========================================================================
+   v7.27 头部重构第八季：banner 即底（撤托盘，台面再提亮）
+   --------------------------------------------------------------------------
+   用户 2026-10-12 晚（对 v7.26 的修正）：「还是感觉不够通透。如果四标签不要
+   底框，直接用 banner 做底会怎样」——诊断：托盘那 0.16 azure 带压在台面上，
+   等于给 banner 底部又压了一层色，是「不通透」的最后一截。用户提议撤掉。
+   本节执行 + 配套两改：
+   ① 撤托盘：.planboard-tabs 背景归透明、圆角归零——tab 行直接坐在 banner
+      自己的渐变上，底部无色量叠加；
+   ② 台面再提亮一档（历轮最亮）：#cde3f5 顶 / #b8d7ef 腰 / #a3c7e6 底。
+      开口对比仍成立：画布 #e5edf4 vs 台面 #a3c7e6 明度差明确，肩块的弧
+      是「banner 底缘绕着活动标签抬起来」；
+   ③ 结构感不减：透明 seg + 发丝线保留（v7.26 的 segmented 语汇不动）——
+      没有托盘也有「一行四个可切换项」的读法；活动段仍是画布开口。
+   若用户要更纯粹，发丝线亦可再撤（一行命令），留作后手。
+   深色同构撤托盘；深色 banner 不动。
+   纯追加：删掉本节即回到 v7.26（有条版）。
+   ========================================================================== */
+
+/* ①-0 结构恢复：撤 v7.20 的整卡化——header 恢复零下边距，让开口咬穿 banner 底缘 */
+.planboard-root .planboard-header {
+	margin-bottom: 0;
+	padding-bottom: 0;
+}
+
+.planboard-root.is-narrow .planboard-header,
+.planboard-root.is-tiny .planboard-header {
+	margin-bottom: 0;
+}
+
+.planboard-root.is-tiny .planboard-header {
+	padding-bottom: 0;
+}
+
+/* ① banner 台面再提亮一档（历轮最亮）：顶 #cde3f5 / 腰 #b8d7ef / 底 #a3c7e6 */
+.theme-light .planboard-root .planboard-header {
+	background-image:
+		radial-gradient(85% 75% at 72% 0%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 58%),
+		linear-gradient(180deg, #cde3f5 0%, #b8d7ef 50%, #a3c7e6 100%);
+	box-shadow: 0 1px 6px rgba(100, 140, 180, 0.16);
+}
+
+/* ①-2 深色台面：末档不透明度 0.16 → 0.36，台面比腰深，与浅色同构 */
+.theme-dark .planboard-root .planboard-header {
+	background-image: linear-gradient(
+		180deg,
+		rgba(74, 138, 200, 0.4) 0%,
+		rgba(74, 138, 200, 0.22) 50%,
+		rgba(74, 138, 200, 0.36) 100%
+	);
+}
+
+/* ①-3 撤托盘：tab 行直接坐在 banner 渐变上——底部不再叠色（不通透的最后一截）；
+   gap 0 + 发丝线保留（v7.26 的 segmented 读法不依赖托盘） */
+.planboard-root .planboard-header .planboard-tabs {
+	padding: 4px 4px 0;
+	gap: 0;
+	background: transparent;
+	border-radius: 0;
+}
+
+/* ② inactive = 条上的透明文字域：无填充无轮廓（轮廓即「独立感」之源），
+   方角（条的圆角包办容器形状）；可点性由 segmented 语汇 + hover 兜底 */
+.planboard-root .planboard-header .planboard-tab {
+	color: #1f4a72;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 0;
+	box-shadow: none;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* seg 间发丝线：只加在 inactive 之间——活动段右侧是画布/条的色界（无需线），
+   且必须避开活动段右肩块（canvas 弧会把发丝线底端盖断一截） */
+.planboard-root .planboard-header .planboard-tab:not(.is-active) + .planboard-tab {
+	border-left: 1px solid rgba(28, 69, 105, 0.18);
+}
+
+.planboard-root .planboard-header .planboard-tab:hover {
+	color: #173a5c;
+	background: rgba(255, 255, 255, 0.22);
+}
+
+/* 触屏点按反馈（无 hover：iOS 点中只触发 :active） */
+.planboard-root .planboard-header .planboard-tab:active {
+	background: rgba(255, 255, 255, 0.32);
+}
+
+/* 活动段：画布开口（结构件归 v7.0/v7.1），文字压深做 anchor */
+.planboard-root .planboard-header .planboard-tab.is-active {
+	color: #16395c;
+}
+
+/* ②-d 深色同构撤托盘：与浅色一致，tab 行直接坐在深色 banner 渐变上
+   （9% 白带压在深台面上同样是「不通透」的一层，浅深一起撤）；
+   inactive 透明文字域；发丝线白 14% */
+.theme-dark .planboard-root .planboard-header .planboard-tabs {
+	background: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab {
+	color: rgba(234, 244, 253, 0.8);
+	background: transparent;
+	/* 显式覆盖 v7.19 老药丸规则（3371，(0,4,0) 白 32% 边）——不写这句
+	   深色下四枚又会带白边退回成药丸 */
+	border: 1px solid transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active) + .planboard-tab {
+	border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:hover {
+	color: #ffffff;
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:active {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+/* ==========================================================================
+   v7.28 修复用户 2026-10-12 2210 两张截图（v7.27 撤托盘后新暴露的两处）
+   --------------------------------------------------------------------------
+   问题①（截图 221008）：「标签颜色和下面连通的页面颜色不一致」——
+   切到计划管理视图才出现：活动标签开口（画布色 #e5edf4）紧贴着的首屏内容是
+   .planboard-page-bar（0.08 蓝底 ≈ 白行），开口的浅蓝灰与它撞色，开口本应
+   「咬穿连通」的那块页面读作两色。今日行动/任务/成就视图首屏是白卡，开口与
+   卡之间隔着画布间隙，读法成立——唯 page-bar 是贴边的白行，把连通关系切断。
+   修法：page-bar 去底色，标题行直接坐在画布上，开口→画布→内容连成一色。
+   问题②（截图 220955）：「鼠标停留在标签上时，标签的两角漏白」——
+   v7.19b 老 hover/:active 规则（3339/3346，(0,4,0)）设置了 border-color
+   深蓝 0.32/0.4，而 v7.26 的新 hover/:active（5378/5384，同 (0,4,0) 后写）
+   只改了 color/background、没写 border-color——按级联，border-color 由
+   「最高特异度中设置了该属性的规则」决定，于是老规则接管：hover 白块
+   带上 1px 深蓝细边，方角白块在浅蓝 banner 上成「贴纸」，上两角最显眼。
+   深色同坑：3374 老深色 hover（(0,5,0)）的 border-color 白 0.45 接管。
+   修法：新 hover/:active 显式写 border-color: transparent（同特异度后写
+   赢老规则）；发丝线规则 (0,5,0)/(0,6,0) 更高，hover 时左侧发丝线不受影响。
+   纯追加：删掉本节即回到 v7.27。
+   ========================================================================== */
+
+/* ① page-bar 去底色（浅/深同构）：圆角随透明底自然不可见，只撤背景 */
+.planboard-root .planboard-page-bar {
+	background: transparent;
+}
+
+.theme-dark .planboard-root .planboard-page-bar {
+	background: transparent;
+}
+
+/* ② 浅色 hover/:active 显式透明边——退役 3339/3346 的深蓝边接管 */
+.planboard-root .planboard-header .planboard-tab:hover {
+	border-color: transparent;
+}
+
+.planboard-root .planboard-header .planboard-tab:active {
+	border-color: transparent;
+}
+
+/* ②-d 深色同构：显式透明边——退役 3374 的白 0.45 边接管 */
+.theme-dark .planboard-root .planboard-header .planboard-tab:hover {
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:active {
+	border-color: transparent;
+}
+
+/* ==========================================================================
+   v7.29 修复 hover/:active 误伤活动标签（用户 22:50 两张截图的真根因）
+   --------------------------------------------------------------------------
+   用户反馈①「标签颜色和下面连通的页面颜色不一致」（截图 225030）、
+   ②「鼠标停留在标签上时，标签的两角漏白」（截图 225041）——同一个根因：
+   v7.26 的 hover/:active 规则（5378/5384）**没有排除 .is-active**。
+   鼠标停在**活动标签**上时：hover 背景规则与活动开口规则 4092 同为 (0,4,0)，
+   按「同特异度后写赢」hover（5378）胜过开口——活动标签主体背景从「画布开口色」
+   var(--pf-tab-open-bg) 变成 hover 的 rgba(255,255,255,0.22)；
+   但开口的双肩块（::before/::after）与 2px 同色硬阴影仍取 var(--pf-tab-open-bg)，
+   于是主体变深、两角仍浅（＝用户说的「两角漏白」），主体色也与下方页面画布不一致
+   （＝用户说的「颜色不一致」）。
+   像素取证：用户截图 225041 标签行 x≈30%~40% 采到 #b7d3eb ＝ 白 0.22 叠
+   banner 末档 #a3c7e6（同时 x≈10%~20%、60%~90% 仍是 #a3c7e6 无 hover）——
+   证实鼠标正停在「计划管理」（第二枚＝活动标签）上。
+   修法：hover/:active 作用域加 :not(.is-active)——活动标签是「当前页」，
+   不参与 hover/点按反馈（它的开口本身就是指示器）；非活动标签的 hover
+   （提亮 + 透明边）保留。
+   纯追加：删掉本节即回到 v7.28。
+   ========================================================================== */
+
+.planboard-root .planboard-header .planboard-tab:not(.is-active):hover {
+	color: #173a5c;
+	background: rgba(255, 255, 255, 0.22);
+	border-color: transparent;
+}
+
+.planboard-root .planboard-header .planboard-tab:not(.is-active):active {
+	background: rgba(255, 255, 255, 0.32);
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active):hover {
+	color: #ffffff;
+	background: rgba(255, 255, 255, 0.1);
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active):active {
+	background: rgba(255, 255, 255, 0.16);
+	border-color: transparent;
+}
+
+/* 活动标签 = 当前页：悬停/点按**不改变外观**（开口就是唯一指示器）。
+   必须正面写这一条——只在 hover 规则上加 :not(.is-active) 不够，
+   因为 v7.26 原始 hover（5378，作用于所有标签，(0,4,0)）仍会命中活动标签；
+   本条 (0,5,0)/(0,6,0) 高于它，把 background/color 拉回开口态。 */
+.planboard-root .planboard-header .planboard-tab.is-active:hover,
+.planboard-root .planboard-header .planboard-tab.is-active:active {
+	background: var(--pf-tab-open-bg);
+	color: #16395c;
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active:hover,
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active:active {
+	background: var(--pf-tab-open-bg);
+	color: #eaf4fd;
+	border-color: transparent;
+}
+
+/* ==========================================================================
+   v7.30 修复：开口下方被画布顶边框横切（用户 23:03「开口色和连通页面色不一致」）
+   --------------------------------------------------------------------------
+   垂直色彩剖面取证（`_tools/_probe-v730-column.mjs`，开口中心 x=604 逐行采样）：
+     292~321   #e5edf4  开口（活动标签）
+     322.7~325 #dce5ee / #dfe7f1 / #dde6ef   ← 一条约 2.5px 的深色带
+     326~407   #e5edf4  页面画布（与开口同色）
+   ⇒ 开口与页面本身同色（均 #e5edf4），但那 2.5px 深带把「连通」割断了。
+   成因：`.planboard-content` 的 `border-top: 1px solid rgba(53,114,168,0.1)`
+   （画布轮廓）画在开口的「2px 同色硬阴影」之上——因为 v7.0 的 3311 把
+   `.planboard-tabs` 设成了 `position: static`，容器上原本的 `z-index: 10`
+   （16 行）随之失效，画布作为后渲染的兄弟元素把边框压了上来。
+   修法：tabs 容器恢复为定位元素（static → relative），让 z-index: 10 生效——
+   开口及其同色阴影（覆盖到标签下方 2px = 盖满 1px 边框）重绘于画布边框之上。
+   relative 不脱离文档流，布局不变；活动标签自身仍是 position: relative
+   (4093)，肩块 ::before/::after 的包含块不受影响。
+   纯追加：删掉本节即回到 v7.29。
+   ========================================================================== */
+
+.planboard-root .planboard-header .planboard-tabs {
+	position: relative;
+	z-index: 10;
+}
+
+/* ==========================================================================
+   v7.31 修复：「开口色和连通页面色不一致」的真凶——banner 投影落在画布上
+   --------------------------------------------------------------------------
+   垂直剖面 + 六组归因实验（`_tools/_diag-v730b.mjs`，A~F 对照）结论：
+   把 header 的 box-shadow 设为 none 后，开口正下方 239.4~243.4 那条深色带
+   （#dce6ef / #dde6ee / #dfe8f1）**完全恢复为画布色 #e5edf4**；
+   而去掉 content 顶边框（B）/ header 底边框（C）/ 活动标签阴影（D）/
+   强制 header overflow:visible（E），该带**均无变化**（D 只影响 239.4~241 那半段，
+   那半段确实是开口阴影在盖线，属正常）。
+   ⇒ 真凶 = v7.27 为「轻云感」加的 `box-shadow: 0 1px 6px rgba(100,140,180,0.16)`
+   （浅色 5339 行）。该投影向下渗约 6px、正好落在 banner 下方的画布上；
+   开口（tabs z-index:10）浮在投影之上是干净的，但开口**正下方的画布**被投影
+   压暗一档 → 用户看到的「开口色和连通的页面色不一致」。
+   修法：撤掉浅色 banner 投影。banner 现在是最亮档（末档 #a3c7e6），与画布
+   （#e5edf4）本身已有明确色差，不再需要投影过渡；撤掉后 banner 底缘只剩
+   header 的 1px 发丝线，开口的 2px 同色硬阴影正好盖住它——「开口↔页面」
+   连通感最强，正是用户历轮要的效果。
+   深色 banner 本无投影（5343 只改 background-image），不动。
+   纯追加：删掉本节即回到 v7.30。
+   ========================================================================== */
+
+.theme-light .planboard-root .planboard-header {
+	box-shadow: none;
+}
