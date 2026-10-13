@@ -5575,3 +5575,643 @@ button.planboard-icon-btn {
 .theme-light .planboard-root .planboard-header {
 	box-shadow: none;
 }
+
+/* ==========================================================================
+   v7.32 修复：banner 与页面接缝处两边的缺角（用户 2026-10-13 154806 截图）
+   --------------------------------------------------------------------------
+   像素取证（_tools/_scan-corner.mjs，用户截图 2x 屏逐点分类）：
+     左下角：蓝 banner 底缘在 x≈0~24（12px CSS 圆角）被切掉，画布色三角
+             从 (x=0,y≈166) 弧到 (x≈24,y=190)——接缝左端缺一角；
+     右下角：同构，蓝只伸到 x≈1524，圆角切掉的部分露出画布色。
+   ⇒ 用户说的「banner 和下面页面接缝处两边的缺角」= 3276 行基础规则的
+     `border-radius: 12px` 把**下两角**也圆了。上两角圆是「卡片感」，
+     下两角圆在「banner 即页头」的读法下就是接缝两端的缺口。
+   修法：下两角归方（12px 12px 0 0）——蓝台面底缘拉直，与下方页面齐边
+   接缝、无缺口；活动标签的「开口」（画布色 + 双肩内凹弧，v7.0/v7.1）
+   在居中原样保留，v7.31 的「开口↔页面完全连续」不受影响。
+   深色 / is-narrow / is-tiny 均无自有 radius 规则（只有 margin/padding），
+   本条 (0,2,0) 后写覆盖 3276 行的 12px，一条全覆盖。
+   纯追加：删掉本节即回到 v7.31。
+   ========================================================================== */
+
+.planboard-root .planboard-header {
+	border-radius: 12px 12px 0 0;
+}
+
+/* ==========================================================================
+   v7.33 修复：接缝第二缺口——画布面板自己的上两角（用户 10-13 复报「还是有缺角」）
+   --------------------------------------------------------------------------
+   v7.32 把 banner 下两角拉直后，用户实测接缝两端仍有缺口。
+   代码复查找到第二来源：`.planboard-content`（v6.9 的「整页浅蓝画布」面板）
+   4042 行 `border-radius: 14px` 同样圆了上两角——banner 直底缘 vs 画布圆上缘，
+   两端各剩一个画布色三角（is-narrow 12px / is-tiny 10px 同病，4058/4063 行）。
+   修法：三条同选择器重声明、只保留下两角（0 0 N N），后写赢；
+   画布面板的 1px 顶边框随之拉直，与 banner 直底缘合成一条齐边接缝。
+   纯追加：删掉本节即回到 v7.32。
+   ========================================================================== */
+
+.planboard-root .planboard-content {
+	border-radius: 0 0 14px 14px;
+}
+
+.planboard-root.is-narrow .planboard-content {
+	border-radius: 0 0 12px 12px;
+}
+
+.planboard-root.is-tiny .planboard-content {
+	border-radius: 0 0 10px 10px;
+}
+
+/* ==========================================================================
+   v8.0 皮肤系统（2026-10-13，用户「皮肤你做出来看看」）
+   --------------------------------------------------------------------------
+   沿用 v4.0 注释里铺好的架构——「换肤只改 ① 变量，②③④ 不用动」：
+   ① 把散落在 v6.x~v7.x 的顶栏硬编码（banner 三档渐变 / 标签墨色 / hover /
+      发丝线 / 开口投影 / 画布膜）收进 --pf-* 变量。手法是**同选择器重声明**
+      （后写赢），不动老规则——整节可删，零回退风险；
+   ② 晴空默认值提亮（用户第五轮「通透」诉求）：顶 #e4f0fa / 腰 #cde3f4 /
+      末 #b2d2ea，辉光 0.42→0.5。末档与画布 #e5edf4 仍保持可辨色差——
+      「开口」读法成立的前提（v7.27 诊断不变）；
+   ③ 四款皮肤 = 四组变量块（浅/深两态），根元素 data-skin 切换，
+      settings.ts 下拉即时生效，TS 渲染逻辑零改动；
+   ④ 🔴 --pf-tab-open-bg（开口色）必须等于**合成画布色**
+      （白页 × root 膜 × content 膜，v7.2 教训：估算值翻车过）。
+      晴空沿用实测值 #e5edf4；其余三款给解析估值，真机逐肤实测后校准
+      （见 PROGRESS.md v8.0 节记录的各肤实测值）。
+   ========================================================================== */
+
+/* ---------- ① 令牌默认值（= 晴空修订版，浅色） ---------- */
+.planboard-root {
+	/* banner */
+	--pf-banner-glow: rgba(255, 255, 255, 0.5);
+	--pf-banner-1: #e4f0fa;
+	--pf-banner-2: #cde3f4;
+	--pf-banner-3: #b2d2ea;
+	/* 标签 */
+	--pf-tab-ink: #1f4a72;
+	--pf-tab-ink-hover: #173a5c;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.22);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.32);
+	--pf-tab-ink-active: #16395c;
+	--pf-tab-hair: rgba(28, 69, 105, 0.18);
+	--pf-tab-open-shadow: rgba(28, 69, 105, 0.1);
+	--pf-period-ink: #40607e;
+	/* 画布：root 膜 / content 膜 / 描边 */
+	--pf-page-tint: rgba(53, 114, 168, 0.075);
+	--pf-canvas-tint: rgba(53, 114, 168, 0.055);
+	--pf-canvas-line: rgba(53, 114, 168, 0.1);
+	/* 开口色 = 合成画布色（实测值） */
+	--pf-tab-open-bg: #e5edf4;
+}
+
+.theme-dark .planboard-root {
+	--pf-banner-1: rgba(74, 138, 200, 0.4);
+	--pf-banner-2: rgba(74, 138, 200, 0.22);
+	--pf-banner-3: rgba(74, 138, 200, 0.36);
+	--pf-tab-ink: rgba(234, 244, 253, 0.8);
+	--pf-tab-ink-hover: #ffffff;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.1);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.16);
+	--pf-tab-ink-active: #eaf4fd;
+	--pf-tab-hair: rgba(255, 255, 255, 0.14);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
+	--pf-period-ink: rgba(226, 238, 248, 0.72);
+	--pf-page-tint: rgba(138, 180, 216, 0.05);
+	--pf-canvas-tint: rgba(138, 180, 216, 0.07);
+	--pf-canvas-line: rgba(138, 180, 216, 0.16);
+	--pf-tab-open-bg: #1e2326;
+}
+
+/* ---------- ② 老规则 → 变量（同选择器重声明，后写赢） ---------- */
+
+/* banner 渐变（v7.27 台面 → 变量；辉光只在浅色） */
+.theme-light .planboard-root .planboard-header {
+	background-image:
+		radial-gradient(85% 75% at 72% 0%, var(--pf-banner-glow), rgba(255, 255, 255, 0) 58%),
+		linear-gradient(180deg, var(--pf-banner-1) 0%, var(--pf-banner-2) 50%, var(--pf-banner-3) 100%);
+}
+
+.theme-dark .planboard-root .planboard-header {
+	background-image: linear-gradient(
+		180deg,
+		var(--pf-banner-1) 0%,
+		var(--pf-banner-2) 50%,
+		var(--pf-banner-3) 100%
+	);
+}
+
+/* 画布：root 膜（v6.9 4030 行硬编码 → 变量） */
+.planboard-root {
+	background-image: linear-gradient(var(--pf-page-tint), var(--pf-page-tint));
+}
+
+.theme-dark .planboard-root {
+	background-image:
+		linear-gradient(rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.34)),
+		linear-gradient(var(--pf-page-tint), var(--pf-page-tint));
+}
+
+/* 画布面板：膜 + 描边 + 上两角归方（v7.33 在此复述一遍，删 v8.0 时 v7.33 仍兜底） */
+.planboard-root .planboard-content {
+	background: var(--pf-canvas-tint);
+	border: 1px solid var(--pf-canvas-line);
+	border-radius: 0 0 14px 14px;
+	padding: 14px;
+}
+
+.theme-dark .planboard-root .planboard-content {
+	background: var(--pf-canvas-tint);
+	border-color: var(--pf-canvas-line);
+}
+
+/* 标签：墨色（v7.26 透明文字域 → 变量） */
+.planboard-root .planboard-header .planboard-tab {
+	color: var(--pf-tab-ink);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab {
+	color: var(--pf-tab-ink);
+}
+
+/* seg 间发丝线（v7.26） */
+.planboard-root .planboard-header .planboard-tab:not(.is-active) + .planboard-tab {
+	border-left: 1px solid var(--pf-tab-hair);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active) + .planboard-tab {
+	border-left: 1px solid var(--pf-tab-hair);
+}
+
+/* hover / 点按（v7.29：不伤活动标签） */
+.planboard-root .planboard-header .planboard-tab:not(.is-active):hover {
+	color: var(--pf-tab-ink-hover);
+	background: var(--pf-tab-hover-bg);
+	border-color: transparent;
+}
+
+.planboard-root .planboard-header .planboard-tab:not(.is-active):active {
+	background: var(--pf-tab-press-bg);
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active):hover {
+	color: var(--pf-tab-ink-hover);
+	background: var(--pf-tab-hover-bg);
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab:not(.is-active):active {
+	background: var(--pf-tab-press-bg);
+	border-color: transparent;
+}
+
+/* 活动标签 = 画布开口（结构件归 v7.0/v7.1，此处只接管配色） */
+.planboard-root .planboard-header .planboard-tab.is-active {
+	position: relative;
+	margin-bottom: -2px;
+	padding-bottom: 10px;
+	border-radius: 10px 10px 0 0;
+	background: var(--pf-tab-open-bg);
+	border-color: transparent;
+	color: var(--pf-tab-ink-active);
+	box-shadow: 0 -1px 3px var(--pf-tab-open-shadow), 0 2px 0 0 var(--pf-tab-open-bg);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active {
+	background: var(--pf-tab-open-bg);
+	border-color: transparent;
+	color: var(--pf-tab-ink-active);
+	box-shadow: 0 2px 0 0 var(--pf-tab-open-bg);
+}
+
+/* 活动标签悬停/点按钉回开口态（v7.29） */
+.planboard-root .planboard-header .planboard-tab.is-active:hover,
+.planboard-root .planboard-header .planboard-tab.is-active:active {
+	background: var(--pf-tab-open-bg);
+	color: var(--pf-tab-ink-active);
+	border-color: transparent;
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active:hover,
+.theme-dark .planboard-root .planboard-header .planboard-tab.is-active:active {
+	background: var(--pf-tab-open-bg);
+	color: var(--pf-tab-ink-active);
+	border-color: transparent;
+}
+
+/* 周期页头副标题（v6.2 3304 行 / 深色 3363 行） */
+.planboard-root .planboard-header .planboard-period-label {
+	color: var(--pf-period-ink);
+}
+
+.theme-dark .planboard-root .planboard-header .planboard-period-label {
+	color: var(--pf-period-ink);
+}
+
+/* ---------- ③ 皮肤：墨纸 Paper（暖纸褐 + 黛蓝；深态 = 深褐墨 + 暖金） ---------- */
+.planboard-root[data-skin="paper"] {
+	--pf-banner-glow: rgba(255, 252, 240, 0.55);
+	--pf-banner-1: #f8f2e4;
+	--pf-banner-2: #f1e9d6;
+	--pf-banner-3: #e7dcc3;
+	--pf-tab-ink: #4d4335;
+	--pf-tab-ink-hover: #3a3226;
+	--pf-tab-hover-bg: rgba(255, 253, 245, 0.45);
+	--pf-tab-press-bg: rgba(255, 253, 245, 0.6);
+	--pf-tab-ink-active: #352e22;
+	--pf-tab-hair: rgba(97, 82, 60, 0.2);
+	--pf-tab-open-shadow: rgba(97, 82, 60, 0.12);
+	--pf-period-ink: #6b5c46;
+	--pf-page-tint: rgba(130, 110, 85, 0.07);
+	--pf-canvas-tint: rgba(130, 110, 85, 0.055);
+	--pf-canvas-line: rgba(130, 110, 85, 0.14);
+	--pf-tab-open-bg: #f0edea;
+	--pfs-sub: #6e6252;
+	--pfs-accent: #3f5f7a;
+	--pfs-accent-soft: #8fa9bd;
+	--pfs-hair: rgba(97, 82, 60, 0.14);
+	--pfs-hair-strong: rgba(97, 82, 60, 0.26);
+	--pfs-track: rgba(97, 82, 60, 0.1);
+	--pfs-hover: rgba(63, 95, 122, 0.07);
+	--pfs-card: rgba(255, 253, 246, 0.95);
+	--pfs-ok: #3d8a5c;
+	--pfs-ok-soft: rgba(61, 138, 92, 0.12);
+	--pfs-ok-flash: rgba(61, 138, 92, 0.3);
+	--pb-accent-hover: #9db4c8;
+}
+
+.theme-dark .planboard-root[data-skin="paper"] {
+	--pf-banner-1: rgba(120, 96, 62, 0.36);
+	--pf-banner-2: rgba(120, 96, 62, 0.2);
+	--pf-banner-3: rgba(120, 96, 62, 0.3);
+	--pf-tab-ink: rgba(238, 227, 205, 0.82);
+	--pf-tab-ink-hover: #f7ecd8;
+	--pf-tab-hover-bg: rgba(255, 243, 220, 0.1);
+	--pf-tab-press-bg: rgba(255, 243, 220, 0.16);
+	--pf-tab-ink-active: #f2e7d0;
+	--pf-tab-hair: rgba(255, 240, 215, 0.14);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
+	--pf-period-ink: rgba(238, 227, 205, 0.6);
+	--pf-page-tint: rgba(216, 180, 138, 0.04);
+	--pf-canvas-tint: rgba(216, 180, 138, 0.06);
+	--pf-canvas-line: rgba(216, 180, 138, 0.16);
+	--pf-tab-open-bg: #221f1b;
+	--pfs-sub: #a99a83;
+	--pfs-accent: #c7a367;
+	--pfs-accent-soft: #a8874f;
+	--pfs-hair: rgba(255, 240, 215, 0.12);
+	--pfs-hair-strong: rgba(255, 240, 215, 0.22);
+	--pfs-track: rgba(255, 240, 215, 0.1);
+	--pfs-hover: rgba(199, 163, 103, 0.12);
+	--pfs-card: rgba(255, 243, 220, 0.06);
+}
+
+/* ---------- ③ 皮肤：夜阑 Midnight（石板灰 + 钢蓝；深态 = 深靛 + 月白蓝） ---------- */
+.planboard-root[data-skin="midnight"] {
+	--pf-banner-glow: rgba(255, 255, 255, 0.45);
+	--pf-banner-1: #e9eef4;
+	--pf-banner-2: #dae2ec;
+	--pf-banner-3: #c4d0de;
+	--pf-tab-ink: #33475e;
+	--pf-tab-ink-hover: #243648;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.3);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.42);
+	--pf-tab-ink-active: #22344a;
+	--pf-tab-hair: rgba(40, 60, 85, 0.18);
+	--pf-tab-open-shadow: rgba(40, 60, 85, 0.1);
+	--pf-period-ink: #4d6076;
+	--pf-page-tint: rgba(70, 90, 115, 0.07);
+	--pf-canvas-tint: rgba(70, 90, 115, 0.055);
+	--pf-canvas-line: rgba(70, 90, 115, 0.14);
+	--pf-tab-open-bg: #e8eaed;
+	--pfs-sub: #5c6b7d;
+	--pfs-accent: #47658a;
+	--pfs-accent-soft: #93a9c4;
+	--pfs-hair: rgba(40, 60, 85, 0.12);
+	--pfs-hair-strong: rgba(40, 60, 85, 0.24);
+	--pfs-track: rgba(40, 60, 85, 0.1);
+	--pfs-hover: rgba(71, 101, 138, 0.07);
+	--pfs-card: rgba(250, 251, 253, 0.95);
+	--pb-accent-hover: #93a9c4;
+}
+
+.theme-dark .planboard-root[data-skin="midnight"] {
+	--pf-banner-1: rgba(70, 110, 170, 0.42);
+	--pf-banner-2: rgba(70, 110, 170, 0.24);
+	--pf-banner-3: rgba(70, 110, 170, 0.38);
+	--pf-tab-ink: rgba(226, 236, 248, 0.82);
+	--pf-tab-ink-hover: #ffffff;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.1);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.16);
+	--pf-tab-ink-active: #e6f0fa;
+	--pf-tab-hair: rgba(255, 255, 255, 0.14);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
+	--pf-period-ink: rgba(226, 236, 248, 0.6);
+	--pf-page-tint: rgba(110, 150, 200, 0.05);
+	--pf-canvas-tint: rgba(110, 150, 200, 0.07);
+	--pf-canvas-line: rgba(110, 150, 200, 0.16);
+	--pf-tab-open-bg: #1c1e22;
+	--pfs-sub: #97a3b2;
+	--pfs-accent: #6f9fd0;
+	--pfs-accent-soft: #a8c6e4;
+	--pfs-hair: rgba(255, 255, 255, 0.1);
+	--pfs-hair-strong: rgba(255, 255, 255, 0.2);
+	--pfs-track: rgba(255, 255, 255, 0.1);
+	--pfs-hover: rgba(111, 159, 208, 0.12);
+	--pfs-card: rgba(255, 255, 255, 0.055);
+	--pb-accent-hover: #a8c6e4;
+}
+
+/* ---------- ③ 皮肤：松风 Pine（松绿浅调 + 墨绿；深态 = 深松绿 + 苔绿） ---------- */
+.planboard-root[data-skin="pine"] {
+	--pf-banner-glow: rgba(255, 255, 255, 0.42);
+	--pf-banner-1: #dfecdf;
+	--pf-banner-2: #c8dcc9;
+	--pf-banner-3: #abc9ae;
+	--pf-tab-ink: #2c4a3a;
+	--pf-tab-ink-hover: #1f3a2b;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.24);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.34);
+	--pf-tab-ink-active: #23402f;
+	--pf-tab-hair: rgba(40, 75, 55, 0.18);
+	--pf-tab-open-shadow: rgba(40, 75, 55, 0.1);
+	--pf-period-ink: #43604c;
+	--pf-page-tint: rgba(70, 110, 85, 0.07);
+	--pf-canvas-tint: rgba(70, 110, 85, 0.055);
+	--pf-canvas-line: rgba(70, 110, 85, 0.14);
+	--pf-tab-open-bg: #e8edea;
+	--pfs-sub: #5f6f63;
+	--pfs-accent: #2e6b4e;
+	--pfs-accent-soft: #8db8a1;
+	--pfs-hair: rgba(40, 75, 55, 0.12);
+	--pfs-hair-strong: rgba(40, 75, 55, 0.24);
+	--pfs-track: rgba(40, 75, 55, 0.1);
+	--pfs-hover: rgba(46, 107, 78, 0.07);
+	--pfs-card: rgba(250, 252, 250, 0.95);
+	--pb-accent-hover: #8db8a1;
+}
+
+.theme-dark .planboard-root[data-skin="pine"] {
+	--pf-banner-1: rgba(64, 116, 86, 0.4);
+	--pf-banner-2: rgba(64, 116, 86, 0.22);
+	--pf-banner-3: rgba(64, 116, 86, 0.34);
+	--pf-tab-ink: rgba(222, 240, 226, 0.82);
+	--pf-tab-ink-hover: #ffffff;
+	--pf-tab-hover-bg: rgba(255, 255, 255, 0.1);
+	--pf-tab-press-bg: rgba(255, 255, 255, 0.16);
+	--pf-tab-ink-active: #e2f2e6;
+	--pf-tab-hair: rgba(255, 255, 255, 0.14);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
+	--pf-period-ink: rgba(222, 240, 226, 0.6);
+	--pf-page-tint: rgba(110, 180, 135, 0.05);
+	--pf-canvas-tint: rgba(110, 180, 135, 0.07);
+	--pf-canvas-line: rgba(110, 180, 135, 0.16);
+	--pf-tab-open-bg: #1d2520;
+	--pfs-sub: #93a89b;
+	--pfs-accent: #6fae8a;
+	--pfs-accent-soft: #a8c9b6;
+	--pfs-hair: rgba(255, 255, 255, 0.1);
+	--pfs-hair-strong: rgba(255, 255, 255, 0.2);
+	--pfs-track: rgba(255, 255, 255, 0.1);
+	--pfs-hover: rgba(111, 174, 138, 0.12);
+	--pfs-card: rgba(255, 255, 255, 0.055);
+	--pb-accent-hover: #a8c9b6;
+}
+
+/* ==========================================================================
+   v8.3 自定义皮肤面板（2026-10-13）：Setting 行内整行自绘 + 方案进下拉框
+   --------------------------------------------------------------------------
+   排版教训（v8.2 用户打回）：面板塞在 Setting 两栏里会被 control 区挤压
+   （标题缩进错位、按钮被 margin-left:auto 甩到最右）。
+   v8.3 首版曾把面板挂成 settingEl 的**兄弟节点**——1.14.4 页面栈只挂载
+   .setting-item 本身，兄弟节点整个被丢（面板凭空消失）。现改回挂 Setting
+   行内部 + flex-basis:100% 强制独占整行，两栏布局自然换行。
+   方案管理收敛进「皮肤主题」下拉框（选中即应用），删除 = 下拉框旁垃圾桶
+   （仅选中方案时可见），命名走 Modal 弹窗。派生逻辑在 src/skin-engine.ts。
+   ========================================================================== */
+/* 🔴 1.14.4 的 .setting-item 是 flex + nowrap：flex-basis 100% 换不了行，
+   面板会被挤进右半栏并溢出裁剪（v8.3 二次打回根因）。只对含面板的那一行放开换行。 */
+.setting-item:has(> .planflow-skin-custom) {
+	flex-wrap: wrap;
+}
+.planflow-skin-custom {
+	flex: 1 0 100%; /* Setting 行内强制换行、独占整行 */
+	--pf-skin-hex-w: 104px; /* hex 框 / 贴图状态文字共用宽：input 与 span 字号不同，em 各算各的永远对不齐 */
+	margin: 8px 0 0;
+	padding: 10px 0 4px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.planflow-skin-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+	flex-wrap: wrap; /* 窄窗兜底：按钮挤不下时换行，不出可视区 */
+}
+.planflow-skin-custom-title {
+	flex: 1 1 auto;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+.planflow-skin-save,
+.planflow-skin-reset {
+	flex: none;
+	font-size: var(--font-ui-small);
+}
+.planflow-skin-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 6px 0;
+}
+.planflow-skin-row-label {
+	width: 3em;
+	flex: none;
+}
+/* v8.4d：hex 文本框删除，原生色盘拉宽占 hex 位——直接显示颜色，
+   点击弹系统色盘（自带 hex 精确输入，能力不丢） */
+.planflow-skin-row input[type="color"] {
+	width: var(--pf-skin-hex-w);
+	height: 26px;
+	padding: 2px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: none;
+	cursor: pointer;
+	flex: none;
+}
+.planflow-skin-row-reset {
+	flex: none;
+	font-size: var(--font-ui-smaller);
+	padding: 2px 8px;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	cursor: pointer;
+}
+.planflow-skin-row-reset:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+/* 方案命名弹窗 */
+.planflow-hidden {
+	display: none !important;
+}
+.planflow-scheme-name-input {
+	width: 100%;
+	margin-bottom: 8px;
+}
+.planflow-scheme-name-error {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-error);
+	margin-bottom: 8px;
+}
+
+/* ==========================================================================
+   v8.4 banner 贴图（2026-10-13，二期：用户拍板开工）
+   --------------------------------------------------------------------------
+   机制：贴图 = .planboard-header 上的一层 ::after（渐变之上、内容之下），
+   由两个 inline 变量驱动（PlanBoardView.applySkin 写入 .planboard-root）：
+     --pf-banner-img          url("app://…")，无贴图时不写
+     --pf-banner-img-opacity  0.10~0.70（用户滑杆；默认 0.35）
+   无贴图时两键都不写 ⇒ opacity 回落 0 = 纯渐变，渲染零变化（像素回归兜底）。
+   贴图不进派生引擎、不进方案定格（独立全局开关）。
+   ========================================================================== */
+.planboard-root .planboard-header {
+	position: relative; /* 贴图层的定位上下文 */
+}
+.planboard-root .planboard-header::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit; /* 跟随 v7.32 的 12px 12px 0 0 */
+	background-image: var(--pf-banner-img, none);
+	background-size: cover;
+	background-position: center;
+	opacity: var(--pf-banner-img-opacity, 0);
+	pointer-events: none;
+}
+/* 内容抬到贴图层之上（渐变之上、贴图之下是 ::after）：定位元素默认盖过普通流内容 */
+.planboard-root .planboard-header > * {
+	position: relative;
+	z-index: 1;
+}
+
+/* ---- 设置页贴图行（微调面板第三行）——列位对齐色行：
+   label(3em) + 状态(8em=hex框位) + 占位(36px=色盘位) + 按钮(=「复原」列) ---- */
+.planflow-skin-img-select {
+	width: var(--pf-skin-hex-w); /* 与 hex 框同宽（同变量），「浏览」与「复原」同列同宽 */
+	flex: none;
+}
+.planflow-skin-img-pick,
+.planflow-skin-img-clear {
+	flex: none;
+	font-size: var(--font-ui-smaller);
+	padding: 2px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.planflow-skin-img-pick {
+	color: var(--text-normal);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+}
+.planflow-skin-img-pick:hover {
+	background: var(--background-modifier-hover);
+}
+.planflow-skin-img-clear {
+	color: var(--text-muted);
+	background: none;
+	border: 1px solid transparent;
+}
+.planflow-skin-img-clear:hover {
+	color: var(--text-error);
+}
+.planflow-skin-op-row input[type="range"] {
+	flex: 1 1 auto;
+	min-width: 6em;
+}
+.planflow-skin-op-val {
+	flex: none;
+	width: 3em;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	text-align: right;
+}
+
+/* ---- v8.4b banner 贴图选图弹窗（文件夹浏览式） ---- */
+.planflow-img-browse-modal .modal-content {
+	max-height: 55vh;
+	overflow-y: auto;
+	padding: 0;
+}
+.planflow-img-browse-path {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.planflow-img-browse-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	cursor: pointer;
+	font-size: var(--font-ui-smaller);
+}
+.planflow-img-browse-item:hover {
+	background: var(--background-modifier-hover);
+}
+.planflow-img-browse-icon {
+	display: flex;
+	color: var(--text-muted);
+}
+.planflow-img-browse-up {
+	color: var(--text-muted);
+	border-bottom: 1px dashed var(--background-modifier-border);
+}
+.planflow-img-browse-img .planflow-img-browse-dim {
+	margin-left: auto;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+.planflow-img-browse-empty {
+	padding: 16px 12px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+}
+
+.planflow-img-browse-hint {
+	padding: 8px 12px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.planflow-img-browse-thumb {
+	width: 64px;
+	height: 36px;
+	object-fit: cover;
+	border-radius: 3px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	flex: none;
+}
+
+/* ==========================================================================
+   v8.4e 微调面板两行布局 + 浏览弹窗文件夹记忆（2026-10-14，用户两问）
+   --------------------------------------------------------------------------
+   ① 主色/墨色并排一行（pair），贴图独占一行——三行并一行右栏太挤，两行刚好。
+   ② 浏览弹窗记忆上次文件夹（settings.bannerBrowseDir），下次打开默认定位；
+      文件夹消失回落根目录。
+   ========================================================================== */
+.planflow-skin-pair {
+	display: flex;
+	gap: 16px;
+	flex-wrap: wrap; /* 窄栏兜底：并排放不下时各自换行，不出可视区 */
+}
+.planflow-skin-pair > .planflow-skin-row {
+	flex: 1 1 0;
+	min-width: 0; /* 允许在半栏内收缩，不撑破 pair */
+}

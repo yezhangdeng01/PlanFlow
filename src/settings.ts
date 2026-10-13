@@ -1,6 +1,8 @@
-import { AbstractInputSuggest, App, FuzzySuggestModal, Notice, PluginSettingTab, Setting, SettingDefinitionItem, TFile, TFolder, setIcon } from "obsidian";
+import { AbstractInputSuggest, App, DropdownComponent, FuzzySuggestModal, Modal, Notice, PluginSettingTab, Setting, SettingDefinitionItem, TFile, TFolder, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
 import { reviewTemplatePath } from "./paths";
+import { addScheme, applyScheme, normalizeHex, PRESET_DEFAULTS, removeScheme, schemeNameTaken } from "./skin-engine";
+import type { CustomSkinOverride, CustomSkinScheme } from "./skin-engine";
 
 /**
  * 预置计划配色（PRD §5）。键为计划标签名。
@@ -75,7 +77,39 @@ export interface PlanFlowSettings {
 	 * 除非再手动改」。首次安装没有这个字段时走 DEFAULT_SETTINGS 的 30。
 	 */
 	checkMinutes: number;
+	/**
+	 * 皮肤主题（v8.0）：sky=晴空（默认）/ paper=墨纸 / midnight=夜阑 / pine=松风。
+	 * 每款各自带浅色+深色两态，跟随 Obsidian 的 light/dark 主题自动切换；
+	 * 计划色（planColors，用户自定）不受皮肤影响。
+	 */
+	skin: PlanFlowSkin;
+	/**
+	 * 自定义皮肤微调（v8.1）：非 null 时在当前 skin 预设基础上覆盖
+	 * 主色（顶栏 banner 家族）与墨色（文字家族），其余令牌（画布膜 / 开口色 /
+	 * 业务强调色）保持预设不动。null = 纯预设。「恢复预设值」即清回 null。
+	 */
+	customSkin: CustomSkinOverride | null;
+	/**
+	 * 命名方案仓库（v8.2）：「保存为方案」把 基底+主色+墨色 定格存库，
+	 * 随时应用/删除。与 customSkin 的分工：customSkin = 当前生效值，这里是仓库。
+	 */
+	skinSchemes: CustomSkinScheme[];
+	/**
+	 * v8.4 banner 贴图：库内图片的 vault 相对路径（选图弹窗产生）。
+	 * 独立于 customSkin（贴图是全局开关，不进派生引擎、不进方案定格）。
+	 * 文件被移动/删除时视图侧按「无贴图」回落（inline 不写）。
+	 */
+	bannerImage: string | null;
+	/** v8.4 贴图不透明度 0.1~0.7（默认 0.35；太透看不见、太实盖住文字）。 */
+	bannerImgOpacity: number;
+	/** v8.4c 最近用过的贴图（下拉快捷切换），最多 8 条。 */
+	bannerRecent: string[];
+	/** v8.4e 浏览弹窗记忆：上次浏览的文件夹（null = 根目录），下次打开默认定位到它。 */
+	bannerBrowseDir: string | null;
 }
+
+/** v8.0 皮肤标识（与 styles.css 的 data-skin 值一一对应）。 */
+export type PlanFlowSkin = "sky" | "paper" | "midnight" | "pine";
 
 export const DEFAULT_SETTINGS: PlanFlowSettings = {
 	rootPath: "raw/计划",
@@ -117,6 +151,13 @@ tags: [复盘]
 	boardColumnOrder: [],
 	deletedAutoTasks: [],
 	checkMinutes: 30,
+	skin: "sky",
+	customSkin: null,
+	skinSchemes: [],
+	bannerImage: null,
+	bannerImgOpacity: 0.35,
+	bannerRecent: [],
+	bannerBrowseDir: null,
 };
 
 /** 文件夹选择弹窗：列出库内全部文件夹，点选即回调路径（Obsidian 标准交互）。 */
@@ -195,13 +236,20 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				desc: "达成新档位（金牌/银牌/铜牌）时播放提示音",
 				control: { type: "toggle", key: "achievementSound" },
 			},
-			{
-				name: "图标主题",
-				desc: "点击选择侧边栏 / 标签页图标，或输入任意 Obsidian / Lucide 图标名",
-				aliases: ["icon", "图标"],
-				render: (setting) => this.renderIconPicker(setting),
-			},
-		];
+		{
+			name: "图标主题",
+			desc: "点击选择侧边栏 / 标签页图标，或输入任意 Obsidian / Lucide 图标名",
+			aliases: ["icon", "图标"],
+			render: (setting) => this.renderIconPicker(setting),
+		},
+		{
+			// v8.2：desc 长文本撤了（用户「太占位置」）——四款预设名 + 自定义说明
+			// 全部收进面板内的小标题与占位提示，aliases 保留保搜索可达性
+			name: "皮肤主题",
+			aliases: ["skin", "皮肤", "主题", "配色", "颜色", "自定义", "方案"],
+			render: (setting) => this.renderSkinPicker(setting),
+		},
+	];
 	}
 
 	/** 声明式绑定读值：从 settings 读取。 */
@@ -272,6 +320,266 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		);
 	}
 
+	/**
+	 * v8.3 皮肤选择器：主行下拉 = 四预设 + 已存方案（选中即应用）；
+	 * 下方**全宽自绘**微调面板（挂在 Setting 行之后，避开两栏布局挤压）：
+	 * 主色/墨色行（hex 框 + 色盘 + 行内「复原」），标题行右侧
+	 * 「保存为方案」（弹 Modal 命名）+「恢复预设值」。
+	 * 自定义只覆盖主色与墨色；画布膜/开口色/业务强调色不开放（skin-engine 铁律①）。
+	 */
+	private renderSkinPicker(setting: Setting): void {
+		const SKINS: Array<{ id: PlanFlowSkin; name: string }> = [
+			{ id: "sky", name: "晴空（天蓝）" },
+			{ id: "paper", name: "墨纸（暖纸褐）" },
+			{ id: "midnight", name: "夜阑（石板灰）" },
+			{ id: "pine", name: "松风（墨绿）" },
+		];
+		// 输入框引用：切基底预设 / 应用方案时刷新显示值（v8.4d 起只有色盘）
+		const inputs: Partial<Record<"accent" | "ink", { color: HTMLInputElement }>> = {};
+		const currentOverride = (): CustomSkinOverride =>
+			this.plugin.settings.customSkin ?? PRESET_DEFAULTS[this.plugin.settings.skin] ?? PRESET_DEFAULTS.sky;
+		const syncInputs = (): void => {
+			const cur = currentOverride();
+			for (const f of ["accent", "ink"] as const) {
+				const pair = inputs[f];
+				if (pair) {
+					pair.color.value = cur[f];
+				}
+			}
+		};
+		const SCHEME_PREFIX = "scheme:";
+		const schemeValue = (name: string): string => SCHEME_PREFIX + name;
+		/** 当前生效外观是否恰好等于某个已存方案（base + 主色 + 墨色全等）。 */
+		const matchedScheme = (): CustomSkinScheme | null => {
+			const c = this.plugin.settings.customSkin;
+			if (!c) return null;
+			return (
+				this.plugin.settings.skinSchemes.find(
+					(s) => s.base === this.plugin.settings.skin && s.accent === c.accent && s.ink === c.ink,
+				) ?? null
+			);
+		};
+		let skinDropdown: DropdownComponent | null = null;
+		let delBtnEl: HTMLElement | null = null;
+		const updateDelBtn = (): void => {
+			// class 切换而非 style.display（市场 lint 禁内联样式赋值）
+			if (delBtnEl) delBtnEl.classList.toggle("planflow-hidden", !matchedScheme());
+		};
+		const rebuildOptions = (): void => {
+			const dd = skinDropdown;
+			if (!dd) return;
+			dd.selectEl.empty();
+			for (const s of SKINS) dd.addOption(s.id, s.name);
+			for (const sch of this.plugin.settings.skinSchemes) dd.addOption(schemeValue(sch.name), sch.name);
+		};
+		const syncDropdown = (): void => {
+			const m = matchedScheme();
+			// setValue 不触发 onChange，只是回显；未匹配方案时回落基底预设项
+			skinDropdown?.setValue(m ? schemeValue(m.name) : this.plugin.settings.skin);
+			updateDelBtn();
+		};
+		/** 应用某个方案：写设置 + 换肤 + 面板同步（下拉回显交给调用方）。 */
+		const applySchemeToSettings = (sch: CustomSkinScheme): void => {
+			const { skin, customSkin } = applyScheme(sch);
+			this.plugin.settings.skin = skin;
+			this.plugin.settings.customSkin = customSkin;
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			syncInputs();
+		};
+
+		setting.addDropdown((dd) => {
+			skinDropdown = dd;
+			rebuildOptions();
+			dd.setValue(this.plugin.settings.skin);
+			dd.onChange((value) => {
+				if (value.startsWith(SCHEME_PREFIX)) {
+					// 选中某个已存方案 → 整套应用（基底 + 微调一起切）
+					const sch = this.plugin.settings.skinSchemes.find((x) => schemeValue(x.name) === value);
+					if (sch) applySchemeToSettings(sch);
+					updateDelBtn();
+					return;
+				}
+				// 下拉值来自固定四项，仍做一次白名单校验，脏数据回落 sky
+				this.plugin.settings.skin = (SKINS.some((s) => s.id === value) ? value : "sky") as PlanFlowSkin;
+				void this.plugin.saveSettings();
+				// 只改根元素 data-skin 属性即整站换肤，不必重开视图（CSS 变量即时生效）
+				this.plugin.applySkinToViews();
+				syncInputs(); // 面板回显新基底的默认色（已自定义则显示用户值，不动）
+				updateDelBtn();
+			});
+		});
+		// 下拉框旁的垃圾桶：仅当前生效外观恰好是某方案时可见（删除仓库条目，不动外观）
+		setting.addExtraButton((btn) => {
+			btn.setIcon("trash-2").setTooltip("删除当前选中的方案（不影响当前外观）");
+			delBtnEl = btn.extraSettingsEl;
+			delBtnEl.addClass("planflow-scheme-del-btn"); // 1.14.4 的内置类不可依赖，加自有类给脚本/样式定位
+			delBtnEl.addEventListener("click", () => {
+				const m = matchedScheme();
+				if (!m) return;
+				this.plugin.settings.skinSchemes = removeScheme(this.plugin.settings.skinSchemes, m.name);
+				void this.plugin.saveSettings();
+				rebuildOptions();
+				skinDropdown?.setValue(this.plugin.settings.skin); // 仓库条目已删，下拉回落基底预设
+				updateDelBtn();
+				new Notice(`已删除方案「${m.name}」`);
+			});
+			updateDelBtn();
+		});
+		// ---- 自定义微调面板（挂 Setting 行**内部**、CSS 撑满整行） ----
+		// ⚠️ 不能挂 settingEl 的兄弟节点：1.14.4 页面栈只挂载 .setting-item 本身，
+		//     兄弟节点会被整个丢掉（v8.3 首版踩坑，面板凭空消失）。
+		const wrap = setting.settingEl.createDiv({ cls: "planflow-skin-custom" });
+		const head = wrap.createDiv({ cls: "planflow-skin-head" });
+		head.createDiv({ cls: "planflow-skin-custom-title", text: "自定义微调（在当前预设基础上）" });
+		const saveBtn = head.createEl("button", {
+			cls: "planflow-skin-save",
+			text: "保存为方案",
+			attr: { type: "button", title: "把当前 基底预设 + 主色 + 墨色 保存为命名方案，保存后进「皮肤主题」下拉框" },
+		});
+		saveBtn.addEventListener("click", () => {
+			new SchemeNameModal(this.app, (name) => {
+				if (schemeNameTaken(this.plugin.settings.skinSchemes, name)) {
+					return `方案「${name}」已存在，换个名字`;
+				}
+				const cur = currentOverride();
+				this.plugin.settings.skinSchemes = addScheme(this.plugin.settings.skinSchemes, {
+					name,
+					base: this.plugin.settings.skin,
+					accent: cur.accent,
+					ink: cur.ink,
+				});
+				void this.plugin.saveSettings();
+				rebuildOptions();
+				syncDropdown(); // 自动选中刚存的方案（matchedScheme 命中）
+				new Notice(`已保存并应用方案「${name}」`);
+				return null;
+			}).open();
+		});
+		const resetBtn = head.createEl("button", { cls: "planflow-skin-reset", text: "恢复预设值", attr: { type: "button" } });
+		resetBtn.addEventListener("click", () => {
+			this.plugin.settings.customSkin = null;
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			syncInputs();
+			syncDropdown(); // 回落基底预设项，垃圾桶隐藏
+			new Notice("已恢复预设皮肤");
+		});
+		/** 改某个色：写 customSkin → 保存 → 即时生效 → 同步面板。 */
+		const applyField = (field: "accent" | "ink", raw: string): void => {
+			const hex = normalizeHex(raw);
+			if (!hex) {
+				new Notice("颜色格式应为 #rrggbb（如 #b2d2ea），已忽略本次输入");
+				syncInputs();
+				return;
+			}
+			this.plugin.settings.customSkin = { ...currentOverride(), [field]: hex };
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			syncInputs();
+			syncDropdown(); // 微调后可能恰好命中/脱离某个方案，下拉与垃圾桶跟着走
+		};
+		const rows: Array<{ field: "accent" | "ink"; label: string; title: string }> = [
+			{ field: "accent", label: "主色", title: "顶栏与强调元素的基调（深色模式下以低透明度叠加）" },
+			{ field: "ink", label: "墨色", title: "标签与周期文字的颜色" },
+		];
+		// v8.4e：主色/墨色并排一行（用户「能放一行吗，不能放两行也行」——三行并一行右栏太挤，
+		// 两行刚好：色对一行、贴图一行），pair 内两个色行各占一半。
+		const pair = wrap.createDiv({ cls: "planflow-skin-pair" });
+		for (const { field, label, title } of rows) {
+			const row = pair.createDiv({ cls: "planflow-skin-row" });
+			row.createSpan({ cls: "planflow-skin-row-label", text: label, attr: { title } });
+			const cur = currentOverride();
+			// v8.4d：hex 文本框删除（用户「显示的是代码，不如直接显示色彩」）——
+			// 原生色盘拉宽到 hex 位：直接显示颜色，点击弹系统色盘（自带 hex 精确输入，能力不丢）
+			const color = row.createEl("input", { attr: { type: "color", title } });
+			color.value = cur[field];
+			color.addEventListener("input", () => applyField(field, color.value));
+			// 行内复原：只回这一行的预设默认值（customSkin 为 null 时即无操作）
+			const rowReset = row.createEl("button", { cls: "planflow-skin-row-reset", text: "复原", attr: { type: "button", title: `恢复${label}的预设值` } });
+			rowReset.addEventListener("click", () => {
+				const preset = PRESET_DEFAULTS[this.plugin.settings.skin] ?? PRESET_DEFAULTS.sky;
+				this.plugin.settings.customSkin = { ...currentOverride(), [field]: preset[field] };
+				void this.plugin.saveSettings();
+				this.plugin.applySkinToViews();
+				syncInputs();
+				syncDropdown();
+			});
+			inputs[field] = { color };
+		}
+		// ---- banner 贴图行（v8.4 二期；v8.4c/d 用户反馈重排） ----
+		// 与色行完全同构：label(3em) + 控件(--pf-skin-hex-w) + 按钮(=「复原」列)。
+		// 「浏览」2 字与「复原」同宽 → 右缘齐；下拉 = 最近贴图（最多 8 条）快捷切换。
+		const imgRow = wrap.createDiv({ cls: "planflow-skin-row planflow-skin-img-row" });
+		imgRow.createSpan({
+			cls: "planflow-skin-row-label",
+			text: "贴图",
+			attr: { title: "顶栏 banner 背景图片（库内文件，文件夹浏览选取）；半透明叠在渐变上，深色模式同样生效" },
+		});
+		const imgSelect = imgRow.createEl("select", { cls: "dropdown planflow-skin-img-select", attr: { title: "最近用过的贴图，可直接切换" } });
+		const pickBtn = imgRow.createEl("button", { cls: "planflow-skin-img-pick", text: "浏览", attr: { type: "button", title: "按文件夹浏览库内图片（png/jpg/webp/gif/svg…）" } });
+		const imgClear = imgRow.createEl("button", { cls: "planflow-skin-img-clear planflow-hidden", text: "清除", attr: { type: "button", title: "移除贴图，回到纯渐变" } });
+		// 不透明度滑杆行：仅贴图生效时显示
+		const opRow = wrap.createDiv({ cls: "planflow-skin-row planflow-skin-op-row planflow-hidden" });
+		opRow.createSpan({ cls: "planflow-skin-row-label", text: "浓度", attr: { title: "贴图不透明度：太透看不见、太实盖住文字" } });
+		const opInput = opRow.createEl("input", { attr: { type: "range", min: "10", max: "70", step: "5", title: "贴图不透明度 10%~70%" } });
+		const opVal = opRow.createSpan({ cls: "planflow-skin-op-val" });
+		const clampOp = (v: number): number => Math.min(0.7, Math.max(0.1, Number.isFinite(v) ? v : 0.35));
+		/** 最近贴图仓库：新图置顶去重，最多 8 条（main.ts loadSettings 同步净化）。 */
+		const pushRecent = (path: string): void => {
+			this.plugin.settings.bannerRecent = [path, ...this.plugin.settings.bannerRecent.filter((p) => p !== path)].slice(0, 8);
+		};
+		const syncImg = (): void => {
+			const p = this.plugin.settings.bannerImage;
+			// 下拉选项 = 「未设置」 + 当前贴图 + 最近仓库（去重），当前值选中
+			const recent = this.plugin.settings.bannerRecent;
+			const items = [...new Set([...(p ? [p] : []), ...recent])];
+			imgSelect.empty();
+			imgSelect.createEl("option", { value: "", text: "未设置" });
+			for (const path of items) imgSelect.createEl("option", { value: path, text: path });
+			imgSelect.value = p ?? "";
+			imgClear.classList.toggle("planflow-hidden", !p);
+			opRow.classList.toggle("planflow-hidden", !p);
+			if (p) {
+				const op = clampOp(this.plugin.settings.bannerImgOpacity);
+				opInput.value = String(Math.round(op * 100));
+				opVal.setText(`${Math.round(op * 100)}%`);
+			}
+		};
+		imgSelect.addEventListener("change", () => {
+			const v = imgSelect.value;
+			this.plugin.settings.bannerImage = v || null;
+			if (v) pushRecent(v);
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			syncImg();
+		});
+		pickBtn.addEventListener("click", () => {
+			new BannerImageModal(this.app, this.plugin, (file) => {
+				this.plugin.settings.bannerImage = file.path;
+				pushRecent(file.path);
+				void this.plugin.saveSettings();
+				this.plugin.applySkinToViews();
+				syncImg();
+				new Notice(`已设置 banner 贴图：${file.path}`);
+			}).open();
+		});
+		imgClear.addEventListener("click", () => {
+			this.plugin.settings.bannerImage = null;
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			syncImg();
+			new Notice("已清除 banner 贴图");
+		});
+		opInput.addEventListener("change", () => {
+			this.plugin.settings.bannerImgOpacity = clampOp(Number(opInput.value) / 100);
+			void this.plugin.saveSettings();
+			this.plugin.applySkinToViews();
+			opVal.setText(`${opInput.value}%`);
+		});
+		syncImg();
+	}
+
 	/** 图标选择器：常用 Lucide 图标格子 + 自定义输入兜底（声明式 render 版）。 */
 	private renderIconPicker(setting: Setting): void {
 		const ICONS = [
@@ -310,5 +618,148 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			this.plugin.applyRibbonIcon(); // v2.8.1: 侧边栏图标即时跟随
 			syncSelection(this.plugin.settings.icon, input);
 		});
+	}
+}
+
+/**
+ * v8.4 banner 贴图选图弹窗（v8.4b 改文件夹浏览）：逐层进入文件夹、
+ * 点图片即选中。用户反馈「没有浏览文件夹按钮」——全库模糊搜索不够直观。
+ */
+class BannerImageModal extends Modal {
+	private static readonly IMG_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "avif"];
+	private dir: TFolder;
+
+	constructor(app: App, private plugin: PlanFlowPlugin, private pick: (file: TFile) => void) {
+		super(app);
+		// v8.4e：恢复上次浏览的文件夹（文件夹已删除/移动则回落根目录）
+		const saved = plugin.settings.bannerBrowseDir;
+		const restored = saved ? app.vault.getAbstractFileByPath(saved) : null;
+		this.dir = restored instanceof TFolder ? restored : app.vault.getRoot();
+	}
+
+	/** v8.4e：导航时记忆当前文件夹（根目录记 null）；设置随写随存。 */
+	private remember(): void {
+		this.plugin.settings.bannerBrowseDir = this.dir === this.app.vault.getRoot() ? null : this.dir.path;
+		void this.plugin.saveSettings();
+	}
+
+	onOpen(): void {
+		this.titleEl.setText("选择 banner 贴图");
+		this.modalEl.addClass("planflow-img-browse-modal");
+		this.renderList();
+	}
+
+	private renderList(): void {
+		this.contentEl.empty();
+		const root = this.app.vault.getRoot();
+		const isRoot = this.dir === root;
+		this.contentEl.createDiv({
+			cls: "planflow-img-browse-path",
+			text: isRoot ? "库根目录" : this.dir.path + "/",
+		});
+		if (!isRoot && this.dir.parent) {
+			const up = this.contentEl.createDiv({ cls: "planflow-img-browse-item planflow-img-browse-up" });
+			setIcon(up.createSpan({ cls: "planflow-img-browse-icon" }), "arrow-up");
+			up.createSpan({ text: "返回上级" });
+			up.addEventListener("click", () => {
+				if (this.dir.parent instanceof TFolder) this.dir = this.dir.parent;
+				this.remember();
+				this.renderList();
+			});
+		}
+		const folders = this.dir.children.filter((c): c is TFolder => c instanceof TFolder).sort((a, b) => a.name.localeCompare(b.name));
+		const images = this.dir.children.filter(
+			(c): c is TFile => c instanceof TFile && BannerImageModal.IMG_EXTS.includes(c.extension.toLowerCase()),
+		).sort((a, b) => a.name.localeCompare(b.name));
+		for (const folder of folders) {
+			const item = this.contentEl.createDiv({ cls: "planflow-img-browse-item" });
+			setIcon(item.createSpan({ cls: "planflow-img-browse-icon" }), "folder");
+			item.createSpan({ text: folder.name });
+			item.addEventListener("click", () => {
+				this.dir = folder;
+				this.remember();
+				this.renderList();
+			});
+		}
+		for (const img of images) {
+			// v8.4d：缩略图预览（用户「浏览不显示文件夹里的图」）——所见即所得，点即选
+			const item = this.contentEl.createDiv({ cls: "planflow-img-browse-item planflow-img-browse-img" });
+			item.createEl("img", {
+				cls: "planflow-img-browse-thumb",
+				attr: { src: this.app.vault.getResourcePath(img), loading: "lazy", alt: img.name },
+			});
+			item.createSpan({ text: img.name });
+			item.createSpan({ cls: "planflow-img-browse-dim", text: `${Math.round(img.stat.size / 1024)} KB` });
+			item.addEventListener("click", () => {
+				this.close();
+				this.pick(img);
+			});
+		}
+		if (folders.length === 0 && images.length === 0) {
+			this.contentEl.createDiv({ cls: "planflow-img-browse-empty", text: "此文件夹没有子文件夹或图片" });
+		}
+		// 格式/尺寸提示（v8.4c 用户问询）：贴图层 cover 裁剪填充，横图最佳
+		this.contentEl.createDiv({
+			cls: "planflow-img-browse-hint",
+			text: "支持 png / jpg / webp / gif / svg；建议宽 ≥ 1200px 的横图，会自动裁剪铺满 banner",
+		});
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+/**
+ * v8.3 保存方案命名弹窗：一个文本框 + 取消/保存。
+ * submit 回调返回错误文案（弹窗内红字提示、不关闭）或 null（成功并关闭）。
+ */
+class SchemeNameModal extends Modal {
+	constructor(app: App, private submit: (name: string) => string | null) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText("保存为皮肤方案");
+		this.modalEl.addClass("planflow-scheme-modal");
+		const input = this.contentEl.createEl("input", {
+			cls: "planflow-scheme-name-input",
+			attr: { type: "text", placeholder: "方案名（如：金麒麟）", spellcheck: "false" },
+		});
+		const err = this.contentEl.createDiv({ cls: "planflow-scheme-name-error planflow-hidden" });
+		const btns = this.contentEl.createDiv({ cls: "modal-button-container" });
+		btns.createEl("button", { text: "取消" }).addEventListener("click", () => this.close());
+		const ok = btns.createEl("button", { text: "保存", cls: "mod-cta" });
+		const showErr = (text: string): void => {
+			err.setText(text);
+			err.classList.remove("planflow-hidden");
+			input.focus();
+		};
+		const doSubmit = (): void => {
+			const name = input.value.trim();
+			if (!name) {
+				showErr("先填个方案名");
+				return;
+			}
+			const conflict = this.submit(name);
+			if (conflict !== null) {
+				showErr(conflict);
+				input.select();
+				return;
+			}
+			this.close();
+		};
+		ok.addEventListener("click", doSubmit);
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				doSubmit();
+			}
+		});
+		window.setTimeout(() => input.focus(), 50);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }

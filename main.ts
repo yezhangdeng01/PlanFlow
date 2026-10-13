@@ -2,6 +2,8 @@ import { ButtonComponent, Modal, Notice, Plugin, TFolder, setIcon } from "obsidi
 import { PlanBoardView, VIEW_TYPE_PLANFLOW } from "./src/PlanBoardView";
 import type { PlanFlowSettings } from "./src/settings";
 import { DEFAULT_PLAN_COLORS, DEFAULT_SETTINGS, PlanFlowSettingTab } from "./src/settings";
+import { normalizeHex, normalizeScheme } from "./src/skin-engine";
+import type { CustomSkinScheme } from "./src/skin-engine";
 
 /** 首次启动引导弹窗：新用户四步上手（新建计划 → 量化目标 → 每日打卡 → 追踪进度）。 */
 class WelcomeModal extends Modal {
@@ -82,6 +84,10 @@ export default class PlanFlowPlugin extends Plugin {
 		this.moveRibbonIconFirst();
 
 		this.addSettingTab(new PlanFlowSettingTab(this.app, this));
+
+		// v8.1：主题切换（亮/暗）时重应用自定义皮肤——inline CSS 变量不随
+		// .theme-dark 自动切换，必须显式重算深浅两态（css-change 是官方事件）。
+		this.registerEvent(this.app.workspace.on("css-change", () => this.applySkinToViews()));
 
 		if (this.settings.openOnStartup) {
 			// 借鉴 Homepage 插件方案：监听 layout-change，等 Obsidian 启动恢复流程
@@ -266,6 +272,13 @@ plans:
 		}
 	}
 
+	/** v8.0: 换肤即时生效——只重挂根元素 data-skin 属性，不走全量 refresh。 */
+	applySkinToViews(): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANFLOW)) {
+			if (leaf.view instanceof PlanBoardView) leaf.view.applySkin();
+		}
+	}
+
 	/** v2.8.1: 设置页改了图标后，动态更新侧边栏 ribbon 图标（setIcon 原地替换 SVG）。 */
 	applyRibbonIcon(): void {
 		if (this.ribbonIconEl) setIcon(this.ribbonIconEl, this.settings.icon || "home");
@@ -275,6 +288,32 @@ plans:
 		const data = (await this.loadData()) as Partial<PlanFlowSettings> | null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
 		this.settings.planColors = Object.assign({}, DEFAULT_PLAN_COLORS, this.settings.planColors);
+		// v8.1：自定义皮肤脏数据防护——手改 data.json 塞进非法 hex 时回落纯预设
+		// （否则派生会产出垃圾色值；这是唯一校验点，视图侧直接信任 settings）
+		if (this.settings.customSkin && (!normalizeHex(this.settings.customSkin.accent) || !normalizeHex(this.settings.customSkin.ink))) {
+			this.settings.customSkin = null;
+		}
+		// v8.2：方案仓库净化——逐条 normalizeScheme，非法项剔除（手改 data.json / 旧格式残留）
+		this.settings.skinSchemes = Array.isArray(this.settings.skinSchemes)
+			? (this.settings.skinSchemes.map(normalizeScheme).filter((s): s is CustomSkinScheme => s !== null))
+			: [];
+		// v8.4：banner 贴图净化——非空字符串才保留；浓度 clamp 0.1~0.7
+		// （文件存在性不在此验：视图侧 applySkin 按库内实况回落，移动/删除即无贴图）
+		if (typeof this.settings.bannerImage !== "string" || !this.settings.bannerImage.trim()) {
+			this.settings.bannerImage = null;
+		}
+		{
+			const op = Number(this.settings.bannerImgOpacity);
+			this.settings.bannerImgOpacity = Number.isFinite(op) ? Math.min(0.7, Math.max(0.1, op)) : 0.35;
+		}
+		// v8.4c：最近贴图仓库净化——字符串数组 + 上限 8
+		this.settings.bannerRecent = Array.isArray(this.settings.bannerRecent)
+			? this.settings.bannerRecent.filter((p): p is string => typeof p === "string" && !!p.trim()).slice(0, 8)
+			: [];
+		// v8.4e：浏览弹窗记忆净化——非空字符串才保留（文件夹存在性在弹窗打开时验，消失即回落根目录）
+		if (typeof this.settings.bannerBrowseDir !== "string" || !this.settings.bannerBrowseDir.trim()) {
+			this.settings.bannerBrowseDir = null;
+		}
 		// v1.4 迁移：月/周列表旧默认 180px → 0（内容自适应，拖拽后才固定）
 		if (this.settings.monthCardHeight === 180) this.settings.monthCardHeight = 0;
 		if (this.settings.weekCardHeight === 180) this.settings.weekCardHeight = 0;

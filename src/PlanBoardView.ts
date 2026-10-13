@@ -10,6 +10,7 @@ import {
 	buildCumulativeSvg,
 } from "./charts";
 import { deepenForText, softenChartColor, hexToRgba } from "./colors";
+import { CUSTOM_TOKEN_KEYS, deriveTokens } from "./skin-engine";
 import { annualPlanPath, dailyDir, dailyNotePath, reviewTemplatePath, taskPoolPath, rootPath as pfRoot } from "./paths";
 import {
 	appendCheckItem,
@@ -716,10 +717,44 @@ export class PlanBoardView extends ItemView {
 		return this.plugin.settings.icon || "calendar";
 	}
 
+	/**
+	 * v8.0 皮肤：把 settings.skin 挂到根元素的 data-skin 上，
+	 * styles.css 的 `.planboard-root[data-skin="..."]` 变量块据此整站换肤。
+	 * v8.1 自定义皮肤：customSkin 非空时把派生令牌以 inline 变量写到根元素
+	 * （inline 压过一切样式表；开口色/画布膜/业务强调色不在派生表内 ⇒ 保持预设）。
+	 * 深浅态切换由 main.ts 监听 css-change 触发重应用（inline 变量不自动跟随主题）。
+	 * 幂等——onOpen 与 refresh() 都调，设置页换肤后不必重开视图。
+	 */
+	applySkin(): void {
+		const s = this.plugin.settings;
+		this.contentEl.setAttribute("data-skin", s.skin || "sky");
+		// 先按全量表清残影：上次深态写过 --pfs-sub 而这次浅态不写，不能留
+		for (const k of CUSTOM_TOKEN_KEYS) this.contentEl.style.removeProperty(k);
+		// v8.4 banner 贴图（独立于 customSkin 的全局开关）：文件在库才写 inline，
+		// 被移动/删除时两个键都不写 = 回落纯渐变。浓度 clamp 0.1~0.7。
+		const imgFile = s.bannerImage ? this.app.vault.getAbstractFileByPath(s.bannerImage) : null;
+		if (imgFile instanceof TFile) {
+			this.contentEl.style.setProperty("--pf-banner-img", `url("${this.app.vault.getResourcePath(imgFile)}")`);
+			const op = Math.min(0.7, Math.max(0.1, s.bannerImgOpacity || 0.35));
+			this.contentEl.style.setProperty("--pf-banner-img-opacity", op.toFixed(2));
+		} else {
+			this.contentEl.style.removeProperty("--pf-banner-img");
+			this.contentEl.style.removeProperty("--pf-banner-img-opacity");
+		}
+		const custom = s.customSkin;
+		if (!custom) return;
+		const dark = document.body.classList.contains("theme-dark");
+		for (const [k, v] of Object.entries(deriveTokens(s.skin || "sky", custom, dark))) {
+			this.contentEl.style.setProperty(k, v);
+		}
+	}
+
 	async onOpen(): Promise<void> {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("planboard-root");
+		// v8.0 皮肤：把 settings.skin 挂到根元素 data-skin（CSS 变量块据此切换整站配色）
+		this.applySkin();
 		// v6.5: 计划色改由 refresh() 统一重算（新增计划后不必重开视图）
 		// v6.2: 顶栏 banner——标题区与四个切换标签同处一块，标签落在 banner 最下层。
 		// 标签容器**常驻**（不随面板重建），所以它挂在 header 上、不挂在 content 上。
@@ -923,6 +958,8 @@ export class PlanBoardView extends ItemView {
 	}
 
 	private async refresh(): Promise<void> {
+		// v8.0 皮肤：幂等重挂 data-skin——设置页换肤后走 refreshView 进来也能生效
+		this.applySkin();
 		// v6.5: 计划色在此统一重算——此前只在 onOpen / 改设置时算过，
 		// 新增「计划」后扇区与标签会先落到兜底色 #3572a8，必须重开视图才对。
 		await this.injectPlanColorStyles();
