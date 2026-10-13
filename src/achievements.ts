@@ -311,6 +311,47 @@ export async function computeStreak(
 	return streak;
 }
 
+/**
+ * v1.3.1: 历史最高连续打卡记录。与 computeStreak 同口径（当天 ≥1 项 = 1 天），
+ * 区别：断段后**继续往前扫**（不是 break）——最长的一段可能在很久以前。
+ * 终止：连扫 60 天笔记缺失即停（断更一个月以上不再回看更早），3700 天硬上限。
+ * 只在首次（settings.maxStreak = -1 哨兵）回填时跑一次全量，之后只做增量 max。
+ */
+export async function computeMaxStreak(
+	app: App,
+	root: string,
+	today: string
+): Promise<number> {
+	const rootPath = paths.rootPath(root);
+	const doneOf = async (ds: string): Promise<number> => {
+		const file = app.vault.getAbstractFileByPath(paths.dailyNotePath(rootPath, ds));
+		if (!(file instanceof TFile)) return -1; // -1 = 断链（缺失/无打卡项）
+		const content = await app.vault.cachedRead(file);
+		const data = parseDailyContent(file, content, ds);
+		if (data.checkItems.length === 0) return -1;
+		return data.checkItems.filter((c) => c.checked).length;
+	};
+
+	let max = 0;
+	let cur = 0;
+	let missing = 0;
+	let d = parseDateString(today);
+	for (let i = 0; i < 3700; i++) {
+		const done = await doneOf(formatDate(d));
+		if (done < 0) {
+			cur = 0; // 段断
+			missing++;
+			if (missing >= 60) break;
+		} else {
+			missing = 0;
+			cur = done === 0 ? 0 : cur + 1;
+			if (cur > max) max = cur;
+		}
+		d = addDays(d, -1);
+	}
+	return max;
+}
+
 /** Monday of the given ISO week (ISO week 1 = the week containing the first Thursday). */
 function isoWeekMonday(year: number, week: number): Date {
 	const jan4 = new Date(year, 0, 4);

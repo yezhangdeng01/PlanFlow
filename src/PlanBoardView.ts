@@ -51,7 +51,7 @@ import {
 } from "./stats";
 import type { AutoTaskPlan, PoolTask } from "./tasks";
 import { DAY_MS, deleteTask, ensureAutoTasks, listTasks, planCounterUnit, toggleTask } from "./tasks";
-import { badgeCounts, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
+import { badgeCounts, computeMaxStreak, computeStreak, readMonthBadges, readPeriodBadges, settleMonth, settleMonthCheckin, settleWeek, settleWeekCheckin, tierFor } from "./achievements";
 import type { PlanTemplate } from "./settings";
 import { PlanEditModal, GoalEditModal, CheckItemManageModal } from "./modals";
 import { readRawPlans, writePlansToFile, rotatePlanColor, toPlanDef } from "./plan-file";
@@ -679,6 +679,11 @@ export class PlanBoardView extends ItemView {
 	private streakNumEl: HTMLElement | null = null;
 	/** v1.2.x: 上一次算出的连击天数 —— 同上，只在变化时跳跃。 */
 	private lastStreak: number | null = null;
+	/* v1.3.1: 最高连续打卡记录药丸（🏆 最高 N 天）；maxBackfilling 防历史回填重入。 */
+	private streakMaxEl: HTMLElement | null = null;
+	private streakMaxNumEl: HTMLElement | null = null;
+	private lastMaxStreak: number | null = null;
+	private maxBackfilling = false;
 	private monthTaskBadgeEl: HTMLElement | null = null;
 	private weekTaskBadgeEl: HTMLElement | null = null;
 
@@ -1334,6 +1339,12 @@ export class PlanBoardView extends ItemView {
 		this.streakEl.createSpan({ cls: "planboard-streak-label", text: "🔥 连续打卡" });
 		this.streakNumEl = this.streakEl.createSpan({ cls: "planboard-streak-num" });
 		this.streakEl.createSpan({ cls: "planboard-streak-unit", text: "天" });
+		/* v1.3.1（用户：「连续打卡天数后面加个最高连续打卡记录」）：同款药丸跟在后面，
+		   三段结构一致（🏆 最高 / 数字 / 天）；数值 = max(settings.maxStreak, 当前 streak)。 */
+		this.streakMaxEl = weekChartHeader.createSpan({ cls: "planboard-streak planboard-hidden" });
+		this.streakMaxEl.createSpan({ cls: "planboard-streak-label", text: "🏆 最高" });
+		this.streakMaxNumEl = this.streakMaxEl.createSpan({ cls: "planboard-streak-num" });
+		this.streakMaxEl.createSpan({ cls: "planboard-streak-unit", text: "天" });
 		this.chartWeekEl = weekChartCard.createDiv({ cls: "planboard-chart-body" });
 		if (this.plugin.settings.weekChartHeight > 0) weekChartCard.style.height = `${this.plugin.settings.weekChartHeight}px`;
 		// v3.9: 两卡高度联动——拖任一个，另一个同步（与打卡/总结卡同款交互）
@@ -1590,6 +1601,32 @@ export class PlanBoardView extends ItemView {
 		// 跳跃只加在**数字**上，火焰与药丸底保持不动
 		if (this.lastStreak !== null && streak !== this.lastStreak) playJump(this.streakNumEl);
 		this.lastStreak = streak;
+		// ═══ v1.3.1: 最高连续打卡记录（🏆 最高 N 天）═══
+		const s = this.plugin.settings;
+		if (s.maxStreak < 0 && !this.maxBackfilling) {
+			// 老用户升级后首次打开：全量回填历史最长段（一次性，之后只做增量 max）
+			this.maxBackfilling = true;
+			void computeMaxStreak(this.app, root, this.today).then((max) => {
+				s.maxStreak = Math.max(max, streak);
+				void this.plugin.saveSettings();
+				this.maxBackfilling = false;
+				this.renderStreakMax(s.maxStreak, true); // 回填出真实历史值，跳一下示意
+			});
+		}
+		if (streak > s.maxStreak) {
+			s.maxStreak = streak; // 打破纪录：即时落盘
+			void this.plugin.saveSettings();
+		}
+		this.renderStreakMax(Math.max(s.maxStreak, streak), false);
+	}
+
+	/** v1.3.1: 最高记录药丸渲染（与连击药丸同构，只更新数字段；值变化时跳）。 */
+	private renderStreakMax(v: number, forceJump: boolean): void {
+		if (!this.streakMaxEl) return;
+		this.streakMaxNumEl?.setText(String(v));
+		this.streakMaxEl.removeClass("planboard-hidden");
+		if (forceJump || (this.lastMaxStreak !== null && v !== this.lastMaxStreak)) playJump(this.streakMaxNumEl);
+		this.lastMaxStreak = v;
 	}
 
 	/** v1.4: 顶部日期 + 时段问候（时间锚点）。 */

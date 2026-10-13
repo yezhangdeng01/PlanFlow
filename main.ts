@@ -314,6 +314,8 @@ plans:
 		if (typeof this.settings.bannerBrowseDir !== "string" || !this.settings.bannerBrowseDir.trim()) {
 			this.settings.bannerBrowseDir = null;
 		}
+		// v1.3.1：最高连续打卡记录净化——非有限数 = 未回填哨兵 -1（下次打开视图时全量回填一次）
+		if (!Number.isFinite(this.settings.maxStreak)) this.settings.maxStreak = -1;
 		// v1.4 迁移：月/周列表旧默认 180px → 0（内容自适应，拖拽后才固定）
 		if (this.settings.monthCardHeight === 180) this.settings.monthCardHeight = 0;
 		if (this.settings.weekCardHeight === 180) this.settings.weekCardHeight = 0;

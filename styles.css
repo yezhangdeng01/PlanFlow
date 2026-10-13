@@ -6215,3 +6215,30 @@ button.planboard-icon-btn {
 	flex: 1 1 0;
 	min-width: 0; /* 允许在半栏内收缩，不撑破 pair */
 }
+
+/* ==========================================================================
+   v1.3.1 iPad 修复：svg 直挂 <button> 在 WebKit（iPad 全系浏览器内核）不渲染
+   （v1.2.2 顶栏触屏按钮同病；卡片/弹窗里挂 div/span 一直正常）
+   —— 两处挂载点（图标选择器、方案垃圾桶）统一包一层 span 承载 svg。
+   ========================================================================== */
+.planflow-btn-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* ---- v1.3.1 图标选择器触屏兜底：svg 空框（用户 iPad，根因未明）→ 媒体查询切 emoji 层。
+   (hover:none),(pointer:coarse) 在用户 iPad 已验证命中（v1.2.2 触屏兜底同查询）。 ---- */
+.planflow-icon-emoji {
+	display: none;
+	font-size: 18px;
+	line-height: 1;
+}
+@media (hover: none), (pointer: coarse) {
+	.planflow-icon-option .planflow-btn-icon {
+		display: none; /* iPad：svg 层收起（当前空框） */
+	}
+	.planflow-icon-option .planflow-icon-emoji {
+		display: flex; /* emoji 层顶上：深浅色/选中态由按钮 color 继承无关，emoji 自着色 */
+	}
+}

@@ -9,7 +9,7 @@
  *   ④ 跨年边界（12-31 → 01-01）不断链。
  */
 import { App, TFile } from "obsidian";
-import { computeStreak } from "../src/achievements";
+import { computeMaxStreak, computeStreak } from "../src/achievements";
 
 let failed = 0;
 function check(name: string, cond: boolean, detail?: unknown): void {
@@ -119,6 +119,51 @@ const dayPath = (ds: string) => `${ROOT}/${ds.slice(0, 4)}/每日/${ds}.md`;
 {
 	const app = makeVault({});
 	check("无任何笔记 → 0 天", (await computeStreak(app, ROOT, "2026", TODAY)) === 0);
+}
+
+// ═══ v1.3.1 最高连续打卡记录（computeMaxStreak）═══
+
+// ═══ 7. 断段后更早有更长段 → max 取长段（区别于 computeStreak 的 break 语义）═══
+{
+	const app = makeVault({
+		[dayPath("2026-10-04")]: daily(true, false),
+		[dayPath("2026-10-03")]: daily(true, false), // 当前连击 2 天
+		[dayPath("2026-09-10")]: daily(true, false),
+		[dayPath("2026-09-09")]: daily(true, false),
+		[dayPath("2026-09-08")]: daily(true, false),
+		[dayPath("2026-09-07")]: daily(true, false), // 9 月一段 4 天
+	});
+	const got7 = await computeMaxStreak(app, ROOT, "2026-10-04");
+	check("断段后更早的更长段计入最高（当前 2 / 历史段 4 → max 4）", got7 === 4, got7);
+}
+
+// ═══ 8. 当前 streak 就是历史最高 → max = 当前值 ═══
+{
+	const app = makeVault({
+		[dayPath("2026-10-04")]: daily(true, false),
+		[dayPath("2026-10-03")]: daily(true, false),
+		[dayPath("2026-10-02")]: daily(true, false),
+	});
+	check("当前 3 天即历史最长 → max 3",
+		(await computeMaxStreak(app, ROOT, "2026-10-04")) === 3);
+}
+
+// ═══ 9. 全空库 → 0 ═══
+{
+	const app = makeVault({});
+	check("无任何笔记 → max 0", (await computeMaxStreak(app, ROOT, TODAY)) === 0);
+}
+
+// ═══ 10. 60 天连续缺失提前终止：更早的段不再回看 ═══
+{
+	// 2026-09-01 有一天记录，距 2027-01-01 有 122 天缺失 → 超 60 天提前停 → max 0
+	const app = makeVault({ [dayPath("2026-09-01")]: daily(true, false) });
+	check("超过 60 天断更 → 不再回看更早段（max 0）",
+		(await computeMaxStreak(app, ROOT, "2027-01-01")) === 0);
+	// 对照：缺失 17 天（< 60）→ 能扫到
+	const app2 = makeVault({ [dayPath("2026-12-15")]: daily(true, false) });
+	check("缺失不足 60 天 → 仍能回看到更早段（max 1）",
+		(await computeMaxStreak(app2, ROOT, "2027-01-01")) === 1);
 }
 
 console.log(failed === 0 ? "\nALL PASSED" : `\n${failed} FAILED`);

@@ -104,6 +104,8 @@ export interface PlanFlowSettings {
 	bannerImgOpacity: number;
 	/** v8.4c 最近用过的贴图（下拉快捷切换），最多 8 条。 */
 	bannerRecent: string[];
+	/** v1.3.1 历史最高连续打卡记录（天）；-1 = 尚未回填（老用户升级后首次打开时全量扫一次）。 */
+	maxStreak: number;
 	/** v8.4e 浏览弹窗记忆：上次浏览的文件夹（null = 根目录），下次打开默认定位到它。 */
 	bannerBrowseDir: string | null;
 }
@@ -157,6 +159,7 @@ tags: [复盘]
 	bannerImage: null,
 	bannerImgOpacity: 0.35,
 	bannerRecent: [],
+	maxStreak: -1,
 	bannerBrowseDir: null,
 };
 
@@ -414,6 +417,9 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			btn.setIcon("trash-2").setTooltip("删除当前选中的方案（不影响当前外观）");
 			delBtnEl = btn.extraSettingsEl;
 			delBtnEl.addClass("planflow-scheme-del-btn"); // 1.14.4 的内置类不可依赖，加自有类给脚本/样式定位
+			// v1.3.1 iPad 修复：同图标选择器——svg 挪进 span，父级不再是 button（WebKit 不渲染 svg-in-button）
+			const delSvg = delBtnEl.querySelector("svg");
+			if (delSvg) delBtnEl.createSpan({ cls: "planflow-btn-icon" }).appendChild(delSvg);
 			delBtnEl.addEventListener("click", () => {
 				const m = matchedScheme();
 				if (!m) return;
@@ -587,6 +593,16 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			"book-open", "trending-up", "check-circle", "flame", "trophy",
 			"rocket", "heart", "star", "clock", "zap", "layers", "workflow", "flag",
 		];
+		// v1.3.1: 触屏设备的图标兜底层——用户 iPad 上选择器 18 个 svg 全空框
+		//（深浅色/选中态都空；同页垃圾桶 svg 正常 ⇒ 非全局 svg 失效，根因远程无法定位）。
+		// 方案：按钮里同时渲染 svg 与 emoji 两层，CSS 触屏媒体查询二选一——
+		// 桌面显示 lucide 图标（与现状逐像素一致），iPad 显示 emoji（可用性兜底，不赌 svg 根因）。
+		const ICON_EMOJI: Record<string, string> = {
+			home: "🏠", calendar: "📅", target: "🎯", "layout-dashboard": "📊", "list-checks": "☑️",
+			"book-open": "📖", "trending-up": "📈", "check-circle": "✅", flame: "🔥", trophy: "🏆",
+			rocket: "🚀", heart: "❤️", star: "⭐", clock: "🕐", zap: "⚡", layers: "🗂️",
+			workflow: "🔀", flag: "🚩",
+		};
 		setting.settingEl.addClass("planflow-icon-setting");
 		const wrap = setting.settingEl.createDiv({ cls: "planflow-icon-picker" });
 		const syncSelection = (selected: string | null, customInput: HTMLInputElement): void => {
@@ -598,7 +614,11 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		};
 		for (const name of ICONS) {
 			const btn = wrap.createEl("button", { cls: "planflow-icon-option", attr: { type: "button" } });
-			setIcon(btn, name);
+			// v1.3.1 iPad 修复：svg 直接挂在 <button> 下 WebKit 不渲染（iPad 全系浏览器都是 WebKit 内核；
+			// v1.2.2 顶栏触屏按钮同病，而卡片/弹窗里挂 div/span 一直正常）——包一层 span 让 svg 的父级不是 button
+			setIcon(btn.createSpan({ cls: "planflow-btn-icon" }), name);
+			// v1.3.1 触屏 emoji 兜底层（桌面 display:none，媒体查询二选一，见 styles.css v1.3.1 节）
+			btn.createSpan({ cls: "planflow-icon-emoji", text: ICON_EMOJI[name] ?? "📦" });
 			btn.title = name;
 			if (name === this.plugin.settings.icon) btn.addClass("is-selected");
 			btn.addEventListener("click", () => {
