@@ -2,10 +2,15 @@
  * v8.1 自定义皮肤派生引擎（用户「在预设上微调 + 一键复原」）。
  * --------------------------------------------------------------------------
  * 设计约束（踩过坑换来的，改前必读）：
- * ① 用户只能覆盖两个主色：accent 主色（顶栏 banner 家族）、ink 墨色（文字家族）。
- *    画布膜 / 开口色 / 业务强调色（--pfs-accent 等）**一律不开放**——
- *    --pf-tab-open-bg 必须等于合成画布色（v7.2/v8.0 两次翻车都是估错它），
- *    用户能碰画布色就等于请他们复刻 bug。所以派生只重算 CUSTOM_TOKEN_KEYS 列出的令牌：
+ * ① 用户只能覆盖两个主色：accent 皮肤色（banner 家族；v8.6 起开口色/画布膜
+ *    也随它联动）、ink 墨色（文字家族）。
+ *    画布膜 / 开口色 / 业务强调色（--pfs-accent 等）**不作为独立输入开放**——
+ *    --pf-tab-open-bg 必须等于合成画布色（v7.2/v8.0 两次翻车都是估错它）。
+ *    v8.6 起开口色/画布膜改为从 --pf-banner-3（= 皮肤色的现成载体，预设与
+ *    自定义都写它）按固定公式派生（styles.css v8.6 节）：用户改皮肤色，
+ *    banner、开口、页面画布同步换相且保持浅淡，且开口 ≡ 页面恒成立——
+ *    用户不再可能「碰坏」画布色，故仍无需开放直接输入。
+ *    所以派生只重算 CUSTOM_TOKEN_KEYS 列出的令牌：
  *      浅色：banner-1/2/3、tab-ink/hover/active、tab-hair、tab-open-shadow、
  *            period-ink、pfs-sub（仅墨色系预设）
  *      深色：banner-1/2/3、tab-ink/hover/active、period-ink、pfs-sub（仅墨色系预设）
@@ -185,7 +190,9 @@ const toHex = (c: RGB) => "#" + c.map((v) => clamp255(v).toString(16).padStart(2
 const rgba = (c: RGB, a: number) => `rgba(${clamp255(c[0])}, ${clamp255(c[1])}, ${clamp255(c[2])}, ${a})`;
 
 /**
- * 派生自定义令牌表（只含 CUSTOM_TOKEN_KEYS 范围内的可重算令牌；开口色/画布膜不在表内 ⇒ 保持预设）。
+ * 派生自定义令牌表（只含 CUSTOM_TOKEN_KEYS 范围内的可重算令牌）。
+ * 开口色/画布膜不在表内——它们由 styles.css v8.6 从 --pf-banner-3 派生
+ * （本函数写 banner-3 即间接驱动），无需在此重算。
  * dark=true 走深态配方。输入 hex 假定已过 normalizeHex。
  */
 export function deriveTokens(base: PlanFlowSkin, ov: CustomSkinOverride, dark: boolean): Record<string, string> {

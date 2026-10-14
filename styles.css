@@ -6242,3 +6242,186 @@ button.planboard-icon-btn {
 		display: flex; /* emoji 层顶上：深浅色/选中态由按钮 color 继承无关，emoji 自着色 */
 	}
 }
+
+/* ==========================================================================
+   v8.4f 接缝清零：开口与连通页面之间不再有分界线（2026-10-14，用户复报）
+   --------------------------------------------------------------------------
+   用户原话：「四个标签的开口和下面连通的页面颜色还是不一样吗，怎么感觉
+   有些分界线」。像素取证（用户截图 163348 纯 Node 解码逐行采样 + 与
+   _preview/_v720-v731-light.png 即 v7.31 验证态对照，方法同
+   _tools/_probe-v730-column.mjs 的垂直剖面）：
+     开口（活动标签）#e5edf4 vs 画布 #e6edf3，Δ≤1/255 —— 颜色早已一致，
+     「不一致」不成立；用户看到的分界线是接缝处两根 1px 线堆成的 ~2px 带：
+       ① 顶栏底部发丝线（3279 行 border-bottom，--pfs-hair 9% 深navy）。
+          叠色底：header 背景图定位区是 padding box（background-origin
+          默认值），底边 1px 边框行露出的是渐变**平铺的最顶行** #e4f0fa
+          ＋辉光——0.09 深navy 叠 #e4f0fa = #d1dce7，与实测 #d0dce7 吻合，
+          故这根线呈浅灰蓝且随辉光 x 向变化（实测 #d0dce7~#dae2e9）；
+       ② 画布面板顶边框（--pf-canvas-line 10% 蓝）叠画布 = #d4e0eb
+          （实测 #d2e0eb）。
+     活动标签正下方被开口 2px 同色硬阴影（4092 起）盖住，只剩 Δ≤5 残影
+     ——比 v7.31 验证态的 6px 过渡带（#dfe9f1，Δ≤6）还轻，无回归；
+     三个非活动标签下方两线完整可见（Δ 8~22）＝用户口中的「分界线」。
+   修法（用户已选定「两根都撤」）：接缝处两根线都撤——banner 末档
+     #b2d2ea 与画布 #e6edf3 本身有 ~50 阶色差，「开口连通」的边缘读法
+     不依赖这两根线；画布面板保留左右下三边（面概念不丢），顶栏保留
+     上左右三边。深浅同构（描边色走变量，宽度不分主题）；is-narrow /
+     is-tiny 无自有 header/content 边框规则，两条全覆盖。
+   几何复核：header 撤底边后盒底上移 1px、content 撤顶边后盒顶再上移
+     1px，活动标签 margin-bottom:-2 + 2px 同色阴影仍正好盖住新接缝。
+   纯追加：删掉本节即回到 v8.4e。
+   ========================================================================== */
+
+/* ① 画布面板：撤顶边框，保左右下三边 */
+.planboard-root .planboard-content {
+	border-top-width: 0;
+}
+
+/* ② 顶栏：撤底部发丝线，保上左右三边 */
+.planboard-root .planboard-header {
+	border-bottom-width: 0;
+}
+
+/* ==========================================================================
+   v8.5 肩块弧线重画：radial-gradient 硬停靠 → border-radius 盖片（解析抗锯齿）
+   （2026-10-14，用户：「开口线两个下角还有毛刺的感觉，不流畅」）
+   --------------------------------------------------------------------------
+   成因（本会话像素取证 + 浏览器对照实验）：肩弧由 radial-gradient 的颜色
+   停靠点画——逐像素着色路径，零抗锯齿，弧上每行只有 0/1 二值台阶
+   （真机 A/B 剪影取证：旧弧边界 x≈310 处 banner→开口色无任何过渡像素）；
+   而标签本体的上两角（border-radius）走形状基元光栅化管线，有解析 AA。
+   同一张图里上角平滑、下角毛刺，就是这个管线差异。SVG mask / clip-path /
+   超采样全都不行（Blink 按使用尺寸光栅化，实验均 ~2~3 个过渡像素），
+   唯有 border-radius 与浏览器标签页同一套解析 AA。
+   构造（⚠️ 走过一次弯路，记录在案）：
+   ✗ 「实心肩块 + 自身圆角」——border-radius 的弧心在距角 r 的内点，
+     画出的是朝 banner 鼓出来的凸四分之一盘（真机剪影翻车后撤）；
+   ✓ 「实心肩块 + banner 盖片，盖片圆角」——盖片 10×10 压在肩块顶部，
+     圆角弧心正好落在肩块外上角（= 旧渐变圆盘的圆心），盖片只画圆盘、
+     让出的凹弧区露出肩块的开口色 = 与旧月牙逐点同轮廓，但弧线有 AA。
+   盖片配色：只盖 banner 最底下 10px。纵向渐变在这一条里总共只变化
+   Δ≈4/255（实测 header 高 149px：条顶 = mix(banner-2 13%, banner-3)），
+   用皮肤现成的 --pf-banner-2/3 调一条 2 停靠点渐变，Δ≤1.5，
+   不需要 JS 测 header 高、不需要逐皮肤复刻 8 组 banner 渐变；
+   辉光（radial 85% 75% at 72% 0%）在底缘归零（归一化距离 ≥1.27），
+   四皮肤同构，可安全省略。深色皮肤 banner 是半透明叠色，盖片会叠在
+   开口色上而非 root 底上——暗底两色差 Δ≤4 × α0.35 ≈ Δ≤2，不可见，放行。
+   TS 侧（renderTabs）给活动标签插两个 span.pf-shoulder-cap 作盖片载体
+   （z-index:1 压过 ::after 肩块；伪元素画不了「块上叠块」两层）。
+   肩块本体几何不动（v7.1/v7.2 的 10×12、bottom:-2、左右 ±10），
+   实心化（去渐变），发丝线遮盖职责原样保留；深浅/四皮肤走 --pf-tab-open-bg。
+   纯追加：删掉本节即回到 v8.4f（radial-gradient 肩块；另删 renderTabs
+   里两行 span 注入）。
+   ========================================================================== */
+
+/* ① 肩块本体：实心开口色（轮廓不变，弧交给盖片） */
+.planboard-root .planboard-header .planboard-tab.is-active::before,
+.planboard-root .planboard-header .planboard-tab.is-active::after {
+	background: var(--pf-tab-open-bg);
+}
+
+/* ② 盖片：10×10 压在肩块顶部（底缘 = banner 底缘），
+   圆角弧心 = 肩块外上角；只画圆盘、让出凹弧露开口色 */
+.planboard-root .planboard-header .planboard-tab .pf-shoulder-cap {
+	position: absolute;
+	bottom: 0;
+	width: 10px;
+	height: 10px;
+	/* z-index:1：同一层叠上下文里压过肩块伪元素（z:auto 定位元素），
+	   否则右肩盖片会被后绘的 ::after 实心块整个盖住 */
+	z-index: 1;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--pf-banner-2) 13%, var(--pf-banner-3)) 0%,
+		var(--pf-banner-3) 100%
+	);
+}
+
+.planboard-root .planboard-header .planboard-tab .pf-shoulder-cap-l {
+	left: -10px;
+	/* 左肩：圆盘圆心 = 盖片左上角 = 肩块外上角 */
+	border-radius: 0 0 10px 0;
+}
+
+.planboard-root .planboard-header .planboard-tab .pf-shoulder-cap-r {
+	right: -10px;
+	/* 右肩镜像：圆心 = 盖片右上角 */
+	border-radius: 0 0 0 10px;
+}
+
+/* ==========================================================================
+   v8.6 开口色与页面同卡 + 跟随皮肤色（2026-10-14；同日二次修订：色源改接皮肤色）
+   --------------------------------------------------------------------------
+   用户三连问：「总觉得开口和页面之间还有接缝」「开口和页面是不是同一个色卡」
+   「跟皮肤色同色系但保持浅淡」——并澄清术语：**随动的源头是插件自己的皮肤色**
+   （设置 → 皮肤主题 → 皮肤色，v8.1 微调项），不是 Obsidian 的主题色
+   （首版误接 --accent-h/s/l，当轮撤换）。术语自此固定：Obsidian 那个叫
+   主题色，插件这套叫皮肤色。
+   根因：不是同一张色卡——页面画布 = 活合成色（--background-primary × 膜7.5%
+   × 膜5.5%，底色一变就漂），开口色 = v7.2 一次真机采样的固化常量 #e5edf4
+   （自带 Δ1 测量误差）。Δ1~2 的大面积同色平面交界，人眼读作一条极淡接缝
+   （v8.4f 实测即此）。
+   修法①（接缝）：开口色改为与画布**同公式**现场合成——两步 color-mix 链
+   精确复刻「底色 ×膜7.5% ×膜5.5%」的两步 8bit 合成顺序（单步折叠有 ±1
+   舍入差，真机实测过）。从此开口 ≡ 页面，与底色无关。
+   修法②（随皮肤色）：膜色源 --pf-tint-accent 从 **--pf-banner-3** 派生——
+   banner-3 就是皮肤色的现成载体：四预设的 banner-3 ≡ 各自皮肤主色
+   （skin-engine PRESET_DEFAULTS.accent），v8.1 自定义微调时 deriveTokens
+   把用户主色写进 banner-3（inline 变量，压过一切样式表）⇒ 预设与自定义
+   自动全通，四个皮肤各自成立，无需逐肤写转换。
+   浅色膜色 = 皮肤色同相加深：hsl(from banner-3 h s×0.9 l×0.53)
+     （sky 实算复现 rgb(52,115,167) ≈ 原膜 rgb(53,114,168)，Δ≤1）
+   深色膜色 = hsl(from banner-3 h s×0.96 l+15%)
+     （按深色预设 banner-3=rgba(74,138,200,.36) 拟合，预设深色画布不动；
+      自定义皮肤色在深态跟随其色相，明度自动钳制）
+   @supports 包裹相对色语法：不支持的宿主整节不生效，回落 v8.0 静态值
+   （开口回常量——宁要旧 Δ1 也不要透明开口）。
+   范围：只接管默认（晴空）皮肤的变量块（(0,1,0) 后写压过 5644、压不过
+   皮肤块 (0,2,0)）——纸墨/松风/午夜的策划膜色不动。banner 不在本次范围。
+   纯追加：删掉本节即回到 v8.5（开口回到写死常量、膜回写死蓝）。
+   ========================================================================== */
+
+.planboard-root {
+	/* 两层膜 + 画布描边：权重与旧值完全一致（浅淡不变），色源 = 皮肤色派生 */
+	--pf-page-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 7.5%, transparent);
+	--pf-canvas-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 5.5%, transparent);
+	--pf-canvas-line: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 10%, transparent);
+	/* 🔴 开口色 = 画布合成色（同公式两步链，Δ≡0） */
+	--pf-tab-open-bg: color-mix(
+		in srgb,
+		color-mix(in srgb, var(--background-primary, #ffffff) 92.5%, var(--pf-tint-accent, rgb(53, 114, 168)) 7.5%) 94.5%,
+		var(--pf-tint-accent, rgb(53, 114, 168)) 5.5%
+	);
+}
+
+.theme-dark .planboard-root {
+	--pf-page-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(138, 180, 216)) 5%, transparent);
+	--pf-canvas-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(138, 180, 216)) 7%, transparent);
+	--pf-canvas-line: color-mix(in srgb, var(--pf-tint-accent, rgb(138, 180, 216)) 16%, transparent);
+	/* 深色开口色 = 底色 ×膜5% → ×黑66% → ×膜7%（精确复刻原三层叠加顺序） */
+	--pf-tab-open-bg: color-mix(
+		in srgb,
+		color-mix(
+			in srgb,
+			color-mix(in srgb, var(--background-primary, #1e1e1e) 95%, var(--pf-tint-accent, rgb(138, 180, 216)) 5%) 66%,
+			black
+		) 93%,
+		var(--pf-tint-accent, rgb(138, 180, 216)) 7%
+	);
+}
+
+/* 膜色源 = 皮肤色（banner-3）的同相派生；相对色语法不支持的宿主整节跳过。
+   ⚠️ 末尾显式 / 1 钉死不透明：相对色语法会继承源色 alpha
+   （深色预设 banner-3 = rgba(74,138,200,0.36)，不钉死则 tint 带 0.36 透明度，
+   开口折叠链与画布分层叠加在半透明 tint 下合成路径不等价 → 接缝 Δ=5，真机实锤） */
+@supports (color: hsl(from red h s l)) {
+	.planboard-root {
+		--pf-tint-accent: hsl(from var(--pf-banner-3) h calc(s * 0.9) calc(l * 0.53) / 1);
+	}
+
+	.theme-dark .planboard-root {
+		/* ⚠️ 相对色通道 calc 只支持乘法——加法（l + 15%）整条声明解析失败
+		   （真机对照实验实锤），明度 +15 个百分点改写为 ×1.278（= 69/54 拟合） */
+		--pf-tint-accent: hsl(from var(--pf-banner-3) h calc(s * 0.96) calc(l * 1.278) / 1);
+	}
+}

@@ -932,6 +932,13 @@ export class PlanBoardView extends ItemView {
 			btn.dataset.tabKey = t.key;
 			btn.createSpan({ cls: "planboard-tab-icon", text: t.icon, attr: { "aria-hidden": "true" } });
 			btn.createSpan({ cls: "planboard-tab-label", text: t.label });
+			// v8.5: 肩部盖片载体（banner 色圆盘、圆角弧 = 解析抗锯齿）。
+			// 伪元素画不了「肩块上再叠盖片」的两层（::after 永远最后绘），
+			// 故用真元素 + z-index:1 压过肩块；形状与配色全在 styles.css v8.5 节。
+			if (active) {
+				btn.createSpan({ cls: "pf-shoulder-cap pf-shoulder-cap-l", attr: { "aria-hidden": "true" } });
+				btn.createSpan({ cls: "pf-shoulder-cap pf-shoulder-cap-r", attr: { "aria-hidden": "true" } });
+			}
 			btn.addEventListener("click", () => void this.switchTab(t.key));
 			btn.addEventListener("keydown", (e: KeyboardEvent) => {
 				const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;

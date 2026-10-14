@@ -249,7 +249,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			// v8.2：desc 长文本撤了（用户「太占位置」）——四款预设名 + 自定义说明
 			// 全部收进面板内的小标题与占位提示，aliases 保留保搜索可达性
 			name: "皮肤主题",
-			aliases: ["skin", "皮肤", "主题", "配色", "颜色", "自定义", "方案"],
+			aliases: ["skin", "皮肤", "皮肤色", "主题", "配色", "颜色", "自定义", "方案"],
 			render: (setting) => this.renderSkinPicker(setting),
 		},
 	];
@@ -405,10 +405,14 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				}
 				// 下拉值来自固定四项，仍做一次白名单校验，脏数据回落 sky
 				this.plugin.settings.skin = (SKINS.some((s) => s.id === value) ? value : "sky") as PlanFlowSkin;
+				// v8.6.2：选预设 = 整套应用该预设的默认外观，必须清掉残留 customSkin——
+				// 否则 deriveTokens 拿旧自定义色压 inline 变量，banner/开口/页面焊死在
+				// 自定义色上、切预设无反应（用户实测 bug）。想跨预设保留微调用「保存为方案」。
+				this.plugin.settings.customSkin = null;
 				void this.plugin.saveSettings();
 				// 只改根元素 data-skin 属性即整站换肤，不必重开视图（CSS 变量即时生效）
 				this.plugin.applySkinToViews();
-				syncInputs(); // 面板回显新基底的默认色（已自定义则显示用户值，不动）
+				syncInputs(); // 面板回显新基底的默认色（customSkin 已清，显示预设值）
 				updateDelBtn();
 			});
 		});
@@ -441,7 +445,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		const saveBtn = head.createEl("button", {
 			cls: "planflow-skin-save",
 			text: "保存为方案",
-			attr: { type: "button", title: "把当前 基底预设 + 主色 + 墨色 保存为命名方案，保存后进「皮肤主题」下拉框" },
+			attr: { type: "button", title: "把当前 基底预设 + 皮肤色 + 墨色 保存为命名方案，保存后进「皮肤主题」下拉框" },
 		});
 		saveBtn.addEventListener("click", () => {
 			new SchemeNameModal(this.app, (name) => {
@@ -486,7 +490,7 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			syncDropdown(); // 微调后可能恰好命中/脱离某个方案，下拉与垃圾桶跟着走
 		};
 		const rows: Array<{ field: "accent" | "ink"; label: string; title: string }> = [
-			{ field: "accent", label: "主色", title: "顶栏与强调元素的基调（深色模式下以低透明度叠加）" },
+			{ field: "accent", label: "皮肤色", title: "插件自己的主题色（区别于 Obsidian 主题色）：顶栏 banner 与开口、页面画布的基调（深色模式下以低透明度叠加）" },
 			{ field: "ink", label: "墨色", title: "标签与周期文字的颜色" },
 		];
 		// v8.4e：主色/墨色并排一行（用户「能放一行吗，不能放两行也行」——三行并一行右栏太挤，
