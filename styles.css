@@ -6425,3 +6425,36 @@ button.planboard-icon-btn {
 		--pf-tint-accent: hsl(from var(--pf-banner-3) h calc(s * 0.96) calc(l * 1.278) / 1);
 	}
 }
+
+/* ==========================================================================
+   v1.3.3 平板打卡「点两次」修复（纯追加：删除本节即回到 v1.3.2）
+   --------------------------------------------------------------------------
+   根因：今日打卡行的 ↑↓ 操作组默认 opacity:0 + pointer-events:none，
+   但**照占 76px 布局**（SKILL 坑 8，见 v7.8 ③ 节注释），且紧挨「打卡」按钮左侧。
+   平板上用户点「打卡按钮附近」实际落进这块隐形死区 → 事件目标是行而非按钮
+   → 被 onPlanboardClick（v1.2.3 触屏显隐）吃成"选中行、展开操作组"，
+   第二次点击才命中按钮。桌面有真 hover 且指针精度足够，症状只在触屏出现。
+   修复：触屏下未展开的操作组直接 display:none——死区从布局上消失，
+   打卡按钮成为行末唯一命中目标；展开（is-actions-open）后照常显形。
+   配套把打卡按钮触屏命中区按门禁提到 44px，两侧留白让"按钮附近"=按钮本身。
+   ⚠️ 特异度：本块在文件末尾且带 .planboard-root 前缀 (0,3,x)，
+   稳过中段所有隐藏/显形规则（v1.2.1 反杀教训，见 5237 注释）。
+   ⚠️ 作用域限定 .planboard-check-card，弹窗管理列表（.is-static 常显）不受影响。 */
+@media (hover: none) and (pointer: coarse) {
+	/* ① 收起态操作组不再占位（display:none 一并接管 is-tiny 的绝对定位变体） */
+	.planboard-root .planboard-check-card .planboard-check-item .planboard-item-actions {
+		display: none;
+	}
+
+	/* ② 行展开（点行一次后）显形——与 v1.2.3 的 opacity 显形机制同触发条件 */
+	.planboard-root .planboard-check-card .planboard-check-item.is-actions-open .planboard-item-actions {
+		display: flex;
+	}
+
+	/* ③ 打卡按钮命中区达标：44px 高 + 加宽左右留白（视觉尺寸随 padding 略增，
+	   换取「点按钮附近」必命中按钮；min-height 压过 4972 的 40px 档） */
+	.planboard-root .planboard-check-btn {
+		min-height: 44px;
+		padding: 0 20px;
+	}
+}
