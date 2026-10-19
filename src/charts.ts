@@ -252,13 +252,18 @@ export function buildHeatmapSvg(map: Map<string, number>, today: string): SVGSVG
 	const year = Number(today.slice(0, 4));
 	const jan1 = new Date(year, 0, 1);
 	const jan1Dow = jan1.getDay() === 0 ? 7 : jan1.getDay(); // ISO 周一=1..周日=7
-	// v1.0.5.1: 档色按用户拍板改 **暖色系**（琥珀/赭，与计划色轮换里的 #f59e0b 同族）。
-	// 语义沿用 GitHub 式 5 档：tier0 空 = 边框色（var()，空态随主题），tier1..4 随完成数
-	// 浅色主题「越多越深」、深色主题「越多越亮」。palette[0] 占位不用。
-	const isDark = document.body.classList.contains("theme-dark");
-	const palette = isDark
-		? ["#42291a", "#42291a", "#6b4423", "#a3702c", "#efa35c"]
-		: ["#fbe4d0", "#fbe4d0", "#f6bd8a", "#ef9548", "#d97706"];
+	// v8.7: 档色改为**与「📅 本月每日打卡」柱条渐变同源**——不再单独维护一套琥珀色，
+	// 而是直接在本月柱图那根冷→暖色带（WEEK_BAR_RAMP / weekBarRampColor）上按档取样：
+	// 1 次偏冷蓝 → 2-3 次转紫 → 4-5 次偏粉 → >5 次暖橙（= 柱条顶端的颜色）。
+	// 两个主题共用同一套色值，因为柱条本身也不随主题换色（见 buildMonthBarsSvg）。
+	// 语义仍是 GitHub 式 5 档：tier0 空 = 边框色（var()，空态随主题），palette[0] 占位不用。
+	const tierT = [0, 0.15, 0.4, 0.68, 1];
+	const palette = tierT.map((t) => weekBarRampColor(t));
+	// v8.8: 低档叠透明度做「越多越浓」的层次（用户 20261019 拍板）。
+	// 色相仍全部取自上面同一根色带，只是让 1~3 档往卡底退一点——
+	// 365 个格子四色同亮会像节庆彩灯，压淡低档后"密集处"才会自己跳出来。
+	// 浅色底=混白变淡、深色底=混暗变沉，两个主题共用一套比例即可。
+	const tierAlpha = [1, 0.55, 0.72, 0.88, 1];
 	// v3.9: preserveAspectRatio none——高度拖拽只拉伸格子高度，宽度始终铺满卡（不会再缩到中间）
 	const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", "aria-hidden": "true" });
 	svg.setCssStyles({ width: "100%" });
@@ -283,6 +288,7 @@ export function buildHeatmapSvg(map: Map<string, number>, today: string): SVGSVG
 			});
 			// v3.0: 空档主题自适应（深色主题下亮灰 #ebedf0 太刺眼，改用边框色变量）
 			rect.setCssStyles({ fill: tier === 0 ? "var(--background-modifier-border)" : palette[tier] });
+			if (tier > 0 && tierAlpha[tier] < 1) rect.setCssStyles({ opacity: String(tierAlpha[tier]) });
 			if (dStr === today) {
 				rect.setAttribute("stroke", "#3572a8");
 				rect.setAttribute("stroke-width", "1.5");

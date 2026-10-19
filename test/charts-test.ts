@@ -182,14 +182,27 @@ check("热力图：0 档用边框色（空态不画绿）", lightCells.some((c) 
 	{ 边框色格: lightCells.filter((c) => c.style.fill === "var(--background-modifier-border)").length });
 // tier 划分：0→边框色, 1, 2-3, 4-5, >5。测最深档必须给 >5 的值
 const deepCells = buildHeatmapSvg(new Map([["2026-10-05", 9]]), "2026-10-06")._find("rect");
-check("热力图：浅色主题最深档是琥珀 #d97706（需 >5 次完成才到该档）",
-	deepCells.some((c) => c.style.fill === "#d97706"),
-	{ 深琥珀: deepCells.filter((c) => c.style.fill === "#d97706").length });
+check("热力图：最深档 = 月柱色带顶端暖橙 #e2a06a（与「本月每日打卡」柱条同源）",
+	deepCells.some((c) => c.style.fill === "#e2a06a"),
+	{ 暖橙: deepCells.filter((c) => c.style.fill === "#e2a06a").length });
+const lightCell1 = buildHeatmapSvg(new Map([["2026-10-05", 1]]), "2026-10-06")._find("rect");
+check("热力图：1 次档取色带冷端 #829ad2（完成越少越冷）",
+	lightCell1.some((c) => c.style.fill === "#829ad2") && !lightCell1.some((c) => c.style.fill === "#e2a06a"),
+	{ 冷蓝: lightCell1.filter((c) => c.style.fill === "#829ad2").length });
+const tierCells = buildHeatmapSvg(new Map([["2026-10-01", 1], ["2026-10-02", 2], ["2026-10-03", 4], ["2026-10-04", 9]]), "2026-10-06")._find("rect");
+check("热力图：低档叠透明度做「越多越浓」（0.55 < 0.72 < 0.88，顶端档不压）", (() => {
+	const o = ["#829ad2", "#a190c9", "#c193a6"].map((f) => tierCells.find((c) => c.style.fill === f)?.style.opacity);
+	const top = tierCells.find((c) => c.style.fill === "#e2a06a");
+	return o.every((v) => v !== undefined)
+		&& parseFloat(String(o[0])) < parseFloat(String(o[1]))
+		&& parseFloat(String(o[1])) < parseFloat(String(o[2]))
+		&& top?.style.opacity === undefined;
+})(), ["#829ad2", "#a190c9", "#c193a6", "#e2a06a"].map((f) => tierCells.find((c) => c.style.fill === f)?.style.opacity));
 setTheme(true);
 const darkCells = buildHeatmapSvg(new Map([["2026-10-05", 9]]), "2026-10-06")._find("rect");
-check("热力图：深色主题最亮档是提亮琥珀 #efa35c",
-	darkCells.some((c) => c.style.fill === "#efa35c") && !darkCells.some((c) => c.style.fill === "#d97706"),
-	{ 亮琥珀: darkCells.filter((c) => c.style.fill === "#efa35c").length });
+check("热力图：深色主题沿用同一色带（不再单独换琥珀，与柱条保持一致）",
+	darkCells.some((c) => c.style.fill === "#e2a06a") && !darkCells.some((c) => c.style.fill === "#d97706"),
+	{ 暖橙: darkCells.filter((c) => c.style.fill === "#e2a06a").length });
 setTheme(false);
 check("热力图：底部月份标签 1..12", (() => {
 	const labels = heatLight._find("text").map((t) => t.textContent);
