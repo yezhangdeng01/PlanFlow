@@ -156,6 +156,13 @@ const valueLabels = mbTexts.filter((t) => ["1", "3", "5"].includes(t.textContent
 const dateLabels = mbTexts.filter((t) => /^[1-5]$/.test(t.textContent) && parseFloat(t.attrs.y) >= 90);
 check("月柱图：柱顶标了数值（有值的 3 根柱）", valueLabels.length === 3,
 	{ 数值: mbTexts.map((t) => `${t.textContent}@y${t.attrs.y}`).slice(0, 10) });
+// v8.9 回归线：满档柱子曾一路顶到 SVG 上边界，真机上柱顶数值被挤没（用户 20261020 实测 4 次无数字）。
+// 柱子可用高度整体 ×0.82 后，满档数值基线必须还在 y≥20（字顶留得出完整空间）。
+check("月柱图：满档（4/4）柱顶数值不越界（y ≥ 20）", (() => {
+	const s = buildMonthBarsSvg([2, 3, 4, 4], 4, 4);
+	const vals = s._find("text").filter((t) => parseFloat(t.attrs.y) < 90);
+	return vals.length === 4 && vals.every((t) => parseFloat(t.attrs.y) >= 20);
+})(), buildMonthBarsSvg([2, 3, 4, 4], 4, 4)._find("text").filter((t) => parseFloat(t.attrs.y) < 90).map((t) => `${t.textContent}@y${t.attrs.y}`));
 check("月柱图：底部日期行 1..5", dateLabels.length === 5,
 	{ 日期: mbTexts.map((t) => `${t.textContent}@y${t.attrs.y}`).filter((s2) => parseFloat(s2.split("@y")[1]) >= 90) });
 check("月柱图：今天那根柱加粗（font-weight 700）",

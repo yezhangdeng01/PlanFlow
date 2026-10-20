@@ -156,6 +156,11 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 	const bx = (i: number): number => pad + i * (cw + gap) + (cw - bw) / 2;
 	const full = goalTotal > 0 ? goalTotal : Math.max(...done, 1);
 	const base = H - pad - dateH;
+	// v8.9: 满档柱子原来一路顶到 pad 边界（柱顶 y=20、数值基线 y=17），
+	// 真机上 4 次那几根的柱顶数字被挤出可视区（用户 20261020 反馈「打卡到 4 就没数字了」）。
+	// 把整列柱子的可用高度乘 0.82——**等比例**缩短，不是只压最高的那根，
+	// 柱间相对高低关系不变；柱顶数值随柱顶一起下移，仍然贴顶 3px，不会被裁。
+	const barArea = (base - pad - labelH) * 0.82;
 	const todayIdx = done.length - 1; // 序列 = 本月 1 日至今，最后一根即今天（slots 为整月格数）
 	// 固定渲染高度（preserveAspectRatio none 随卡宽缩放），配合可拖拽卡高
 	const svg = svgEl("svg", {
@@ -190,7 +195,7 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 	svg.append(defs);
 	done.forEach((v, i) => {
 		const t = full > 0 ? Math.max(0, Math.min(1, v / full)) : 0;
-		const h = t * (base - pad - labelH);
+		const h = t * barArea;
 		const x = bx(i);
 		const rect = svgEl("rect", { x, y: base - h, width: bw, height: Math.max(h, v > 0 ? 2 : 0), rx: 2 });
 		rect.setAttribute("fill", `url(#pf-bar-${i})`);
@@ -205,7 +210,7 @@ export function buildMonthBarsSvg(done: number[], goalTotal = 0, slots = 0): SVG
 	done.forEach((v, i) => {
 		if (v <= 0) return;
 		const t = full > 0 ? Math.max(0, Math.min(1, v / full)) : 0;
-		const h = t * (base - pad - labelH);
+		const h = t * barArea;
 		const label = svgEl("text", {
 			x: bx(i) + bw / 2,
 			y: Math.max(12, base - h - 3),
