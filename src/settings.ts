@@ -1,7 +1,7 @@
 import { AbstractInputSuggest, App, DropdownComponent, FuzzySuggestModal, Modal, Notice, PluginSettingTab, Setting, SettingDefinitionItem, TFile, TFolder, setIcon } from "obsidian";
 import type PlanFlowPlugin from "../main";
 import { reviewTemplatePath } from "./paths";
-import { addScheme, applyScheme, normalizeHex, PRESET_DEFAULTS, removeScheme, schemeNameTaken } from "./skin-engine";
+import { addScheme, applyScheme, normalizeHex, PRESET_DEFAULTS, removeScheme, replaceScheme, resolveSkinSelection, schemeNameTaken } from "./skin-engine";
 import type { CustomSkinOverride, CustomSkinScheme } from "./skin-engine";
 
 /**
@@ -78,7 +78,7 @@ export interface PlanFlowSettings {
 	 */
 	checkMinutes: number;
 	/**
-	 * 皮肤主题（v8.0）：sky=晴空（默认）/ paper=墨纸 / midnight=夜阑 / pine=松风。
+	 * 皮肤主题（v8.0）：sky=晴空（默认）/ paper=素笺 / midnight=夜阑 / pine=松风。
 	 * 每款各自带浅色+深色两态，跟随 Obsidian 的 light/dark 主题自动切换；
 	 * 计划色（planColors，用户自定）不受皮肤影响。
 	 */
@@ -94,6 +94,13 @@ export interface PlanFlowSettings {
 	 * 随时应用/删除。与 customSkin 的分工：customSkin = 当前生效值，这里是仓库。
 	 */
 	skinSchemes: CustomSkinScheme[];
+	/**
+	 * v8.10 「皮肤主题」下拉上次选中/正在编辑的方案名（null = 未选方案）。
+	 * 只影响回显，不参与派色：改色后外观已不等于方案快照，但下拉不该跳回预设
+	 * （用户正在「青空」上微调，名字就该还写着「青空」）。
+	 * 选预设 / 恢复预设值 / 删除方案时清空。
+	 */
+	skinScheme: string | null;
 	/**
 	 * v8.4 banner 贴图：库内图片的 vault 相对路径（选图弹窗产生）。
 	 * 独立于 customSkin（贴图是全局开关，不进派生引擎、不进方案定格）。
@@ -156,6 +163,7 @@ tags: [复盘]
 	skin: "sky",
 	customSkin: null,
 	skinSchemes: [],
+	skinScheme: null,
 	bannerImage: null,
 	bannerImgOpacity: 0.35,
 	bannerRecent: [],
@@ -328,13 +336,14 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 	 * 下方**全宽自绘**微调面板（挂在 Setting 行之后，避开两栏布局挤压）：
 	 * 主色/墨色行（hex 框 + 色盘 + 行内「复原」），标题行右侧
 	 * 「保存为方案」（弹 Modal 命名）+「恢复预设值」。
-	 * 自定义只覆盖主色与墨色；画布膜/开口色/业务强调色不开放（skin-engine 铁律①）。
+	 * 自定义只覆盖主色与墨色；画布膜/开口色不单独开放——v8.17 起它们随主色由
+	 * deriveTokens 现算（tintAccent），业务强调色仍保持预设（skin-engine 铁律①）。
 	 */
 	private renderSkinPicker(setting: Setting): void {
 		const SKINS: Array<{ id: PlanFlowSkin; name: string }> = [
 			{ id: "sky", name: "晴空（天蓝）" },
-			{ id: "paper", name: "墨纸（暖纸褐）" },
-			{ id: "midnight", name: "夜阑（石板灰）" },
+			{ id: "paper", name: "素笺（暖纸褐）" },
+			{ id: "midnight", name: "夜阑（深夜靛）" },
 			{ id: "pine", name: "松风（墨绿）" },
 		];
 		// 输入框引用：切基底预设 / 应用方案时刷新显示值（v8.4d 起只有色盘）
@@ -352,8 +361,11 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		};
 		const SCHEME_PREFIX = "scheme:";
 		const schemeValue = (name: string): string => SCHEME_PREFIX + name;
-		/** 当前生效外观是否恰好等于某个已存方案（base + 主色 + 墨色全等）。 */
-		const matchedScheme = (): CustomSkinScheme | null => {
+		/**
+		 * 当前外观是否**精确**等于某个方案（base + 主色 + 墨色全等，不掺记忆）。
+		 * 只用于 v8.10 的老数据自愈：升级上来的用户有 customSkin 却没有 skinScheme 名字。
+		 */
+		const exactScheme = (): CustomSkinScheme | null => {
 			const c = this.plugin.settings.customSkin;
 			if (!c) return null;
 			return (
@@ -362,11 +374,24 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				) ?? null
 			);
 		};
-		let skinDropdown: DropdownComponent | null = null;
+		/**
+		 * 下拉当前显示的那个方案（v8.10）。
+		 * 判定交给 resolveSkinSelection：精确命中优先，其次「上次选中/正在编辑」的记忆。
+		 * 回显与垃圾桶共用它——下拉写谁的名字，垃圾桶就删谁，不会出现「显示方案却删不掉」。
+		 */
+		const activeScheme = (): CustomSkinScheme | null => {
+			const sel = resolveSkinSelection(
+				this.plugin.settings.skinSchemes,
+				{ skin: this.plugin.settings.skin, customSkin: this.plugin.settings.customSkin },
+				this.plugin.settings.skinScheme,
+			);
+			if (sel.kind !== "scheme") return null;
+			return this.plugin.settings.skinSchemes.find((s) => s.name === sel.name) ?? null;
+		};		let skinDropdown: DropdownComponent | null = null;
 		let delBtnEl: HTMLElement | null = null;
 		const updateDelBtn = (): void => {
 			// class 切换而非 style.display（市场 lint 禁内联样式赋值）
-			if (delBtnEl) delBtnEl.classList.toggle("planflow-hidden", !matchedScheme());
+			if (delBtnEl) delBtnEl.classList.toggle("planflow-hidden", !activeScheme());
 		};
 		const rebuildOptions = (): void => {
 			const dd = skinDropdown;
@@ -376,9 +401,19 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			for (const sch of this.plugin.settings.skinSchemes) dd.addOption(schemeValue(sch.name), sch.name);
 		};
 		const syncDropdown = (): void => {
-			const m = matchedScheme();
-			// setValue 不触发 onChange，只是回显；未匹配方案时回落基底预设项
-			skinDropdown?.setValue(m ? schemeValue(m.name) : this.plugin.settings.skin);
+			// v8.10 自愈：外观恰好等于某方案、但没记住名字（从 <8.10 升级上来，
+			// data.json 里没有 skinScheme 字段）→ 补记一次。否则用户下一次改色时
+			// resolveSkinSelection 拿不到记忆，下拉又会跳回预设名（正是本次报的 bug）。
+			const exact = exactScheme();
+			if (exact && this.plugin.settings.skinScheme !== exact.name) {
+				this.plugin.settings.skinScheme = exact.name;
+				void this.plugin.saveSettings();
+			}
+			// 外观精确命中方案 → 显示该方案；改过色（不再命中）但记忆里的方案仍在
+			// → 仍显示它（别跳回预设，用户会以为方案丢了）；否则回落基底预设。
+			const sch = activeScheme();
+			// setValue 不触发 onChange，只是回显
+			skinDropdown?.setValue(sch ? schemeValue(sch.name) : this.plugin.settings.skin);
 			updateDelBtn();
 		};
 		/** 应用某个方案：写设置 + 换肤 + 面板同步（下拉回显交给调用方）。 */
@@ -386,6 +421,8 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			const { skin, customSkin } = applyScheme(sch);
 			this.plugin.settings.skin = skin;
 			this.plugin.settings.customSkin = customSkin;
+			// v8.10：记住正在编辑的方案，改色后下拉仍显示它
+			this.plugin.settings.skinScheme = sch.name;
 			void this.plugin.saveSettings();
 			this.plugin.applySkinToViews();
 			syncInputs();
@@ -394,7 +431,9 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		setting.addDropdown((dd) => {
 			skinDropdown = dd;
 			rebuildOptions();
-			dd.setValue(this.plugin.settings.skin);
+			// v8.10：初始化必须走 syncDropdown 而不是裸 setValue(settings.skin)——
+			// 否则重开设置页时下拉永远显示基底预设（用户「设为青空后重开仍显示晴空天蓝」）。
+			syncDropdown();
 			dd.onChange((value) => {
 				if (value.startsWith(SCHEME_PREFIX)) {
 					// 选中某个已存方案 → 整套应用（基底 + 微调一起切）
@@ -409,6 +448,8 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 				// 否则 deriveTokens 拿旧自定义色压 inline 变量，banner/开口/页面焊死在
 				// 自定义色上、切预设无反应（用户实测 bug）。想跨预设保留微调用「保存为方案」。
 				this.plugin.settings.customSkin = null;
+				// v8.10：选预设 = 离开方案编辑状态，清掉回显记忆
+				this.plugin.settings.skinScheme = null;
 				void this.plugin.saveSettings();
 				// 只改根元素 data-skin 属性即整站换肤，不必重开视图（CSS 变量即时生效）
 				this.plugin.applySkinToViews();
@@ -425,13 +466,14 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 			const delSvg = delBtnEl.querySelector("svg");
 			if (delSvg) delBtnEl.createSpan({ cls: "planflow-btn-icon" }).appendChild(delSvg);
 			delBtnEl.addEventListener("click", () => {
-				const m = matchedScheme();
+				const m = activeScheme();
 				if (!m) return;
 				this.plugin.settings.skinSchemes = removeScheme(this.plugin.settings.skinSchemes, m.name);
+				// v8.10：删的就是当前显示的那个方案，回显记忆一并清掉（否则会指着一个不存在的名字）
+				this.plugin.settings.skinScheme = null;
 				void this.plugin.saveSettings();
 				rebuildOptions();
-				skinDropdown?.setValue(this.plugin.settings.skin); // 仓库条目已删，下拉回落基底预设
-				updateDelBtn();
+				syncDropdown(); // 仓库条目已删，按实际外观回显（通常回落基底预设）
 				new Notice(`已删除方案「${m.name}」`);
 			});
 			updateDelBtn();
@@ -444,37 +486,66 @@ export class PlanFlowSettingTab extends PluginSettingTab {
 		head.createDiv({ cls: "planflow-skin-custom-title", text: "自定义微调（在当前预设基础上）" });
 		const saveBtn = head.createEl("button", {
 			cls: "planflow-skin-save",
-			text: "保存为方案",
-			attr: { type: "button", title: "把当前 基底预设 + 皮肤色 + 墨色 保存为命名方案，保存后进「皮肤主题」下拉框" },
+			text: "保存",
+			attr: {
+				type: "button",
+				title: "把当前皮肤色/墨色写回正在编辑的方案；还没有方案时（纯预设基础）会引导你另存为",
+			},
 		});
-		saveBtn.addEventListener("click", () => {
+		const saveAsBtn = head.createEl("button", {
+			cls: "planflow-skin-saveas",
+			text: "另存为",
+			attr: { type: "button", title: "把当前 基底预设 + 皮肤色 + 墨色 存成一个新方案（进「皮肤主题」下拉框）" },
+		});
+		/** 另存为：弹命名框 → 进仓库并选中它。 */
+		const openSaveAs = (): void => {
 			new SchemeNameModal(this.app, (name) => {
 				if (schemeNameTaken(this.plugin.settings.skinSchemes, name)) {
-					return `方案「${name}」已存在，换个名字`;
+					const cur = activeScheme();
+					// 撞上正在编辑的那个方案 → 提示走「保存」；撞别的 → 换个名字
+					return cur && cur.name === name
+						? `「${name}」正在使用中，直接点「保存」即可覆盖`
+						: `方案「${name}」已存在，换个名字`;
 				}
-				const cur = currentOverride();
+				const c = currentOverride();
 				this.plugin.settings.skinSchemes = addScheme(this.plugin.settings.skinSchemes, {
 					name,
 					base: this.plugin.settings.skin,
-					accent: cur.accent,
-					ink: cur.ink,
+					accent: c.accent,
+					ink: c.ink,
 				});
+				this.plugin.settings.skinScheme = name;
 				void this.plugin.saveSettings();
 				rebuildOptions();
-				syncDropdown(); // 自动选中刚存的方案（matchedScheme 命中）
-				new Notice(`已保存并应用方案「${name}」`);
+				syncDropdown();
+				new Notice(`已保存方案「${name}」`);
 				return null;
 			}).open();
-		});
-		const resetBtn = head.createEl("button", { cls: "planflow-skin-reset", text: "恢复预设值", attr: { type: "button" } });
-		resetBtn.addEventListener("click", () => {
-			this.plugin.settings.customSkin = null;
+		};
+		// v8.11（用户 20261020）：「保存为方案 / 恢复预设值」→「保存 / 另存为」，撤掉恢复预设值。
+		// 语义：预设本身不可改，在预设上微调只能另存为；已有方案时「保存」= 覆盖该方案。
+		saveBtn.addEventListener("click", () => {
+			const active = activeScheme();
+			if (!active) {
+				// 纯预设基础：没有可覆盖的对象，引导另存为（预设值永不写坏）
+				new Notice("预设皮肤不可修改，已打开「另存为」");
+				openSaveAs();
+				return;
+			}
+			const c = currentOverride();
+			this.plugin.settings.skinSchemes = replaceScheme(this.plugin.settings.skinSchemes, {
+				name: active.name,
+				base: active.base,
+				accent: c.accent,
+				ink: c.ink,
+			});
+			this.plugin.settings.skinScheme = active.name;
 			void this.plugin.saveSettings();
-			this.plugin.applySkinToViews();
-			syncInputs();
-			syncDropdown(); // 回落基底预设项，垃圾桶隐藏
-			new Notice("已恢复预设皮肤");
+			rebuildOptions();
+			syncDropdown();
+			new Notice(`已更新方案「${active.name}」`);
 		});
+		saveAsBtn.addEventListener("click", () => openSaveAs());
 		/** 改某个色：写 customSkin → 保存 → 即时生效 → 同步面板。 */
 		const applyField = (field: "accent" | "ink", raw: string): void => {
 			const hex = normalizeHex(raw);

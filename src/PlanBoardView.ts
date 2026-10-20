@@ -726,7 +726,8 @@ export class PlanBoardView extends ItemView {
 	 * v8.0 皮肤：把 settings.skin 挂到根元素的 data-skin 上，
 	 * styles.css 的 `.planboard-root[data-skin="..."]` 变量块据此整站换肤。
 	 * v8.1 自定义皮肤：customSkin 非空时把派生令牌以 inline 变量写到根元素
-	 * （inline 压过一切样式表；开口色/画布膜/业务强调色不在派生表内 ⇒ 保持预设）。
+	 * （inline 压过一切样式表；v8.17 起画布膜/开口色的色源 --pf-tint-accent 也在
+	 *  派生表内，自定义主色会带着画布膜一起走；只有业务强调色仍保持预设）。
 	 * 深浅态切换由 main.ts 监听 css-change 触发重应用（inline 变量不自动跟随主题）。
 	 * 幂等——onOpen 与 refresh() 都调，设置页换肤后不必重开视图。
 	 */

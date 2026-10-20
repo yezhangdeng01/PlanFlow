@@ -5636,50 +5636,45 @@ button.planboard-icon-btn {
       settings.ts 下拉即时生效，TS 渲染逻辑零改动；
    ④ 🔴 --pf-tab-open-bg（开口色）必须等于**合成画布色**
       （白页 × root 膜 × content 膜，v7.2 教训：估算值翻车过）。
-      晴空沿用实测值 #e5edf4；其余三款给解析估值，真机逐肤实测后校准
-      （见 PROGRESS.md v8.0 节记录的各肤实测值）。
+      v8.17 起四套不再各自手配这组值：皮肤块只给一支 --pf-tint-accent，
+      开口色 / 两层膜 / 描边全由文件末尾的全局公式按同一浓度算（见 v8.17 节）。
    ========================================================================== */
 
 /* ---------- ① 令牌默认值（= 晴空修订版，浅色） ---------- */
 .planboard-root {
-	/* banner */
+	/* banner（v8.12：晴空预设吸收原「青空」自定义配色，旧 #b2d2ea 太灰） */
 	--pf-banner-glow: rgba(255, 255, 255, 0.5);
-	--pf-banner-1: #e4f0fa;
-	--pf-banner-2: #cde3f4;
-	--pf-banner-3: #b2d2ea;
-	/* 标签 */
-	--pf-tab-ink: #1f4a72;
-	--pf-tab-ink-hover: #173a5c;
+	--pf-banner-1: #dff1ff;
+	--pf-banner-2: #bfe3fe;
+	--pf-banner-3: #95d0fe;
+	/* 标签（墨 = 深古铜金；与 PRESET_DEFAULTS.sky.ink 同源，改一处必须改另一处） */
+	--pf-tab-ink: #8a5f1f;
+	--pf-tab-ink-hover: #6c4a18;
 	--pf-tab-hover-bg: rgba(255, 255, 255, 0.22);
 	--pf-tab-press-bg: rgba(255, 255, 255, 0.32);
-	--pf-tab-ink-active: #16395c;
-	--pf-tab-hair: rgba(28, 69, 105, 0.18);
-	--pf-tab-open-shadow: rgba(28, 69, 105, 0.1);
-	--pf-period-ink: #40607e;
-	/* 画布：root 膜 / content 膜 / 描边 */
-	--pf-page-tint: rgba(53, 114, 168, 0.075);
-	--pf-canvas-tint: rgba(53, 114, 168, 0.055);
-	--pf-canvas-line: rgba(53, 114, 168, 0.1);
-	/* 开口色 = 合成画布色（实测值） */
-	--pf-tab-open-bg: #e5edf4;
+	--pf-tab-ink-active: #694818;
+	--pf-tab-hair: rgba(138, 95, 31, 0.18);
+	--pf-tab-open-shadow: rgba(138, 95, 31, 0.1);
+	--pf-period-ink: #98723a;
+	/* v8.17 膜色源（晴空）：画布两层膜 / 描边 / 开口色四套**统一**由它按固定浓度
+	   合成（7.5% / 5.5% / 10%，见文件末尾 v8.17 节），本块不再手配这四个值。 */
+	--pf-tint-accent: rgb(12, 118, 201);
 }
 
 .theme-dark .planboard-root {
-	--pf-banner-1: rgba(74, 138, 200, 0.4);
-	--pf-banner-2: rgba(74, 138, 200, 0.22);
-	--pf-banner-3: rgba(74, 138, 200, 0.36);
-	--pf-tab-ink: rgba(234, 244, 253, 0.8);
-	--pf-tab-ink-hover: #ffffff;
+	--pf-banner-1: rgba(149, 208, 254, 0.4);
+	--pf-banner-2: rgba(149, 208, 254, 0.22);
+	--pf-banner-3: rgba(149, 208, 254, 0.36);
+	--pf-tab-ink: rgba(249, 247, 244, 0.8);
+	--pf-tab-ink-hover: #fbf9f7;
 	--pf-tab-hover-bg: rgba(255, 255, 255, 0.1);
 	--pf-tab-press-bg: rgba(255, 255, 255, 0.16);
-	--pf-tab-ink-active: #eaf4fd;
+	--pf-tab-ink-active: #faf8f5;
 	--pf-tab-hair: rgba(255, 255, 255, 0.14);
 	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
-	--pf-period-ink: rgba(226, 238, 248, 0.72);
-	--pf-page-tint: rgba(138, 180, 216, 0.05);
-	--pf-canvas-tint: rgba(138, 180, 216, 0.07);
-	--pf-canvas-line: rgba(138, 180, 216, 0.16);
-	--pf-tab-open-bg: #1e2326;
+	--pf-period-ink: rgba(249, 247, 244, 0.72);
+	/* v8.17 膜色源（晴空·深态）：底是暗的，膜色源仍取亮的一支 */
+	--pf-tint-accent: rgb(138, 180, 216);
 }
 
 /* ---------- ② 老规则 → 变量（同选择器重声明，后写赢） ---------- */
@@ -5808,7 +5803,7 @@ button.planboard-icon-btn {
 	color: var(--pf-period-ink);
 }
 
-/* ---------- ③ 皮肤：墨纸 Paper（暖纸褐 + 黛蓝；深态 = 深褐墨 + 暖金） ---------- */
+/* ---------- ③ 皮肤：素笺 Paper（暖纸褐 + 黛蓝；深态 = 深褐墨 + 暖金） ---------- */
 .planboard-root[data-skin="paper"] {
 	--pf-banner-glow: rgba(255, 252, 240, 0.55);
 	--pf-banner-1: #f8f2e4;
@@ -5822,10 +5817,8 @@ button.planboard-icon-btn {
 	--pf-tab-hair: rgba(97, 82, 60, 0.2);
 	--pf-tab-open-shadow: rgba(97, 82, 60, 0.12);
 	--pf-period-ink: #6b5c46;
-	--pf-page-tint: rgba(130, 110, 85, 0.07);
-	--pf-canvas-tint: rgba(130, 110, 85, 0.055);
-	--pf-canvas-line: rgba(130, 110, 85, 0.14);
-	--pf-tab-open-bg: #f0edea;
+	/* v8.17 膜色源：旧手配 7% / 5.5% / 14% + 开口 #f0edea → 统一 7.5% / 5.5% / 10% */
+	--pf-tint-accent: rgb(130, 110, 85);
 	--pfs-sub: #6e6252;
 	--pfs-accent: #3f5f7a;
 	--pfs-accent-soft: #8fa9bd;
@@ -5852,10 +5845,8 @@ button.planboard-icon-btn {
 	--pf-tab-hair: rgba(255, 240, 215, 0.14);
 	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
 	--pf-period-ink: rgba(238, 227, 205, 0.6);
-	--pf-page-tint: rgba(216, 180, 138, 0.04);
-	--pf-canvas-tint: rgba(216, 180, 138, 0.06);
-	--pf-canvas-line: rgba(216, 180, 138, 0.16);
-	--pf-tab-open-bg: #221f1b;
+	/* v8.17 膜色源（深态） */
+	--pf-tint-accent: rgb(216, 180, 138);
 	--pfs-sub: #a99a83;
 	--pfs-accent: #c7a367;
 	--pfs-accent-soft: #a8874f;
@@ -5866,60 +5857,85 @@ button.planboard-icon-btn {
 	--pfs-card: rgba(255, 243, 220, 0.06);
 }
 
-/* ---------- ③ 皮肤：夜阑 Midnight（石板灰 + 钢蓝；深态 = 深靛 + 月白蓝） ---------- */
+/* ---------- ③ 皮肤：夜阑 Midnight（深夜靛底 + 烛光墨；深态 = 夜窟靛 + 更暗的烛光） ----------
+   v8.15：四套里唯一的「深底亮墨」皮肤。顶栏向夜色混（见 skin-engine bannerBase），
+   墨色是烛光米 #efe2c2 —— 因此本块里 tab-ink 是亮色，而 tab-ink-active 是深色
+   （活动页签落在浅色开口上，见下方 .is-active 规则用变暗的墨）。 */
 .planboard-root[data-skin="midnight"] {
-	--pf-banner-glow: rgba(255, 255, 255, 0.45);
-	--pf-banner-1: #e9eef4;
-	--pf-banner-2: #dae2ec;
-	--pf-banner-3: #c4d0de;
-	--pf-tab-ink: #33475e;
-	--pf-tab-ink-hover: #243648;
-	--pf-tab-hover-bg: rgba(255, 255, 255, 0.3);
-	--pf-tab-press-bg: rgba(255, 255, 255, 0.42);
-	--pf-tab-ink-active: #22344a;
-	--pf-tab-hair: rgba(40, 60, 85, 0.18);
-	--pf-tab-open-shadow: rgba(40, 60, 85, 0.1);
-	--pf-period-ink: #4d6076;
-	--pf-page-tint: rgba(70, 90, 115, 0.07);
-	--pf-canvas-tint: rgba(70, 90, 115, 0.055);
-	--pf-canvas-line: rgba(70, 90, 115, 0.14);
-	--pf-tab-open-bg: #e8eaed;
-	--pfs-sub: #5c6b7d;
-	--pfs-accent: #47658a;
-	--pfs-accent-soft: #93a9c4;
-	--pfs-hair: rgba(40, 60, 85, 0.12);
-	--pfs-hair-strong: rgba(40, 60, 85, 0.24);
-	--pfs-track: rgba(40, 60, 85, 0.1);
-	--pfs-hover: rgba(71, 101, 138, 0.07);
-	--pfs-card: rgba(250, 251, 253, 0.95);
-	--pb-accent-hover: #93a9c4;
+	/* 辉光换暖色：其余三套是中性白，夜阑是烛火／月晕 */
+	--pf-banner-glow: rgba(255, 222, 160, 0.26);
+	--pf-banner-1: #202644;
+	--pf-banner-2: #252b4b;
+	--pf-banner-3: #2c3258;
+	--pf-tab-ink: #ffe0ae;
+	--pf-tab-ink-hover: #ffebb7;
+	--pf-tab-hover-bg: rgba(255, 224, 174, 0.1);
+	--pf-tab-press-bg: rgba(255, 224, 174, 0.16);
+	/* 活动页签坐在浅色开口上 ⇒ 墨必须压回深靛（不派生，手配） */
+	--pf-tab-ink-active: #232848;
+	--pf-tab-hair: rgba(255, 224, 174, 0.16);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.34);
+	/* 副标题 = 烛光减三层（不派生，手配） */
+	--pf-period-ink: #e0c69a;
+	/* v8.17 膜色源：主色 #2c3258 只有 L26，直接上膜几乎等于黑（v8.16b 用户原话
+	   「怎么看不出来」）——膜色源统一取「同色相、提到中明度」的一支（H235 S44 L47），
+	   再按全局浓度 7.5% / 5.5% 叠，色度 Δ9 / 15：看得出靛，又不抢戏。 */
+	--pf-tint-accent: rgb(60, 70, 180);
+	/* 内容盘仍是浅底：这里的 pfs-* 服务于盘内文字/进度条，别跟顶栏混 */
+	--pfs-sub: #4c5170;
+	--pfs-accent: #3f3f88;
+	--pfs-accent-soft: #9aa0d0;
+	--pfs-hair: rgba(44, 50, 88, 0.12);
+	--pfs-hair-strong: rgba(44, 50, 88, 0.24);
+	--pfs-track: rgba(44, 50, 88, 0.12);
+	--pfs-hover: rgba(63, 63, 136, 0.07);
+	--pfs-card: rgba(252, 252, 255, 0.95);
+	--pb-accent-hover: #9aa0d0;
+}
+
+/* 顶栏是深色底 ⇒ 只把**顶栏子树**的文字令牌翻成烛光，下方内容盘不受影响。
+   （年度目标标题/日期/问候/计划项名与数字都读 Obsidian 的 --text-normal/--text-muted） */
+.planboard-root[data-skin="midnight"] .planboard-header {
+	--text-normal: #ffe0ae;
+	--text-muted: rgba(255, 224, 174, 0.62);
+	--pfs-sub: rgba(255, 224, 174, 0.62);
+	--pfs-hair: rgba(255, 224, 174, 0.14);
+	--pfs-hair-strong: rgba(255, 224, 174, 0.22);
+	--pfs-track: rgba(255, 224, 174, 0.18);
+	--pfs-hover: rgba(255, 224, 174, 0.08);
+	--pfs-accent: #e8b96a;
+	--pfs-accent-soft: #f0cf94;
+}
+
+/* 计划色（用户在设置里挑的高饱和色）在深底上会糊 ⇒ 朝烛光提亮，保留可辨性 */
+.planboard-root[data-skin="midnight"] .planboard-header .planboard-goal-name.is-plan-colored {
+	color: color-mix(in srgb, var(--plan-title-light, #ffe0ae) 52%, #ffe0ae);
 }
 
 .theme-dark .planboard-root[data-skin="midnight"] {
-	--pf-banner-1: rgba(70, 110, 170, 0.42);
-	--pf-banner-2: rgba(70, 110, 170, 0.24);
-	--pf-banner-3: rgba(70, 110, 170, 0.38);
-	--pf-tab-ink: rgba(226, 236, 248, 0.82);
-	--pf-tab-ink-hover: #ffffff;
-	--pf-tab-hover-bg: rgba(255, 255, 255, 0.1);
-	--pf-tab-press-bg: rgba(255, 255, 255, 0.16);
-	--pf-tab-ink-active: #e6f0fa;
-	--pf-tab-hair: rgba(255, 255, 255, 0.14);
-	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
-	--pf-period-ink: rgba(226, 236, 248, 0.6);
-	--pf-page-tint: rgba(110, 150, 200, 0.05);
-	--pf-canvas-tint: rgba(110, 150, 200, 0.07);
-	--pf-canvas-line: rgba(110, 150, 200, 0.16);
-	--pf-tab-open-bg: #1c1e22;
-	--pfs-sub: #97a3b2;
-	--pfs-accent: #6f9fd0;
-	--pfs-accent-soft: #a8c6e4;
-	--pfs-hair: rgba(255, 255, 255, 0.1);
-	--pfs-hair-strong: rgba(255, 255, 255, 0.2);
-	--pfs-track: rgba(255, 255, 255, 0.1);
-	--pfs-hover: rgba(111, 159, 208, 0.12);
+	--pf-banner-1: rgba(78, 88, 150, 0.46);
+	--pf-banner-2: rgba(60, 68, 120, 0.34);
+	--pf-banner-3: rgba(52, 58, 106, 0.44);
+	--pf-tab-ink: rgba(255, 228, 184, 0.88);
+	--pf-tab-ink-hover: #ffefd2;
+	--pf-tab-hover-bg: rgba(255, 228, 184, 0.1);
+	--pf-tab-press-bg: rgba(255, 228, 184, 0.16);
+	--pf-tab-ink-active: #ffe9c6;
+	--pf-tab-hair: rgba(255, 228, 184, 0.16);
+	--pf-tab-open-shadow: rgba(0, 0, 0, 0.4);
+	--pf-period-ink: rgba(255, 228, 184, 0.6);
+	/* v8.17 膜色源（深态）：比浅态那支压暗一档，压在夜底上不外溢 */
+	--pf-tint-accent: rgb(90, 100, 170);
+	--pfs-sub: #9f9785;
+	/* 深态内容盘：强调色仍是靛（金是顶栏专属的点缀——金底白字按钮对比度只有 2:1） */
+	--pfs-accent: #8f97dd;
+	--pfs-accent-soft: #b3bae8;
+	--pfs-hair: rgba(241, 229, 201, 0.1);
+	--pfs-hair-strong: rgba(241, 229, 201, 0.2);
+	--pfs-track: rgba(241, 229, 201, 0.12);
+	--pfs-hover: rgba(143, 151, 221, 0.12);
 	--pfs-card: rgba(255, 255, 255, 0.055);
-	--pb-accent-hover: #a8c6e4;
+	--pb-accent-hover: #b3bae8;
 }
 
 /* ---------- ③ 皮肤：松风 Pine（松绿浅调 + 墨绿；深态 = 深松绿 + 苔绿） ---------- */
@@ -5936,10 +5952,8 @@ button.planboard-icon-btn {
 	--pf-tab-hair: rgba(40, 75, 55, 0.18);
 	--pf-tab-open-shadow: rgba(40, 75, 55, 0.1);
 	--pf-period-ink: #43604c;
-	--pf-page-tint: rgba(70, 110, 85, 0.07);
-	--pf-canvas-tint: rgba(70, 110, 85, 0.055);
-	--pf-canvas-line: rgba(70, 110, 85, 0.14);
-	--pf-tab-open-bg: #e8edea;
+	/* v8.17 膜色源：旧手配 7% / 5.5% / 14% + 开口 #e8edea → 统一 7.5% / 5.5% / 10% */
+	--pf-tint-accent: rgb(70, 110, 85);
 	--pfs-sub: #5f6f63;
 	--pfs-accent: #2e6b4e;
 	--pfs-accent-soft: #8db8a1;
@@ -5963,10 +5977,8 @@ button.planboard-icon-btn {
 	--pf-tab-hair: rgba(255, 255, 255, 0.14);
 	--pf-tab-open-shadow: rgba(0, 0, 0, 0.3);
 	--pf-period-ink: rgba(222, 240, 226, 0.6);
-	--pf-page-tint: rgba(110, 180, 135, 0.05);
-	--pf-canvas-tint: rgba(110, 180, 135, 0.07);
-	--pf-canvas-line: rgba(110, 180, 135, 0.16);
-	--pf-tab-open-bg: #1d2520;
+	/* v8.17 膜色源（深态） */
+	--pf-tint-accent: rgb(110, 180, 135);
 	--pfs-sub: #93a89b;
 	--pfs-accent: #6fae8a;
 	--pfs-accent-soft: #a8c9b6;
@@ -6014,7 +6026,7 @@ button.planboard-icon-btn {
 	color: var(--text-muted);
 }
 .planflow-skin-save,
-.planflow-skin-reset {
+.planflow-skin-saveas {
 	flex: none;
 	font-size: var(--font-ui-small);
 }
@@ -6364,33 +6376,39 @@ button.planboard-icon-btn {
    修法①（接缝）：开口色改为与画布**同公式**现场合成——两步 color-mix 链
    精确复刻「底色 ×膜7.5% ×膜5.5%」的两步 8bit 合成顺序（单步折叠有 ±1
    舍入差，真机实测过）。从此开口 ≡ 页面，与底色无关。
-   修法②（随皮肤色）：膜色源 --pf-tint-accent 从 **--pf-banner-3** 派生——
-   banner-3 就是皮肤色的现成载体：四预设的 banner-3 ≡ 各自皮肤主色
-   （skin-engine PRESET_DEFAULTS.accent），v8.1 自定义微调时 deriveTokens
-   把用户主色写进 banner-3（inline 变量，压过一切样式表）⇒ 预设与自定义
-   自动全通，四个皮肤各自成立，无需逐肤写转换。
-   浅色膜色 = 皮肤色同相加深：hsl(from banner-3 h s×0.9 l×0.53)
-     （sky 实算复现 rgb(52,115,167) ≈ 原膜 rgb(53,114,168)，Δ≤1）
-   深色膜色 = hsl(from banner-3 h s×0.96 l+15%)
-     （按深色预设 banner-3=rgba(74,138,200,.36) 拟合，预设深色画布不动；
-      自定义皮肤色在深态跟随其色相，明度自动钳制）
-   @supports 包裹相对色语法：不支持的宿主整节不生效，回落 v8.0 静态值
-   （开口回常量——宁要旧 Δ1 也不要透明开口）。
-   范围：只接管默认（晴空）皮肤的变量块（(0,1,0) 后写压过 5644、压不过
-   皮肤块 (0,2,0)）——纸墨/松风/午夜的策划膜色不动。banner 不在本次范围。
-   纯追加：删掉本节即回到 v8.5（开口回到写死常量、膜回写死蓝）。
+   修法②（随皮肤色）：膜色源 --pf-tint-accent 决定膜的色相，浓度由本节统一给。
+   --------------------------------------------------------------------------
+   v8.17 重做（2026-10-21）
+   用户问「为什么这几个预设的开口和页面的规则都不一致？」——根因：v8.6 把「膜色源
+   从 banner-3 派生」这条写法挂在 .planboard-root（0,1,0）上，被三套皮肤块的 (0,2,0)
+   手配常量整块压过，**实际只有晴空吃到了公式**，另三套仍是 v8.0 的逐肤手配
+   （开口还是 #f0edea / #e8edea / #dbdcea 三个互不相干的常量）。后果：换主色时
+   晴空自动跟随，另三套原地不动——同一件事四套四种规矩。
+   统一后（四套同一套规则）：
+     ① 皮肤块只声明一支 --pf-tint-accent（膜色源），不再手配任何下游值；
+     ② 本节按同一浓度合成全部下游：
+        浅态 膜 7.5% / 5.5%、描边 10%（旧值 7 / 5.5 / 14 与 11 / 8 / 16 一并收编）；
+        深态 膜 5% / 7%、描边 16%；
+        开口色 = 画布合成值（Δ≡0，接缝问题的解不变）。
+   膜色源取值铁律（v8.16b 实测）：**不是「主色 × 固定系数」，而是把主色拉到中明度**
+   ——固定系数对深主色会塌成黑（夜阑 L26×0.53 = L14，6% 叠白只剩 Δ5 的灰，用户原话
+   「怎么看不出来」）。四套膜色源见各皮肤块注释，落屏色度 Δ：晴空 14/24、
+   素笺 3/6、夜阑 9/15、松风 3/5（页面/开口）。
+   自定义主色：skin-engine.deriveTokens 按同一条规则（同色相 + 中明度，见 tintAccent）
+   现算 --pf-tint-accent 并 inline 写出 ⇒ 自定义皮肤的画布膜跟随自己的主色。
+   ⚠️ 本节现在是四套膜色/开口色的唯一来源：删掉它四套会一起退化为无膜。
    ========================================================================== */
 
 .planboard-root {
 	/* 两层膜 + 画布描边：权重与旧值完全一致（浅淡不变），色源 = 皮肤色派生 */
-	--pf-page-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 7.5%, transparent);
-	--pf-canvas-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 5.5%, transparent);
-	--pf-canvas-line: color-mix(in srgb, var(--pf-tint-accent, rgb(53, 114, 168)) 10%, transparent);
+	--pf-page-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(12, 118, 201)) 7.5%, transparent);
+	--pf-canvas-tint: color-mix(in srgb, var(--pf-tint-accent, rgb(12, 118, 201)) 5.5%, transparent);
+	--pf-canvas-line: color-mix(in srgb, var(--pf-tint-accent, rgb(12, 118, 201)) 10%, transparent);
 	/* 🔴 开口色 = 画布合成色（同公式两步链，Δ≡0） */
 	--pf-tab-open-bg: color-mix(
 		in srgb,
-		color-mix(in srgb, var(--background-primary, #ffffff) 92.5%, var(--pf-tint-accent, rgb(53, 114, 168)) 7.5%) 94.5%,
-		var(--pf-tint-accent, rgb(53, 114, 168)) 5.5%
+		color-mix(in srgb, var(--background-primary, #ffffff) 92.5%, var(--pf-tint-accent, rgb(12, 118, 201)) 7.5%) 94.5%,
+		var(--pf-tint-accent, rgb(12, 118, 201)) 5.5%
 	);
 }
 
@@ -6410,21 +6428,11 @@ button.planboard-icon-btn {
 	);
 }
 
-/* 膜色源 = 皮肤色（banner-3）的同相派生；相对色语法不支持的宿主整节跳过。
-   ⚠️ 末尾显式 / 1 钉死不透明：相对色语法会继承源色 alpha
-   （深色预设 banner-3 = rgba(74,138,200,0.36)，不钉死则 tint 带 0.36 透明度，
-   开口折叠链与画布分层叠加在半透明 tint 下合成路径不等价 → 接缝 Δ=5，真机实锤） */
-@supports (color: hsl(from red h s l)) {
-	.planboard-root {
-		--pf-tint-accent: hsl(from var(--pf-banner-3) h calc(s * 0.9) calc(l * 0.53) / 1);
-	}
-
-	.theme-dark .planboard-root {
-		/* ⚠️ 相对色通道 calc 只支持乘法——加法（l + 15%）整条声明解析失败
-		   （真机对照实验实锤），明度 +15 个百分点改写为 ×1.278（= 69/54 拟合） */
-		--pf-tint-accent: hsl(from var(--pf-banner-3) h calc(s * 0.96) calc(l * 1.278) / 1);
-	}
-}
+/* v8.17：原来这里还有一段 @supports (hsl(from …)) 从 banner-3 反推膜色源，
+   已删除——四套皮肤块现在各自显式给 --pf-tint-accent（预设走实测校准值），
+   自定义主色由 deriveTokens 现算 inline 写出，都不再需要 CSS 侧反推。
+   （相对色语法在本机 Chromium 上本就可用，但「一条公式通吃四套」是伪命题：
+   sky 要 S×0.9/L×0.53、夜阑要 S×1.33/L×1.81、素笺要 S×0.49/L×0.5，方向都不同。）
 
 /* ==========================================================================
    v1.3.3 平板打卡「点两次」修复（纯追加：删除本节即回到 v1.3.2）

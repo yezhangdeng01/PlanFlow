@@ -87,26 +87,79 @@ export function removeScheme(schemes: CustomSkinScheme[], name: string): CustomS
 	return schemes.filter((s) => s.name !== name);
 }
 
+/**
+ * v8.11 按名原地替换（「保存」覆盖当前方案）；返回新数组。
+ * 保持原位置——否则覆盖后下拉选项顺序会跳动，用户会觉得方案"换了地方"。
+ */
+export function replaceScheme(schemes: CustomSkinScheme[], s: CustomSkinScheme): CustomSkinScheme[] {
+	return schemes.map((x) => (x.name === s.name ? s : x));
+}
+
 /** 应用方案 = 得到应写入 settings 的 skin 与 customSkin（调用方 save + applySkinToViews）。 */
 export function applyScheme(s: CustomSkinScheme): { skin: PlanFlowSkin; customSkin: CustomSkinOverride } {
 	return { skin: s.base, customSkin: { accent: s.accent, ink: s.ink } };
+}
+
+/** 皮肤下拉的当前外观快照（= settings.skin + settings.customSkin）。 */
+export interface SkinSelectionInput {
+	skin: PlanFlowSkin;
+	customSkin: CustomSkinOverride | null;
+}
+
+/**
+ * v8.10：决定「皮肤主题」下拉该显示哪一项（纯决策，无副作用，便于单测）。
+ *
+ * 三层优先级：
+ * ① 外观恰好等于某个已存方案（base + 主色 + 墨色全等）→ 显示该方案；
+ * ② 外观已被微调、不再等于任何方案，但 remembered（上次选中/正在编辑的方案）
+ *    仍存在 → **仍显示它**。用户正在「青空」上改颜色，名字不该突然跳回预设；
+ * ③ 否则回落基底预设。
+ *
+ * ②是 v8.10 修的 bug：原先改色后下拉直接回落基底预设，用户以为自己的方案丢了。
+ * 注意 ② 只在 customSkin 非空时生效——纯预设外观不该顶着方案名。
+ */
+export function resolveSkinSelection(
+	schemes: CustomSkinScheme[],
+	current: SkinSelectionInput,
+	remembered: string | null,
+): { kind: "scheme"; name: string } | { kind: "preset"; skin: PlanFlowSkin } {
+	const c = current.customSkin;
+	if (c) {
+		const hit = schemes.find((s) => s.base === current.skin && s.accent === c.accent && s.ink === c.ink);
+		if (hit) return { kind: "scheme", name: hit.name };
+		if (remembered && schemes.some((s) => s.name === remembered)) {
+			return { kind: "scheme", name: remembered };
+		}
+	}
+	return { kind: "preset", skin: current.skin };
 }
 
 type RGB = [number, number, number];
 
 /** 浅态配方（全部必需——deriveTokens 不做 optional 兜底，缺字段直接编译期暴露）。 */
 interface SkinLightRecipe {
-	/** banner 末档 → 中档、中档 → 顶档 的混白比例。 */
+	/** banner 末档 → 中档、中档 → 顶档 的混合比例（默认向白混；bannerBase 可改成向深色混）。 */
 	bannerMix: [number, number];
-	/** ink → ink-hover / ink-active 混黑比例。 */
+	/**
+	 * v8.15：banner 混合目标色，缺省 = 白。
+	 * 夜阑这类「深底 + 亮墨」皮肤必须向夜色混——否则主色越深、顶栏反而越亮，
+	 * 墨一改亮就整片糊在一起（v8.14 之前的假设是「顶栏恒亮、墨恒暗」）。
+	 */
+	bannerBase?: RGB;
+	/** ink → ink-hover 混合比例：正 = 混黑，**负 = 混白**（亮墨皮肤的 hover 要更亮，不是更暗）。 */
 	inkHover: number;
-	inkActive: number;
-	/** ink → period-ink 混白比例。 */
-	periodMix: number;
+	/**
+	 * ink → ink-active 混合比例；null = 不派生。
+	 * 夜阑的活动页签落在**浅色开口**上（开口色本就不派生），墨必须压回深色，
+	 * 无法从烛光墨推出来 ⇒ 交回预设手配，与「开口色不派生」的规矩一致。
+	 */
+	inkActive: number | null;
+	/** ink → period-ink 混白比例；null = 不派生（亮墨皮肤的 period 只能往暗里调，交回预设）。 */
+	periodMix: number | null;
 	/** tab-hair / open-shadow = rgba(ink, alpha)。 */
 	hairAlpha: number;
 	shadowAlpha: number;
-	/** ink → pfs-sub 混白比例；null = 该预设 pfs-sub 非墨色系（sky 冷灰），不覆盖。 */
+	/** ink → pfs-sub 混白比例；null = 该预设 pfs-sub 非墨色系（sky 冷灰 / midnight 亮墨），不覆盖。 */
 	subMix: number | null;
 }
 
@@ -146,8 +199,12 @@ export const SKIN_RECIPES: Record<PlanFlowSkin, SkinRecipe> = {
 		dark: { bannerAlphas: [0.36, 0.2, 0.3], hoverMix: 0.3, activeMix: 0.12, periodAlpha: 0.6, darkInkMix: 0.84, inkAlpha: 0.82, subDarkMix: 0.32 },
 	},
 	midnight: {
-		light: { bannerMix: [0.39, 0.41], inkHover: 0.26, inkActive: 0.27, periodMix: 0.14, hairAlpha: 0.18, shadowAlpha: 0.1, subMix: 0.2 },
-		dark: { bannerAlphas: [0.42, 0.24, 0.38], hoverMix: 0.3, activeMix: 0.12, periodAlpha: 0.6, darkInkMix: 0.9, inkAlpha: 0.82, subDarkMix: 0.31 },
+		// v8.15：夜阑是全套里唯一的**夜肤**——顶栏向夜色混（不再向白混），墨是烛光。
+		// bannerMix 越大越深；bannerBase 是夜色底（不用纯黑，留一点蓝紫）。
+		// inkHover 取负 = 混白（烛芯拨亮）；inkActive/periodMix/subMix 都不派生，交回预设手配。
+		light: { bannerMix: [0.3, 0.26], bannerBase: [20, 26, 46], inkHover: -0.05, inkActive: null, periodMix: null, hairAlpha: 0.16, shadowAlpha: 0.34, subMix: null },
+		// 深态：darkInkMix 压到 0.12——烛光墨本身已经够亮，再混白就洗成中性白、丢掉暖意
+		dark: { bannerAlphas: [0.42, 0.24, 0.38], hoverMix: 0.3, activeMix: 0.12, periodAlpha: 0.58, darkInkMix: 0.12, inkAlpha: 0.86, subDarkMix: 0.34 },
 	},
 	pine: {
 		light: { bannerMix: [0.34, 0.42], inkHover: 0.26, inkActive: 0.18, periodMix: 0.11, hairAlpha: 0.18, shadowAlpha: 0.1, subMix: 0.22 },
@@ -157,9 +214,20 @@ export const SKIN_RECIPES: Record<PlanFlowSkin, SkinRecipe> = {
 
 /** 各预设的主色/墨色默认值（= 浅态 banner-3 与 tab-ink；设置面板默认显示它们）。 */
 export const PRESET_DEFAULTS: Record<PlanFlowSkin, CustomSkinOverride> = {
-	sky: { accent: "#b2d2ea", ink: "#1f4a72" },
+	// v8.12（用户 20261020）：晴空预设吸收原自定义「青空」的配色——
+	// 旧 #b2d2ea 饱和度仅 57% 偏灰，用户要求「用青空的配色替换原来的晴空天蓝，名字不变」。
+	// 新 accent = #95d0fe（饱和度 98%）；ink = #8a5f1f（深古铜金，白底 5.7:1 / 顶栏 3.4:1）。
+	// ⚠️ 改这里必须同步 styles.css 的 sky 令牌块（浅色 + 深色 banner），否则预设与
+	// 「以预设为基础的自定义」会两套色，复现度测试（LIGHT_EXPECT.sky）也会失败。
+	sky: { accent: "#95d0fe", ink: "#8a5f1f" },
 	paper: { accent: "#e7dcc3", ink: "#4d4335" },
-	midnight: { accent: "#c4d0de", ink: "#33475e" },
+	// v8.15（用户 20261020）：「用符合名字的更深一点的配色，更静谧一点…主色深了，墨色反而可以用烛光」。
+	// 全流程：石板灰蓝 #c4d0de →（v8.13）深靛紫 #a9a0e2 →（v8.14）群青 #9aa4dc →
+	// （v8.16 定版）**深夜靛底 + 烛光墨**：主色压到 #2c3258（L26），墨色翻成烛光 #ffe0ae（H37 S100 L84）。
+	// 这是四套里唯一的「深底亮墨」皮肤 ⇒ 顶栏配方改为向夜色混（bannerBase），
+	// 活动页签落在浅色开口上、墨压回深靛（inkActive 不派生，见 styles.css）。
+	// 对比度：烛光墨 / 顶栏顶档 #212744 ≈ 11.9、/ 末档 #2c3258 ≈ 9.9（要求 4.5）。
+	midnight: { accent: "#2c3258", ink: "#ffe0ae" },
 	pine: { accent: "#abc9ae", ink: "#2c4a3a" },
 };
 
@@ -173,6 +241,8 @@ export const CUSTOM_TOKEN_KEYS: readonly string[] = [
 	"--pf-tab-ink", "--pf-tab-ink-hover", "--pf-tab-ink-active",
 	"--pf-tab-hair", "--pf-tab-open-shadow",
 	"--pf-period-ink", "--pfs-sub",
+	// v8.17：画布膜/开口色的色源（自定义主色时现算，覆盖皮肤块的预设值）
+	"--pf-tint-accent",
 ];
 
 function hexToRgb(hex: string): RGB {
@@ -188,11 +258,73 @@ function mix(a: RGB, b: RGB, t: number): RGB {
 const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
 const toHex = (c: RGB) => "#" + c.map((v) => clamp255(v).toString(16).padStart(2, "0")).join("");
 const rgba = (c: RGB, a: number) => `rgba(${clamp255(c[0])}, ${clamp255(c[1])}, ${clamp255(c[2])}, ${a})`;
+/** 感知亮度（Rec.601）> 140 视为「亮墨」：夜阑的烛光墨就属于这一类。 */
+const isLightColor = (c: RGB) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] > 140;
+
+/** RGB → [色相 0..360, 饱和度 0..1]（膜色源只关心这两项，明度另行定档）。 */
+function rgbHueSat(c: RGB): [number, number] {
+	const r = c[0] / 255;
+	const g = c[1] / 255;
+	const b = c[2] / 255;
+	const max = Math.max(r, g, b);
+	const min = Math.min(r, g, b);
+	const d = max - min;
+	const l = (max + min) / 2;
+	if (d === 0) return [0, 0];
+	let h: number;
+	if (max === r) h = ((g - b) / d) % 6;
+	else if (max === g) h = (b - r) / d + 2;
+	else h = (r - g) / d + 4;
+	h *= 60;
+	if (h < 0) h += 360;
+	const s = Math.min(1, d / (1 - Math.abs(2 * l - 1))); // l=0/1 时除零 → 钳到 1
+	return [h, s];
+}
+
+/** HSL → RGB（h 0..360、s/l 0..1）。 */
+function hslToRgb(h: number, s: number, l: number): RGB {
+	const c = (1 - Math.abs(2 * l - 1)) * s;
+	const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+	const m = l - c / 2;
+	const t: RGB =
+		h < 60 ? [c, x, 0] :
+		h < 120 ? [x, c, 0] :
+		h < 180 ? [0, c, x] :
+		h < 240 ? [0, x, c] :
+		h < 300 ? [x, 0, c] :
+		[c, 0, x];
+	return [(t[0] + m) * 255, (t[1] + m) * 255, (t[2] + m) * 255];
+}
+
+/**
+ * v8.17 膜色源（--pf-tint-accent）：主色 → 「同色相 + 中明度」的一支。
+ * 画布两层膜 / 描边 / 开口色全由 styles.css 按**固定浓度**从它合成
+ * （浅 7.5% / 5.5% / 10%，深 5% / 7% / 16%），四套预设与自定义走同一条链。
+ *
+ * 🔴 铁律（v8.16b 实测）：不是「主色 × 固定系数」。固定系数对深主色会塌成黑——
+ * 夜阑主色 L26×0.53 = L14，6% 叠在白上只剩 Δ(B-R)=5 的灰，用户原话
+ * 「怎么看不出来」。改成「先拉到中明度再上膜」才四套通用。
+ * 明度定档：浅 0.44（四套预设校准值的均值落 42~47）、深 0.66；
+ * 饱和度按档钳制：免得纯高饱和主色做出彩膜。**主色本身近乎无色时不钳制**——
+ * 那不是「膜太淡」，是用户就选了灰，凭空造色相会变成红膜（HSL 里灰的 h=0）。
+ */
+function tintAccent(accent: RGB, dark: boolean): string {
+	const [h, s] = rgbHueSat(accent);
+	const l = dark ? 0.66 : 0.44;
+	// 主色近乎无色（用户就是选了灰）⇒ 不凭空造色相：HSL 里灰色的 h 是 0（红），
+	// 按饱和度下限硬拉会做出红膜。这种情况保持中性膜。
+	if (s < 0.06) return toHex(hslToRgb(0, 0, l));
+	const lo = dark ? 0.35 : 0.18;
+	const hi = dark ? 0.8 : 0.85;
+	return toHex(hslToRgb(h, Math.min(hi, Math.max(lo, s)), l));
+}
+
 
 /**
  * 派生自定义令牌表（只含 CUSTOM_TOKEN_KEYS 范围内的可重算令牌）。
- * 开口色/画布膜不在表内——它们由 styles.css v8.6 从 --pf-banner-3 派生
- * （本函数写 banner-3 即间接驱动），无需在此重算。
+ * v8.17：画布膜/开口色已并入本表——不再是「styles.css 从 banner-3 反推」，
+ * 而是本函数算出 --pf-tint-accent（见 tintAccent），CSS 只负责按固定浓度合成。
+ * 业务强调色（--pfs-accent 等）仍不在表内，保持预设。
  * dark=true 走深态配方。输入 hex 假定已过 normalizeHex。
  */
 export function deriveTokens(base: PlanFlowSkin, ov: CustomSkinOverride, dark: boolean): Record<string, string> {
@@ -203,18 +335,23 @@ export function deriveTokens(base: PlanFlowSkin, ov: CustomSkinOverride, dark: b
 	if (!dark) {
 		const r: SkinLightRecipe = recipe.light;
 		const [m1, m2] = r.bannerMix;
-		const b2 = mix(accent, [255, 255, 255], m1);
-		const b1 = mix(b2, [255, 255, 255], m2);
+		const bannerBase = r.bannerBase ?? ([255, 255, 255] as RGB);
+		const b2 = mix(accent, bannerBase, m1);
+		const b1 = mix(b2, bannerBase, m2);
 		out["--pf-banner-1"] = toHex(b1);
 		out["--pf-banner-2"] = toHex(b2);
 		out["--pf-banner-3"] = toHex(accent);
 		out["--pf-tab-ink"] = toHex(ink);
+		// inkHover 允许负数 = 往白里提（亮墨皮肤 hover 要更亮）；mix 的 clamp255 会兜住溢出
 		out["--pf-tab-ink-hover"] = toHex(mix(ink, [0, 0, 0], r.inkHover));
-		out["--pf-tab-ink-active"] = toHex(mix(ink, [0, 0, 0], r.inkActive));
+		if (r.inkActive != null) out["--pf-tab-ink-active"] = toHex(mix(ink, [0, 0, 0], r.inkActive));
 		out["--pf-tab-hair"] = rgba(ink, r.hairAlpha);
-		out["--pf-tab-open-shadow"] = rgba(ink, r.shadowAlpha);
-		out["--pf-period-ink"] = toHex(mix(ink, [255, 255, 255], r.periodMix));
+		// v8.15：墨本身是亮色（夜阑烛光墨）时开口阴影必须走黑——rgba(亮墨, α) 是发光不是阴影
+		out["--pf-tab-open-shadow"] = rgba(isLightColor(ink) ? [0, 0, 0] : ink, r.shadowAlpha);
+		if (r.periodMix != null) out["--pf-period-ink"] = toHex(mix(ink, [255, 255, 255], r.periodMix));
 		if (r.subMix != null) out["--pfs-sub"] = toHex(mix(ink, [255, 255, 255], r.subMix));
+		// v8.17：画布膜/开口色的色源（预设用实测校准值，自定义走这条统一规则）
+		out["--pf-tint-accent"] = tintAccent(accent, false);
 	} else {
 		const r: SkinDarkRecipe = recipe.dark;
 		const [a1, a2, a3] = r.bannerAlphas;
@@ -227,6 +364,8 @@ export function deriveTokens(base: PlanFlowSkin, ov: CustomSkinOverride, dark: b
 		out["--pf-tab-ink-active"] = toHex(mix(dInk, [255, 255, 255], r.activeMix));
 		out["--pf-period-ink"] = rgba(dInk, r.periodAlpha);
 		if (r.subDarkMix != null) out["--pfs-sub"] = toHex(mix(dInk, [0, 0, 0], r.subDarkMix));
+		// v8.17：深态膜色源（同色相、提到 L66——暗底上的膜要亮的一支才看得出）
+		out["--pf-tint-accent"] = tintAccent(accent, true);
 	}
 	return out;
 }

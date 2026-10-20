@@ -297,6 +297,11 @@ plans:
 		this.settings.skinSchemes = Array.isArray(this.settings.skinSchemes)
 			? (this.settings.skinSchemes.map(normalizeScheme).filter((s): s is CustomSkinScheme => s !== null))
 			: [];
+		// v8.10：下拉回显记忆净化——方案被删/手改 data.json 后不能留悬空名字
+		// （必须放在 skinSchemes 净化之后，否则会拿未净化的仓库做存在性判断）
+		if (!this.settings.skinScheme || !this.settings.skinSchemes.some((s) => s.name === this.settings.skinScheme)) {
+			this.settings.skinScheme = null;
+		}
 		// v8.4：banner 贴图净化——非空字符串才保留；浓度 clamp 0.1~0.7
 		// （文件存在性不在此验：视图侧 applySkin 按库内实况回落，移动/删除即无贴图）
 		if (typeof this.settings.bannerImage !== "string" || !this.settings.bannerImage.trim()) {
